@@ -68,12 +68,12 @@ plus.Parent = frame
 Instance.new("UICorner", plus).CornerRadius = UDim.new(0, 6)
 
 local hideBtn = Instance.new("TextButton")
-hideBtn.Size = UDim2.new(0, 40, 0, 25)
-hideBtn.Position = UDim2.new(0.05, 0, 0.2, 30)
+hideBtn.Size = UDim2.new(0, 25, 0, 25)
+hideBtn.Position = UDim2.new(0, 5, 0, 5)
 hideBtn.Text = "-"
 hideBtn.Font = Enum.Font.GothamBold
 hideBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-hideBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
+hideBtn.BackgroundColor3 = Color3.fromRGB(200, 100, 100)
 hideBtn.TextScaled = true
 hideBtn.Parent = frame
 Instance.new("UICorner", hideBtn).CornerRadius = UDim.new(1, 0)
@@ -124,9 +124,9 @@ close.Parent = frame
 Instance.new("UICorner", close).CornerRadius = UDim.new(1, 0)
 
 local mini = Instance.new("TextButton")
-mini.Size = UDim2.new(0, 50, 0, 50)
-mini.Position = UDim2.new(0, 20, 0.8, 0)
-mini.Text = "⚙️"
+mini.Size = UDim2.new(0, 40, 0, 40)
+mini.Position = UDim2.new(0, 20, 0.7, 0)
+mini.Text = "-"
 mini.Font = Enum.Font.GothamBold
 mini.TextColor3 = Color3.fromRGB(255, 255, 255)
 mini.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
@@ -137,7 +137,6 @@ mini.TextScaled = true
 mini.Parent = screenGui
 Instance.new("UICorner", mini).CornerRadius = UDim.new(1, 0)
 
--- Tăng giảm, nhập tốc độ
 local function updateSpeed(val)
 	local speed = tonumber(val)
 	if speed then
@@ -178,21 +177,30 @@ close.MouseButton1Click:Connect(function()
 	screenGui:Destroy()
 end)
 
--- Stickman ESP
 local espEnabled = true
 local beams = {}
 
 local function createLine(from, to, color)
 	local a0 = Instance.new("Attachment", from)
 	local a1 = Instance.new("Attachment", to)
+	local gui = Instance.new("BillboardGui")
+	gui.Adornee = from
+	gui.Size = UDim2.new(4, 0, 4, 0)
+	gui.AlwaysOnTop = true
+	gui.LightInfluence = 0
+	gui.Name = "StickmanLayer"
+	gui.Parent = from
 	local beam = Instance.new("Beam")
 	beam.Attachment0 = a0
 	beam.Attachment1 = a1
 	beam.Color = ColorSequence.new(color)
-	beam.Width0 = 0.1
-	beam.Width1 = 0.1
+	beam.Width0 = 0.4
+	beam.Width1 = 0.4
 	beam.FaceCamera = true
-	beam.Parent = from
+	beam.LightInfluence = 0
+	beam.Transparency = NumberSequence.new(0)
+	beam.ZIndex = 10
+	beam.Parent = gui
 	table.insert(beams, beam)
 end
 
@@ -200,18 +208,19 @@ local function drawStickman(char)
 	local parts = {
 		Head = char:FindFirstChild("Head"),
 		Torso = char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso"),
+		HRP = char:FindFirstChild("HumanoidRootPart"),
 		LArm = char:FindFirstChild("LeftUpperArm") or char:FindFirstChild("Left Arm"),
 		RArm = char:FindFirstChild("RightUpperArm") or char:FindFirstChild("Right Arm"),
 		LLeg = char:FindFirstChild("LeftUpperLeg") or char:FindFirstChild("Left Leg"),
 		RLeg = char:FindFirstChild("RightUpperLeg") or char:FindFirstChild("Right Leg"),
 	}
-	if not (parts.Head and parts.Torso and parts.LArm and parts.RArm and parts.LLeg and parts.RLeg) then return end
-
+	if not (parts.Head and parts.Torso and parts.LArm and parts.RArm and parts.LLeg and parts.RLeg and parts.HRP) then return end
 	createLine(parts.Head, parts.Torso, Color3.fromRGB(0, 255, 0))
-	createLine(parts.LArm, parts.Torso, Color3.fromRGB(255, 255, 0))
-	createLine(parts.RArm, parts.Torso, Color3.fromRGB(255, 255, 0))
-	createLine(parts.LLeg, parts.Torso, Color3.fromRGB(255, 100, 100))
-	createLine(parts.RLeg, parts.Torso, Color3.fromRGB(255, 100, 100))
+	createLine(parts.Torso, parts.LArm, Color3.fromRGB(255, 255, 0))
+	createLine(parts.Torso, parts.RArm, Color3.fromRGB(255, 255, 0))
+	createLine(parts.Torso, parts.LLeg, Color3.fromRGB(255, 100, 100))
+	createLine(parts.Torso, parts.RLeg, Color3.fromRGB(255, 100, 100))
+	createLine(parts.Head, parts.HRP, Color3.fromRGB(0, 255, 255))
 end
 
 local function drawAllESP()
@@ -234,5 +243,4 @@ toggleESP.MouseButton1Click:Connect(function()
 	end
 end)
 
--- Vẽ ban đầu
 drawAllESP()
