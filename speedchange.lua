@@ -1,16 +1,10 @@
--- Kevinz Hub - Full Script with GUI, WalkSpeed/JumpPower Save, Role-based ESP for Murder Mystery 2,
--- plus hidden features: anti void, anti linear fling, anti angular fling,
--- ESP tự động cập nhật role mỗi 1s khi bật ESP,
--- Fix anti-return khi nhảy từ cao,
--- Thêm WalkFling toggle,
--- Highlight dropped gun và Gun Aura pick-up tự động với radius tùy chỉnh.
+-- Kevinz Hub - Full Script với WalkFling cải tiến nhanh nhất, text size 12, gradient black-red fade, dashed rounded border, và các tính năng khác.
 
 -- Services
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local StarterGui = game:GetService("StarterGui")
 local RunService = game:GetService("RunService")
-local CollectionService = game:GetService("CollectionService") -- nếu cần tagging
 
 -- Local player references
 local LocalPlayer = Players.LocalPlayer
@@ -21,7 +15,7 @@ local RootPart = Character:WaitForChild("HumanoidRootPart")
 -- Saved defaults
 local savedWalkSpeed = Humanoid.WalkSpeed
 local savedJumpPower = Humanoid.JumpPower
-local HUB_VERSION = "v1.7.1"  -- cập nhật phiên bản
+local HUB_VERSION = "v1.7.3"  -- phiên bản cập nhật
 
 -- GUI Setup
 local gui = Instance.new("ScreenGui")
@@ -38,10 +32,14 @@ window.Size = UDim2.fromOffset(550, 500)
 window.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 window.Active = true
 window.Draggable = true
-Instance.new("UICorner", window).CornerRadius = UDim.new(0, 12)
+-- Bo góc
+local uic = Instance.new("UICorner", window)
+uic.CornerRadius = UDim.new(0, 12)
+-- Cho clip con để dashed border cắt đúng bo góc
+window.ClipsDescendants = true
 window.Parent = gui
 
--- Gradient background
+-- Gradient background: black -> red fade
 local gradient = Instance.new("UIGradient", window)
 gradient.Rotation = 45
 gradient.Color = ColorSequence.new {
@@ -53,47 +51,67 @@ gradient.Transparency = NumberSequence.new {
     NumberSequenceKeypoint.new(1, 0.2)
 }
 
--- Top bar with avatar and name
+-- Top bar with avatar và tên
 local topBar = Instance.new("Frame", window)
-topBar.Size = UDim2.new(1, 0, 0, 40)
+topBar.Size = UDim2.new(1, 0, 0, 30)  -- chiều cao 30
+topBar.Position = UDim2.new(0, 0, 0, 0)
 topBar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 topBar.BorderSizePixel = 0
-Instance.new("UICorner", topBar).CornerRadius = UDim.new(0, 8)
+local topBarCorner = Instance.new("UICorner", topBar)
+topBarCorner.CornerRadius = UDim.new(0, 8)
 
 local avatar = Instance.new("ImageLabel", topBar)
-avatar.Size = UDim2.new(0, 32, 0, 32)
-avatar.Position = UDim2.new(0, 6, 0.5, -16)
+avatar.Size = UDim2.new(0, 24, 0, 24)
+avatar.Position = UDim2.new(0, 6, 0.5, -12)
 avatar.BackgroundTransparency = 1
--- Lấy thumbnail headshot
 avatar.Image = Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
 
 local nameLabel = Instance.new("TextLabel", topBar)
 nameLabel.Size = UDim2.new(1, -50, 1, 0)
-nameLabel.Position = UDim2.new(0, 44, 0, 0)
+nameLabel.Position = UDim2.new(0, 36, 0, 0)
+nameLabel.BackgroundTransparency = 1
 nameLabel.Text = LocalPlayer.DisplayName
 nameLabel.TextColor3 = Color3.new(1, 1, 1)
 nameLabel.Font = Enum.Font.GothamBold
-nameLabel.TextSize = 16
-nameLabel.BackgroundTransparency = 1
+nameLabel.TextScaled = false
+nameLabel.TextSize = 12
 nameLabel.TextXAlignment = Enum.TextXAlignment.Left
 
--- Content area
+-- Close button
+local closeButton = Instance.new("TextButton", topBar)
+closeButton.Size = UDim2.new(0, 28, 0, 28)
+closeButton.Position = UDim2.new(1, -32, 0, 1)
+closeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+closeButton.Text = "-"
+closeButton.Font = Enum.Font.GothamBold
+closeButton.TextScaled = false
+closeButton.TextSize = 12
+closeButton.TextColor3 = Color3.new(1, 1, 1)
+closeButton.AutoButtonColor = false
+local closeCorner = Instance.new("UICorner", closeButton)
+closeCorner.CornerRadius = UDim.new(1, 0)
+closeButton.MouseButton1Click:Connect(function()
+    window.Visible = false
+    miniToggle.Visible = true
+end)
+
+-- Content area dưới topBar
 local content = Instance.new("Frame", window)
-content.Size = UDim2.new(1, 0, 1, -40)
-content.Position = UDim2.new(0, 0, 0, 40)
+content.Size = UDim2.new(1, 0, 1, -30)
+content.Position = UDim2.new(0, 0, 0, 30)
 content.BackgroundTransparency = 1
 
--- Helpers for dynamic input rows
+-- Helpers cho các input rows
 local inputRow = 0
 local function createInput(labelText, getDefault, callback)
     inputRow = inputRow + 1
-    local rowHeight = 40
-    local padding = 10
+    local rowHeight = 30    -- giảm từ 40 xuống 30
+    local padding = 6       -- giảm từ 10 xuống 6
     local yOffset = (inputRow - 1) * (rowHeight + padding) + padding
 
     local container = Instance.new("Frame")
-    container.Size = UDim2.new(1, -40, 0, rowHeight)
-    container.Position = UDim2.new(0, 20, 0, yOffset)
+    container.Size = UDim2.new(1, -20, 0, rowHeight)
+    container.Position = UDim2.new(0, 10, 0, yOffset)
     container.BackgroundTransparency = 1
     container.Parent = content
 
@@ -102,7 +120,8 @@ local function createInput(labelText, getDefault, callback)
     label.Size = UDim2.new(0.4, 0, 1, 0)
     label.Font = Enum.Font.Gotham
     label.TextColor3 = Color3.new(1, 1, 1)
-    label.TextScaled = true
+    label.TextScaled = false
+    label.TextSize = 12
     label.BackgroundTransparency = 1
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = container
@@ -114,7 +133,8 @@ local function createInput(labelText, getDefault, callback)
     local defaultVal = getDefault()
     input.PlaceholderText = tostring(defaultVal)
     input.Text = ""
-    input.TextScaled = true
+    input.TextScaled = false
+    input.TextSize = 12
     input.ClearTextOnFocus = false
     input.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     input.TextColor3 = Color3.new(1, 1, 1)
@@ -134,13 +154,13 @@ end
 
 local function createSwitch(labelText, callback)
     inputRow = inputRow + 1
-    local rowHeight = 40
-    local padding = 10
+    local rowHeight = 30
+    local padding = 6
     local yOffset = (inputRow - 1) * (rowHeight + padding) + padding
 
     local container = Instance.new("Frame")
-    container.Size = UDim2.new(1, -40, 0, rowHeight)
-    container.Position = UDim2.new(0, 20, 0, yOffset)
+    container.Size = UDim2.new(1, -20, 0, rowHeight)
+    container.Position = UDim2.new(0, 10, 0, yOffset)
     container.BackgroundTransparency = 1
     container.Parent = content
 
@@ -149,7 +169,8 @@ local function createSwitch(labelText, callback)
     label.Size = UDim2.new(0.6, 0, 1, 0)
     label.Font = Enum.Font.Gotham
     label.TextColor3 = Color3.new(1, 1, 1)
-    label.TextScaled = true
+    label.TextScaled = false
+    label.TextSize = 12
     label.BackgroundTransparency = 1
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = container
@@ -160,7 +181,8 @@ local function createSwitch(labelText, callback)
     toggle.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     toggle.Text = "OFF"
     toggle.Font = Enum.Font.GothamBold
-    toggle.TextScaled = true
+    toggle.TextScaled = false
+    toggle.TextSize = 12
     toggle.TextColor3 = Color3.new(1, 1, 1)
     toggle.AutoButtonColor = false
     Instance.new("UICorner", toggle).CornerRadius = UDim.new(0, 6)
@@ -175,7 +197,7 @@ local function createSwitch(labelText, callback)
     end)
 end
 
--- Inputs: WalkSpeed, JumpPower, FOV
+-- Tạo các input: WalkSpeed, JumpPower, FOV
 createInput("WalkSpeed", function() return savedWalkSpeed end, function(v)
     savedWalkSpeed = v
     if Humanoid then
@@ -196,7 +218,6 @@ end)
 local chamEnabled = false
 local chamHighlights = {}  -- map Player -> Highlight
 
--- Xác định role: dùng tên tool "Knife" và "Gun"
 local function getRole(player)
     local char = player.Character
     if char then
@@ -265,14 +286,12 @@ end
 
 -- Setup listeners để respawn & tool change
 local function setupPlayerListeners(player)
-    -- CharacterAdded: re-add highlight khi respawn nếu ESP bật
     player.CharacterAdded:Connect(function(char)
         task.delay(0.5, function()
             if chamEnabled and player ~= LocalPlayer then
                 addHighlightForPlayer(player)
             end
             if char then
-                -- lắng nghe thay đổi tool để cập nhật role
                 char.ChildAdded:Connect(function(child)
                     if child.Name == "Knife" or child.Name == "Gun" then
                         updateHighlightColor(player)
@@ -286,7 +305,7 @@ local function setupPlayerListeners(player)
             end
         end)
     end)
-    -- Backpack changes cũng cập nhật role
+    -- Backpack changes
     spawn(function()
         local backpack = player:FindFirstChild("Backpack") or player:WaitForChild("Backpack", 5)
         if backpack then
@@ -321,54 +340,39 @@ Players.PlayerAdded:Connect(function(player)
         setupPlayerListeners(player)
     end
 end)
--- Khi player remove, xoá highlight map
 Players.PlayerRemoving:Connect(function(player)
     removeHighlightForPlayer(player)
 end)
 
 -- mini toggle để ẩn/hiện window
 local miniToggle = Instance.new("TextButton", gui)
-miniToggle.Size = UDim2.new(0, 36, 0, 36)
-miniToggle.Position = UDim2.new(0, 50, 1, -50)
+miniToggle.Size = UDim2.new(0, 28, 0, 28)
+miniToggle.Position = UDim2.new(0, 50, 1, -40)
 miniToggle.AnchorPoint = Vector2.new(0.5, 0.5)
 miniToggle.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 miniToggle.Text = "+"
-miniToggle.TextScaled = true
 miniToggle.Font = Enum.Font.GothamBold
+miniToggle.TextScaled = false
+miniToggle.TextSize = 12
 miniToggle.TextColor3 = Color3.new(1, 1, 1)
 miniToggle.AutoButtonColor = false
 miniToggle.Visible = false
 Instance.new("UICorner", miniToggle).CornerRadius = UDim.new(1, 0)
-
-local closeButton = Instance.new("TextButton", topBar)
-closeButton.Size = UDim2.new(0, 36, 0, 36)
-closeButton.Position = UDim2.new(1, -42, 0, 2)
-closeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-closeButton.Text = "-"
-closeButton.Font = Enum.Font.GothamBold
-closeButton.TextScaled = true
-closeButton.TextColor3 = Color3.new(1, 1, 1)
-Instance.new("UICorner", closeButton).CornerRadius = UDim.new(1, 0)
-closeButton.MouseButton1Click:Connect(function()
-    window.Visible = false
-    miniToggle.Visible = true
-end)
 miniToggle.MouseButton1Click:Connect(function()
     window.Visible = true
     miniToggle.Visible = false
 end)
 
--- Tween-in
+-- Tween-in khi mở window
 TweenService:Create(window, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
     Position = UDim2.new(0.5, 0, 0.5, 0)
 }):Play()
 
--- Anti features setup function
+-- Anti features setup function (cải tiến không return khi nhảy)
 local function setupAntiFeatures()
     if not Character or not Humanoid or not RootPart then return end
     local lastSafeCFrame = RootPart.CFrame
 
-    -- Cập nhật lastSafeCFrame khi chạm đất bình thường
     Humanoid.StateChanged:Connect(function(oldState, newState)
         if newState == Enum.HumanoidStateType.Landed
         or newState == Enum.HumanoidStateType.Running
@@ -382,7 +386,6 @@ local function setupAntiFeatures()
         end
     end)
 
-    -- Heartbeat loop
     RunService.Heartbeat:Connect(function()
         if not RootPart or not RootPart.Parent then return end
 
@@ -404,7 +407,6 @@ local function setupAntiFeatures()
         -- ANTI LINEAR FLING
         local vel = RootPart.AssemblyLinearVelocity
         if vel.Magnitude > 200 and not isFallingOrJump then
-            -- nếu tốc độ quá lớn và không phải đang rơi/jump bình thường => coi như fling
             pcall(function()
                 RootPart.Velocity = Vector3.new(0, 0, 0)
                 RootPart.CFrame = lastSafeCFrame + Vector3.new(0, 5, 0)
@@ -418,12 +420,10 @@ local function setupAntiFeatures()
                 RootPart.Velocity = Vector3.new(0,0,0)
                 RootPart.RotVelocity = Vector3.new(0,0,0)
                 local safePos = lastSafeCFrame.Position
-                -- Giữ nguyên hướng y cũ
                 local _, yOri, _ = lastSafeCFrame:ToOrientation()
                 local newCFrame = CFrame.new(safePos) * CFrame.Angles(0, yOri, 0)
                 RootPart.CFrame = newCFrame + Vector3.new(0, 5, 0)
             end)
-            -- Cho FrameGyro giữ orientation tạm thời
             if not RootPart:FindFirstChild("AntiFlingGyro") then
                 local bg = Instance.new("BodyGyro")
                 bg.Name = "AntiFlingGyro"
@@ -439,88 +439,109 @@ local function setupAntiFeatures()
     end)
 end
 
--- WalkFling feature
+-- ================= WalkFling cải tiến =================
+-- Phát hiện gần người chơi khác trong radius, fling ngay lập tức với lực mạnh, và cooldown tránh lặp liên tục.
 local walkFlingEnabled = false
-local flingForce = 100  -- bạn có thể điều chỉnh mặc định, hoặc thêm input nếu muốn
+local flingRadius = 5      -- default radius để detect (studs)
+local flingForce = 200     -- default lực fling
+local flingCooldown = 1    -- thời gian cooldown cho mỗi target (giây)
+-- Bảng lưu thời gian lần cuối fling mỗi player
+local lastFlingTime = {}
 
--- Tạo toggle WalkFling
+-- GUI để chỉnh radius và force WalkFling
 createSwitch("WalkFling (troll)", function(on)
     walkFlingEnabled = on
+    -- nếu tắt, reset lastFlingTime để khi bật lại có thể fling ngay
+    if not on then
+        lastFlingTime = {}
+    end
+end)
+createInput("WalkFling Radius", function() return flingRadius end, function(v)
+    flingRadius = v
+end)
+createInput("WalkFling Force", function() return flingForce end, function(v)
+    flingForce = v
+end)
+createInput("WalkFling Cooldown", function() return flingCooldown end, function(v)
+    flingCooldown = v
 end)
 
--- Kết nối Touched event khi character tải xong
-local function setupWalkFlingForCharacter(char)
-    local root = char:FindFirstChild("HumanoidRootPart")
-    if not root then return end
-    root.Touched:Connect(function(hit)
-        if not walkFlingEnabled then return end
-        -- Kiểm tra hit là part của người chơi khác
-        local otherChar = hit:FindFirstAncestorWhichIsA("Model")
-        if otherChar and otherChar ~= Character then
-            local otherHum = otherChar:FindFirstChildOfClass("Humanoid")
-            local otherRoot = otherChar:FindFirstChild("HumanoidRootPart")
-            if otherHum and otherRoot then
-                -- Tính hướng fling: đẩy ra xa LocalPlayer
-                local direction = (otherRoot.Position - root.Position)
-                if direction.Magnitude > 0 then
-                    direction = direction.Unit
-                else
-                    direction = Vector3.new(0, 1, 0)
-                end
-                -- Tạo BodyVelocity trên otherRoot
-                local bv = Instance.new("BodyVelocity")
-                bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
-                bv.Velocity = direction * flingForce + Vector3.new(0, 50, 0)
-                bv.P = 1250
-                bv.Parent = otherRoot
-                -- Tự hủy sau 0.3s
-                task.delay(0.3, function()
-                    if bv and bv.Parent then
-                        bv:Destroy()
-                    end
-                end)
-            end
+-- Hàm fling một player
+local function flingPlayer(otherRoot)
+    -- Tạo BodyVelocity để đẩy
+    local direction = (otherRoot.Position - RootPart.Position)
+    if direction.Magnitude > 0 then
+        direction = direction.Unit
+    else
+        -- phòng trường hợp trùng vị trí, đẩy lên
+        direction = Vector3.new(0, 1, 0)
+    end
+    -- Tạo BodyVelocity
+    local bv = Instance.new("BodyVelocity")
+    bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+    bv.Velocity = direction * flingForce + Vector3.new(0, 50, 0)
+    bv.P = 1250
+    bv.Parent = otherRoot
+    -- Tự hủy rất nhanh để giảm khả năng bị “nhìn thấy” áp dụng lâu
+    task.delay(0.1, function()
+        if bv and bv.Parent then
+            bv:Destroy()
         end
     end)
 end
 
--- Kết nối cho existing và respawn
-if Character then
-    setupWalkFlingForCharacter(Character)
-end
-LocalPlayer.CharacterAdded:Connect(function(char)
-    Character = char
-    Humanoid = char:WaitForChild("Humanoid", 5)
-    RootPart = char:WaitForChild("HumanoidRootPart", 5)
-    -- Delay nhỏ để HumanoidRootPart ổn định
-    task.delay(0.5, function()
-        setupWalkFlingForCharacter(char)
-    end)
+-- Heartbeat loop phát hiện và fling
+RunService.Heartbeat:Connect(function()
+    if not walkFlingEnabled or not RootPart or not RootPart.Parent then return end
+
+    local now = os.clock()
+    -- Lấy hướng nhìn LocalPlayer để chỉ fling khi ở gần phía trước nếu muốn: (tùy chọn)
+    -- local lookVec = workspace.CurrentCamera.CFrame.LookVector
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local char = player.Character
+            if char then
+                local otherRoot = char:FindFirstChild("HumanoidRootPart")
+                local otherHum = char:FindFirstChildOfClass("Humanoid")
+                if otherRoot and otherHum and otherHum.Health > 0 then
+                    local dist = (otherRoot.Position - RootPart.Position).Magnitude
+                    if dist <= flingRadius then
+                        local lastTime = lastFlingTime[player]
+                        if not lastTime or now - lastTime >= flingCooldown then
+                            -- (Tùy chọn) Có thể thêm điều kiện góc: chỉ fling khi đối tượng nằm trong góc nhìn:
+                            -- local dir = (otherRoot.Position - RootPart.Position).Unit
+                            -- if lookVec:Dot(dir) > 0.5 then
+                                flingPlayer(otherRoot)
+                                lastFlingTime[player] = now
+                            -- end
+                        end
+                    end
+                end
+            end
+        end
+    end
 end)
+-- ======================================================
 
 -- Gun Highlight & Gun Aura
 local gunHighlightTable = {}  -- map Tool -> Highlight
 local gunAuraEnabled = false
-local auraRadius = 10  -- default meters
+local auraRadius = 10  -- mặc định
 
--- Toggle Gun Aura
 createSwitch("Gun Aura", function(on)
     gunAuraEnabled = on
 end)
--- Input radius Gun Aura
 createInput("Gun Aura Radius", function() return auraRadius end, function(v)
     auraRadius = v
 end)
 
--- Hàm highlight dropped gun
 local function highlightDroppedGun(tool)
     if gunHighlightTable[tool] then return end
-    -- Nếu tool có Handle, highlight lên Handle
     local adorneeObj = nil
     if tool:FindFirstChild("Handle") then
         adorneeObj = tool.Handle
     else
-        -- fallback: cả tool
         adorneeObj = tool
     end
     local hl = Instance.new("Highlight")
@@ -534,7 +555,6 @@ local function highlightDroppedGun(tool)
     gunHighlightTable[tool] = hl
 end
 
--- Hàm bỏ highlight khi tool được nhặt hoặc removed
 local function removeHighlightDroppedGun(tool)
     local hl = gunHighlightTable[tool]
     if hl then
@@ -543,24 +563,18 @@ local function removeHighlightDroppedGun(tool)
     end
 end
 
--- Loop kiểm tra dropped guns trong workspace
 spawn(function()
     while true do
-        -- Duyệt workspace descendants tìm Tool tên "Gun"
         for _, obj in ipairs(workspace:GetDescendants()) do
             if obj:IsA("Tool") and obj.Name == "Gun" then
-                -- Nếu tool parent không phải là character của ai (đang rơi/trên ground)
                 local parent = obj.Parent
                 local inCharacter = false
                 if parent and parent:FindFirstChildOfClass("Humanoid") then
                     inCharacter = true
                 end
                 if not inCharacter then
-                    -- Highlight nếu chưa
                     highlightDroppedGun(obj)
-                    -- Gun Aura: nếu enabled và LocalPlayer đang gần
                     if gunAuraEnabled and RootPart and RootPart.Parent then
-                        -- tìm vị trí tool: lấy Handle Position hoặc PrimaryPart
                         local pos = nil
                         if obj:FindFirstChild("Handle") then
                             pos = obj.Handle.Position
@@ -570,23 +584,19 @@ spawn(function()
                         if pos then
                             local dist = (RootPart.Position - pos).Magnitude
                             if dist <= auraRadius then
-                                -- pick up tool: đưa vào Backpack
                                 local backpack = LocalPlayer:FindFirstChild("Backpack") or LocalPlayer:WaitForChild("Backpack", 5)
                                 pcall(function()
                                     obj.Parent = backpack
                                 end)
-                                -- Remove highlight
                                 removeHighlightDroppedGun(obj)
                             end
                         end
                     end
                 else
-                    -- tool đang trên người chơi => remove highlight nếu có
                     removeHighlightDroppedGun(obj)
                 end
             end
         end
-        -- Clean up entries đã destroy
         for tool, hl in pairs(gunHighlightTable) do
             if not tool.Parent then
                 removeHighlightDroppedGun(tool)
@@ -596,7 +606,7 @@ spawn(function()
     end
 end)
 
--- Anti features và reapply stats khi respawn
+-- Anti features và reapply khi respawn
 LocalPlayer.CharacterAdded:Connect(function(char)
     Character = char
     Humanoid = char:WaitForChild("Humanoid", 5)
@@ -609,18 +619,14 @@ LocalPlayer.CharacterAdded:Connect(function(char)
         end)
     end
     setupAntiFeatures()
-    -- re-setup WalkFling
-    task.delay(0.5, function()
-        setupWalkFlingForCharacter(char)
-    end)
-    -- reapply ESP nếu bật
+    -- Reset lastFlingTime khi respawn để fling lại ngay
+    lastFlingTime = {}
     if chamEnabled then
         task.delay(0.5, function()
             updateAllChams()
         end)
     end
 end)
--- Setup anti lần đầu
 setupAntiFeatures()
 
 -- Notification khi hub load
@@ -649,3 +655,75 @@ spawn(function()
         wait(1)
     end
 end)
+
+-- ===== Thêm dashed border quanh window =====
+do
+    local borderContainer = Instance.new("Frame", window)
+    borderContainer.Name = "DashedBorderContainer"
+    borderContainer.BackgroundTransparency = 1
+    borderContainer.Size = UDim2.new(1, 0, 1, 0)
+    borderContainer.Position = UDim2.new(0, 0, 0, 0)
+    borderContainer.ZIndex = window.ZIndex + 1
+
+    local function drawDashed()
+        for _, child in ipairs(borderContainer:GetChildren()) do
+            child:Destroy()
+        end
+        local w = window.AbsoluteSize.X
+        local h = window.AbsoluteSize.Y
+        if w <= 0 or h <= 0 then return end
+
+        local dashLen = 10    -- độ dài mỗi đoạn (có thể chỉnh)
+        local gapLen = 5      -- gap giữa đoạn
+        local thickness = 2   -- độ dày border
+        local color = Color3.fromRGB(255, 255, 255)  -- màu border
+
+        -- Top edge
+        local x = 0
+        while x < w do
+            local seg = Instance.new("Frame", borderContainer)
+            seg.BackgroundColor3 = color
+            seg.BorderSizePixel = 0
+            local segWidth = math.min(dashLen, w - x)
+            seg.Size = UDim2.new(0, segWidth, 0, thickness)
+            seg.Position = UDim2.new(0, x, 0, 0)
+            x = x + dashLen + gapLen
+        end
+        -- Bottom edge
+        x = 0
+        while x < w do
+            local seg = Instance.new("Frame", borderContainer)
+            seg.BackgroundColor3 = color
+            seg.BorderSizePixel = 0
+            local segWidth = math.min(dashLen, w - x)
+            seg.Size = UDim2.new(0, segWidth, 0, thickness)
+            seg.Position = UDim2.new(0, x, 1, -thickness)
+            x = x + dashLen + gapLen
+        end
+        -- Left edge
+        local y = 0
+        while y < h do
+            local seg = Instance.new("Frame", borderContainer)
+            seg.BackgroundColor3 = color
+            seg.BorderSizePixel = 0
+            local segHeight = math.min(dashLen, h - y)
+            seg.Size = UDim2.new(0, thickness, 0, segHeight)
+            seg.Position = UDim2.new(0, 0, 0, y)
+            y = y + dashLen + gapLen
+        end
+        -- Right edge
+        y = 0
+        while y < h do
+            local seg = Instance.new("Frame", borderContainer)
+            seg.BackgroundColor3 = color
+            seg.BorderSizePixel = 0
+            local segHeight = math.min(dashLen, h - y)
+            seg.Size = UDim2.new(0, thickness, 0, segHeight)
+            seg.Position = UDim2.new(1, -thickness, 0, y)
+            y = y + dashLen + gapLen
+        end
+    end
+
+    window:GetPropertyChangedSignal("AbsoluteSize"):Connect(drawDashed)
+    task.defer(drawDashed)
+end
