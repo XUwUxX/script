@@ -6,41 +6,50 @@ local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local Humanoid = Character:WaitForChild("Humanoid")
 local Camera = workspace.CurrentCamera
 
--- GUI Setup
+-- GUI container
 local gui = Instance.new("ScreenGui", game.CoreGui)
 gui.Name = "KevinzHub"
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Global
 gui.ResetOnSpawn = false
 
--- Gradient background
+-- Background Frame (centered with gradient)
 local bg = Instance.new("Frame", gui)
-bg.Size = UDim2.new(1, 0, 1, 0)
-bg.BackgroundTransparency = 1
+bg.AnchorPoint = Vector2.new(0.5, 0.5)
+bg.Position = UDim2.fromScale(0.5, 0.5)
+bg.Size = UDim2.fromOffset(550, 350)
+bg.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+bg.ZIndex = 0
+
+local bgCorner = Instance.new("UICorner", bg)
+bgCorner.CornerRadius = UDim.new(0, 12)
 
 local gradient = Instance.new("UIGradient", bg)
-gradient.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 20, 20)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))
-}
 gradient.Rotation = 90
-gradient.Transparency = NumberSequence.new{
+gradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(120, 0, 0)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(50, 0, 0))
+})
+gradient.Transparency = NumberSequence.new({
     NumberSequenceKeypoint.new(0, 0),
-    NumberSequenceKeypoint.new(0.5, 0.5),
+    NumberSequenceKeypoint.new(0.7, 1),
     NumberSequenceKeypoint.new(1, 1)
-}
+})
 
--- Main Window
-local window = Instance.new("Frame", gui)
+-- Main Window inside bg
+local window = Instance.new("Frame", bg)
 window.Size = UDim2.new(0, 360, 0, 270)
 window.Position = UDim2.new(0.5, 0, 1.2, 0)
 window.AnchorPoint = Vector2.new(0.5, 0.5)
 window.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 window.BorderSizePixel = 0
 window.ClipsDescendants = true
+window.ZIndex = 1
+window.Active = true
+window.Draggable = true
 Instance.new("UICorner", window).CornerRadius = UDim.new(0, 10)
 Instance.new("UIStroke", window).Color = Color3.fromRGB(255, 0, 0)
 
--- Top Bar
+-- Top Bar (not draggable)
 local topBar = Instance.new("Frame", window)
 topBar.Size = UDim2.new(1, 0, 0, 40)
 topBar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
@@ -65,17 +74,13 @@ nameLabel.TextSize = 16
 nameLabel.BackgroundTransparency = 1
 nameLabel.TextXAlignment = Enum.TextXAlignment.Left
 
--- Draggable
-topBar.Active = true
-topBar.Draggable = true
-
 -- Content frame
 local content = Instance.new("Frame", window)
 content.Size = UDim2.new(1, 0, 1, -40)
 content.Position = UDim2.new(0, 0, 0, 40)
 content.BackgroundTransparency = 1
 
--- Create text inputs
+-- Input creator
 local function createInput(labelText, defaultValue, callback)
     local container = Instance.new("Frame", content)
     container.Size = UDim2.new(1, -40, 0, 40)
@@ -108,50 +113,60 @@ local function createInput(labelText, defaultValue, callback)
     end)
 end
 
--- Default values from game
-local defaultWalkSpeed = Humanoid.WalkSpeed
-local defaultJumpPower = Humanoid.JumpPower
-local defaultFOV = Camera.FieldOfView
-
-createInput("WalkSpeed", defaultWalkSpeed, function(v)
+-- Default values
+createInput("WalkSpeed", Humanoid.WalkSpeed, function(v)
     Humanoid.WalkSpeed = v
 end)
 
-createInput("JumpPower", defaultJumpPower, function(v)
+createInput("JumpPower", Humanoid.JumpPower, function(v)
     Humanoid.JumpPower = v
 end)
 
-createInput("FOV", defaultFOV, function(v)
+createInput("FOV", Camera.FieldOfView, function(v)
     Camera.FieldOfView = v
 end)
 
--- Toggle button
-local toggle = Instance.new("TextButton", content)
-toggle.Size = UDim2.new(1, -40, 0, 40)
-toggle.Position = UDim2.new(0, 20, 1, -50)
-toggle.Text = "Toggle UI"
-toggle.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-toggle.TextColor3 = Color3.new(1, 1, 1)
-toggle.Font = Enum.Font.GothamBold
-toggle.TextSize = 16
-Instance.new("UICorner", toggle).CornerRadius = UDim.new(0, 6)
+-- Mini toggle button (circle)
+local miniToggle = Instance.new("TextButton", gui)
+miniToggle.Size = UDim2.new(0, 36, 0, 36)
+miniToggle.Position = UDim2.new(0.5, -18, 0.5, -18)
+miniToggle.AnchorPoint = Vector2.new(0.5, 0.5)
+miniToggle.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+miniToggle.Text = "-"
+miniToggle.TextScaled = true
+miniToggle.Font = Enum.Font.GothamBold
+miniToggle.TextColor3 = Color3.new(1, 1, 1)
+miniToggle.AutoButtonColor = false
+miniToggle.ZIndex = 2
+Instance.new("UICorner", miniToggle).CornerRadius = UDim.new(1, 0)
 
-local visible = true
-toggle.MouseButton1Click:Connect(function()
-    visible = not visible
-    TweenService:Create(window, TweenInfo.new(0.5), {
-        Position = visible and UDim2.new(0.5, 0, 0.5, 0) or UDim2.new(0.5, 0, 1.2, 0)
+-- Button hover fade
+local function updateButtonTransparency(hover)
+    TweenService:Create(miniToggle, TweenInfo.new(0.3), {
+        BackgroundTransparency = hover and 0.2 or 0.7
     }):Play()
+end
+updateButtonTransparency(false)
+miniToggle.MouseEnter:Connect(function() updateButtonTransparency(true) end)
+miniToggle.MouseLeave:Connect(function() updateButtonTransparency(false) end)
+
+-- Toggle show/hide UI
+local visible = true
+miniToggle.MouseButton1Click:Connect(function()
+    visible = not visible
+    miniToggle.Text = visible and "-" or "+"
+    local newPos = visible and UDim2.new(0.5, 0, 0.5, 0) or UDim2.new(0.5, 0, 1.2, 0)
+    TweenService:Create(window, TweenInfo.new(0.5), { Position = newPos }):Play()
 end)
 
--- Animation Slide In (On Script Execute)
+-- Slide in animation
 TweenService:Create(window, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
     Position = UDim2.new(0.5, 0, 0.5, 0)
 }):Play()
 
--- Notify
+-- Notification
 StarterGui:SetCore("SendNotification", {
-    Title = "Kevinz Hub Version beta-1003",
+    Title = "Kevinz Hub",
     Text = "Script executed successfully in " .. math.random(10, 60) .. " ms!",
     Duration = 3
 })
