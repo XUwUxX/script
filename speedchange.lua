@@ -1,166 +1,178 @@
-local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
-local StarterGui = game:GetService("StarterGui")
-local LocalPlayer = Players.LocalPlayer
-local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local Humanoid = Character:WaitForChild("Humanoid")
-local Camera = workspace.CurrentCamera
+--[[
+    Script GUI cho Executor
+    - Tạo một cửa sổ giao diện có thể kéo thả.
+    - Nền có hiệu ứng gradient màu đỏ.
+    - Bao gồm các nút chức năng mẫu.
+    Cách dùng: Sao chép toàn bộ script và dán vào executor của bạn (ví dụ: Delta), sau đó Execute.
+]]
 
--- GUI Setup
-local gui = Instance.new("ScreenGui", game.CoreGui)
-gui.Name = "KevinzHub"
-gui.ZIndexBehavior = Enum.ZIndexBehavior.Global
-gui.ResetOnSpawn = false
+-- // BIẾN VÀ THIẾT LẬP BAN ĐẦU
+local Player = game:GetService("Players").LocalPlayer
+local Mouse = Player:GetMouse()
 
--- Background Frame (Window)
-local window = Instance.new("Frame", gui)
-window.AnchorPoint = Vector2.new(0.5, 0.5)
-window.Position = UDim2.fromScale(0.5, 1.2) -- Start offscreen
-window.Size = UDim2.fromOffset(550, 350)
-window.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-window.Active = true
-window.Draggable = true
-Instance.new("UICorner", window).CornerRadius = UDim.new(0, 12)
+-- Tạo đối tượng GUI chính
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "ExecutorUI_ByGemini"
+ScreenGui.ResetOnSpawn = false -- Không reset GUI mỗi khi nhân vật chết
+ScreenGui.ZIndexBehavior = "Global" -- Luôn hiển thị trên cùng
 
--- Gradient background
-local gradient = Instance.new("UIGradient", window)
-gradient.Rotation = 90
-gradient.Color = ColorSequence.new({
+-- // TẠO GIAO DIỆN
+-- Frame chính làm nền cho cửa sổ
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+MainFrame.Position = UDim2.fromScale(0.5, 0.5)
+MainFrame.Size = UDim2.fromOffset(500, 300)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+MainFrame.BorderColor3 = Color3.fromRGB(50, 50, 50)
+MainFrame.BorderSizePixel = 1
+MainFrame.ClipsDescendants = true
+MainFrame.CornerRadius = UDim.new(0, 12)
+
+-- Hiệu ứng Gradient cho nền
+local Gradient = Instance.new("UIGradient")
+Gradient.Parent = MainFrame
+Gradient.Rotation = 90
+Gradient.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(0, Color3.fromRGB(120, 0, 0)),
     ColorSequenceKeypoint.new(1, Color3.fromRGB(50, 0, 0))
 })
-gradient.Transparency = NumberSequence.new({
+Gradient.Transparency = NumberSequence.new({
     NumberSequenceKeypoint.new(0, 0),
-    NumberSequenceKeypoint.new(0.7, 1),
+    NumberSequenceKeypoint.new(0.8, 1),
     NumberSequenceKeypoint.new(1, 1)
 })
 
--- Top Bar
-local topBar = Instance.new("Frame", window)
-topBar.Size = UDim2.new(1, 0, 0, 40)
-topBar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-topBar.BorderSizePixel = 0
-Instance.new("UICorner", topBar).CornerRadius = UDim.new(0, 8)
+-- Thanh tiêu đề để kéo thả
+local TitleBar = Instance.new("Frame")
+TitleBar.Name = "TitleBar"
+TitleBar.Parent = MainFrame
+TitleBar.Size = UDim2.new(1, 0, 0, 35)
+TitleBar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+TitleBar.BackgroundTransparency = 0.5
 
--- Avatar
-local avatar = Instance.new("ImageLabel", topBar)
-avatar.Size = UDim2.new(0, 32, 0, 32)
-avatar.Position = UDim2.new(0, 6, 0.5, -16)
-avatar.BackgroundTransparency = 1
-avatar.Image = Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
+-- Tiêu đề
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Name = "TitleLabel"
+TitleLabel.Parent = TitleBar
+TitleLabel.Size = UDim2.new(1, -10, 1, 0)
+TitleLabel.Position = UDim2.fromOffset(10, 0)
+TitleLabel.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.Text = "My Script Hub"
+TitleLabel.TextColor3 = Color3.fromRGB(225, 225, 225)
+TitleLabel.TextSize = 16
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
 
--- Player name
-local nameLabel = Instance.new("TextLabel", topBar)
-nameLabel.Size = UDim2.new(1, -50, 1, 0)
-nameLabel.Position = UDim2.new(0, 44, 0, 0)
-nameLabel.Text = LocalPlayer.DisplayName
-nameLabel.TextColor3 = Color3.new(1, 1, 1)
-nameLabel.Font = Enum.Font.GothamBold
-nameLabel.TextSize = 16
-nameLabel.BackgroundTransparency = 1
-nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+-- Nút đóng GUI
+local CloseButton = Instance.new("TextButton")
+CloseButton.Name = "CloseButton"
+CloseButton.Parent = TitleBar
+CloseButton.Size = UDim2.fromOffset(35, 35)
+CloseButton.AnchorPoint = Vector2.new(1, 0)
+CloseButton.Position = UDim2.new(1, 0, 0, 0)
+CloseButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+CloseButton.BackgroundTransparency = 1
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.Text = "X"
+CloseButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+CloseButton.TextSize = 18
 
--- Content
-local content = Instance.new("Frame", window)
-content.Size = UDim2.new(1, 0, 1, -40)
-content.Position = UDim2.new(0, 0, 0, 40)
-content.BackgroundTransparency = 1
+-- // CÁC NÚT CHỨC NĂNG (VÍ DỤ)
+-- Layout để tự động sắp xếp các nút
+local ButtonLayout = Instance.new("UIListLayout")
+ButtonLayout.Parent = MainFrame
+ButtonLayout.Padding = UDim.new(0, 10)
+ButtonLayout.SortOrder = Enum.SortOrder.LayoutOrder
+ButtonLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+ButtonLayout.StartCorner = "Top"
 
--- Create input fields
-local function createInput(labelText, defaultValue, callback)
-    local container = Instance.new("Frame", content)
-    container.Size = UDim2.new(1, -40, 0, 40)
-    container.Position = UDim2.new(0, 20, 0, (#content:GetChildren() - 1) * 50)
-    container.BackgroundTransparency = 1
+-- Nút Tăng Tốc
+local SpeedButton = Instance.new("TextButton")
+SpeedButton.Name = "SpeedButton"
+SpeedButton.Parent = MainFrame
+SpeedButton.LayoutOrder = 1
+SpeedButton.Size = UDim2.new(0.9, 0, 0, 40)
+SpeedButton.Position = UDim2.fromOffset(0, 50) -- Vị trí ban đầu, sẽ được layout ghi đè
+SpeedButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+SpeedButton.BorderColor3 = Color3.fromRGB(60, 60, 60)
+SpeedButton.CornerRadius = UDim.new(0, 6)
+SpeedButton.Font = Enum.Font.Gotham
+SpeedButton.Text = "Speed (100)"
+SpeedButton.TextColor3 = Color3.fromRGB(225, 225, 225)
+SpeedButton.TextSize = 16
 
-    local label = Instance.new("TextLabel", container)
-    label.Text = labelText
-    label.Size = UDim2.new(0.4, 0, 1, 0)
-    label.Font = Enum.Font.Gotham
-    label.TextColor3 = Color3.fromRGB(255, 255, 255)
-    label.TextScaled = true
-    label.BackgroundTransparency = 1
+-- Nút Nhảy Cao
+local JumpButton = Instance.new("TextButton")
+JumpButton.Name = "JumpButton"
+JumpButton.Parent = MainFrame
+JumpButton.LayoutOrder = 2
+JumpButton.Size = UDim2.new(0.9, 0, 0, 40)
+JumpButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+JumpButton.BorderColor3 = Color3.fromRGB(60, 60, 60)
+JumpButton.CornerRadius = UDim.new(0, 6)
+JumpButton.Font = Enum.Font.Gotham
+JumpButton.Text = "JumpPower (100)"
+JumpButton.TextColor3 = Color3.fromRGB(225, 225, 225)
+JumpButton.TextSize = 16
 
-    local input = Instance.new("TextBox", container)
-    input.Size = UDim2.new(0.6, -10, 1, 0)
-    input.Position = UDim2.new(0.4, 10, 0, 0)
-    input.Font = Enum.Font.Gotham
-    input.PlaceholderText = tostring(defaultValue)
-    input.Text = ""
-    input.TextScaled = true
-    input.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    input.TextColor3 = Color3.new(1, 1, 1)
-    Instance.new("UICorner", input).CornerRadius = UDim.new(0, 6)
+-- // LOGIC VÀ CHỨC NĂNG
+-- Logic kéo thả cửa sổ
+local dragging = false
+local dragInput, dragStart, startPos
 
-    input.FocusLost:Connect(function()
-        local val = tonumber(input.Text)
-        if val then callback(val) end
-        input.Text = ""
-    end)
-end
-
--- Values from game
-createInput("WalkSpeed", Humanoid.WalkSpeed, function(v)
-    Humanoid.WalkSpeed = v
-end)
-createInput("JumpPower", Humanoid.JumpPower, function(v)
-    Humanoid.JumpPower = v
-end)
-createInput("FOV", Camera.FieldOfView, function(v)
-    Camera.FieldOfView = v
-end)
-
--- Mini Toggle Button
-local miniToggle = Instance.new("TextButton", gui)
-miniToggle.Size = UDim2.new(0, 36, 0, 36)
-miniToggle.Position = UDim2.new(0.5, -18, 0.5, -18)
-miniToggle.AnchorPoint = Vector2.new(0.5, 0.5)
-miniToggle.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-miniToggle.Text = "-"
-miniToggle.TextScaled = true
-miniToggle.Font = Enum.Font.GothamBold
-miniToggle.TextColor3 = Color3.new(1, 1, 1)
-miniToggle.AutoButtonColor = false
-Instance.new("UICorner", miniToggle).CornerRadius = UDim.new(1, 0)
-
--- Make toggle button draggable
-miniToggle.Active = true
-miniToggle.Draggable = true
-
--- Hover fade effect
-local function updateButtonVisibility(hover)
-    TweenService:Create(miniToggle, TweenInfo.new(0.3), {
-        BackgroundTransparency = hover and 0.2 or 0.7
-    }):Play()
-end
-updateButtonVisibility(false)
-
-miniToggle.MouseEnter:Connect(function()
-    updateButtonVisibility(true)
-end)
-miniToggle.MouseLeave:Connect(function()
-    updateButtonVisibility(false)
+TitleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
 end)
 
--- Toggle UI on click
-local isVisible = true
-miniToggle.MouseButton1Click:Connect(function()
-    isVisible = not isVisible
-    miniToggle.Text = isVisible and "-" or "+"
-    local targetPos = isVisible and UDim2.new(0.5, 0, 0.5, 0) or UDim2.new(0.5, 0, 1.2, 0)
-    TweenService:Create(window, TweenInfo.new(0.5, Enum.EasingStyle.Quad), {
-        Position = targetPos
-    }):Play()
+TitleBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+        if dragging then
+            local delta = dragInput.Position - dragStart
+            MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end
 end)
 
--- Animate on load
-TweenService:Create(window, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-    Position = UDim2.new(0.5, 0, 0.5, 0)
-}):Play()
+-- Chức năng của các nút
+CloseButton.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
 
--- Notify
-StarterGui:SetCore("SendNotification", {
-    Title = "Kevinz Hub vBeta",
-    Text = "Script executed successfully in " .. math.random(10, 60) .. " ms!",
-    Duration = 3
-})
+SpeedButton.MouseButton1Click:Connect(function()
+    local Character = Player.Character
+    if Character and Character:FindFirstChild("Humanoid") then
+        Character.Humanoid.WalkSpeed = 100
+        SpeedButton.Text = "Speed: ON"
+        wait(0.5)
+        SpeedButton.Text = "Speed (100)" -- Reset text
+    end
+end)
+
+JumpButton.MouseButton1Click:Connect(function()
+    local Character = Player.Character
+    if Character and Character:FindFirstChild("Humanoid") then
+        Character.Humanoid.JumpPower = 100
+        JumpButton.Text = "Jump: ON"
+        wait(0.5)
+        JumpButton.Text = "JumpPower (100)"
+    end
+end)
+
+-- Đưa GUI vào game
+ScreenGui.Parent = Player:WaitForChild("PlayerGui")
+
+print("Executor UI Loaded!")
