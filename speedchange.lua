@@ -1,20 +1,24 @@
--- Kevinz Hub - Full Script with GUI, WalkSpeed/JumpPower Save, Role-based ESP for Murder Mystery 2
+-- Kevinz Hub - Full Script with GUI, WalkSpeed/JumpPower Save, Role-based ESP for Murder Mystery 2,
+-- plus hidden features: anti void, anti linear fling, anti angular fling
+
+-- Services
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local StarterGui = game:GetService("StarterGui")
-local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
+local RunService = game:GetService("RunService")
 
--- Wait for local character & humanoid
+-- Local player references
+local LocalPlayer = Players.LocalPlayer
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local Humanoid = Character:WaitForChild("Humanoid")
+local RootPart = Character:WaitForChild("HumanoidRootPart")
 
 -- Saved defaults
 local savedWalkSpeed = Humanoid.WalkSpeed
 local savedJumpPower = Humanoid.JumpPower
-local HUB_VERSION = "v1.4.0"  -- phiên bản mới
+local HUB_VERSION = "v1.6.0"  -- cập nhật phiên bản
 
--- Create GUI
+-- GUI Setup
 local gui = Instance.new("ScreenGui")
 gui.Name = "KevinzHub"
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Global
@@ -68,7 +72,7 @@ nameLabel.TextSize = 16
 nameLabel.BackgroundTransparency = 1
 nameLabel.TextXAlignment = Enum.TextXAlignment.Left
 
--- Content area for inputs/switches
+-- Content area
 local content = Instance.new("Frame", window)
 content.Size = UDim2.new(1, 0, 1, -40)
 content.Position = UDim2.new(0, 0, 0, 40)
@@ -76,9 +80,8 @@ content.BackgroundTransparency = 1
 
 -- Helpers for dynamic input rows
 local inputRow = 0
-
 local function createInput(labelText, getDefault, callback)
-    inputRow += 1
+    inputRow = inputRow + 1
     local rowHeight = 40
     local padding = 10
     local yOffset = (inputRow - 1) * (rowHeight + padding) + padding
@@ -103,7 +106,7 @@ local function createInput(labelText, getDefault, callback)
     input.Size = UDim2.new(0.6, -10, 1, 0)
     input.Position = UDim2.new(0.4, 10, 0, 0)
     input.Font = Enum.Font.Gotham
-    -- Placeholder khởi tạo từ getDefault()
+    -- Placeholder khởi tạo
     local defaultVal = getDefault()
     input.PlaceholderText = tostring(defaultVal)
     input.Text = ""
@@ -119,7 +122,6 @@ local function createInput(labelText, getDefault, callback)
         local val = tonumber(text)
         if val then
             pcall(function() callback(val) end)
-            -- Cập nhật placeholder thành giá trị mới
             input.PlaceholderText = tostring(val)
         end
         input.Text = ""
@@ -127,7 +129,7 @@ local function createInput(labelText, getDefault, callback)
 end
 
 local function createSwitch(labelText, callback)
-    inputRow += 1
+    inputRow = inputRow + 1
     local rowHeight = 40
     local padding = 10
     local yOffset = (inputRow - 1) * (rowHeight + padding) + padding
@@ -169,37 +171,31 @@ local function createSwitch(labelText, callback)
     end)
 end
 
--- Create inputs for WalkSpeed, JumpPower, FOV
+-- Inputs: WalkSpeed, JumpPower, FOV
 createInput("WalkSpeed", function() return savedWalkSpeed end, function(v)
     savedWalkSpeed = v
     if Humanoid then
         pcall(function() Humanoid.WalkSpeed = v end)
     end
 end)
-
 createInput("JumpPower", function() return savedJumpPower end, function(v)
     savedJumpPower = v
     if Humanoid then
         pcall(function() Humanoid.JumpPower = v end)
     end
 end)
-
-createInput("FOV", function() return Camera.FieldOfView end, function(v)
-    pcall(function() Camera.FieldOfView = v end)
+createInput("FOV", function() return workspace.CurrentCamera.FieldOfView end, function(v)
+    pcall(function() workspace.CurrentCamera.FieldOfView = v end)
 end)
 
--- Chams ESP variables
+-- ESP theo role Murder Mystery 2
 local chamEnabled = false
-local chamHighlights = {}  -- map Player -> Highlight instance
+local chamHighlights = {}  -- map Player -> Highlight
 
--- Function to determine role in Murder Mystery 2
--- Kiểm tra tool “Knife” => Murderer; “Gun” => Sheriff; else Innocent
+-- Xác định role: dùng tên tool "Knife" và "Gun"
 local function getRole(player)
     local char = player.Character
-    -- Nếu chưa có Character, tạm xem Innocent
     if char then
-        -- Kiểm tra trên Character (equip) hoặc Backpack (chưa equip)
-        -- Lưu ý: đổi tên tool nếu game dùng tên khác
         if char:FindFirstChild("Knife") or (player:FindFirstChild("Backpack") and player.Backpack:FindFirstChild("Knife")) then
             return "Murderer"
         end
@@ -210,32 +206,27 @@ local function getRole(player)
     return "Innocent"
 end
 
--- Update màu Highlight dựa role
 local function updateHighlightColor(player)
     local h = chamHighlights[player]
     if not h or not h.Parent then return end
     local role = getRole(player)
     if role == "Murderer" then
-        h.FillColor = Color3.fromRGB(255, 0, 0)       -- đỏ
+        h.FillColor = Color3.fromRGB(255, 0, 0)
     elseif role == "Sheriff" then
-        h.FillColor = Color3.fromRGB(0, 0, 255)       -- xanh dương
+        h.FillColor = Color3.fromRGB(0, 0, 255)
     else
-        h.FillColor = Color3.fromRGB(255, 255, 255)   -- trắng
+        h.FillColor = Color3.fromRGB(255, 255, 255)
     end
-    -- Nếu muốn, có thể chỉnh OutlineColor theo role
 end
 
--- Add Highlight for a player (nếu chưa có), rồi cập nhật màu
 local function addHighlightForPlayer(player)
     if not player.Character then return end
     if chamHighlights[player] and chamHighlights[player].Parent then
-        -- đã có, chỉ update màu
         updateHighlightColor(player)
         return
     end
     local highlight = Instance.new("Highlight")
     highlight.Adornee = player.Character
-    -- Set tạm default; sẽ được update ngay sau
     highlight.FillColor = Color3.fromRGB(255, 255, 255)
     highlight.OutlineColor = Color3.new(1, 1, 1)
     highlight.FillTransparency = 0.6
@@ -243,11 +234,9 @@ local function addHighlightForPlayer(player)
     highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     highlight.Parent = player.Character
     chamHighlights[player] = highlight
-    -- Cập nhật màu theo role hiện tại
     updateHighlightColor(player)
 end
 
--- Remove Highlight cho player
 local function removeHighlightForPlayer(player)
     local h = chamHighlights[player]
     if h then
@@ -256,7 +245,6 @@ local function removeHighlightForPlayer(player)
     end
 end
 
--- Khi ESP bật/tắt: apply hoặc remove cho tất cả
 local function updateAllChams()
     if chamEnabled then
         for _, player in ipairs(Players:GetPlayers()) do
@@ -271,16 +259,13 @@ local function updateAllChams()
     end
 end
 
--- Thiết lập listeners để theo dõi respawn và tool changes cho một player
 local function setupPlayerListeners(player)
-    -- CharacterAdded: respawn
+    -- respawn
     player.CharacterAdded:Connect(function(char)
-        -- Delay để Character và Backpack replicate đầy đủ
         task.delay(0.5, function()
             if chamEnabled and player ~= LocalPlayer then
                 addHighlightForPlayer(player)
             end
-            -- Lắng nghe tool trong Character mới
             if char then
                 char.ChildAdded:Connect(function(child)
                     if child.Name == "Knife" or child.Name == "Gun" then
@@ -295,9 +280,8 @@ local function setupPlayerListeners(player)
             end
         end)
     end)
-    -- Backpack changes (tool giao/trả)
+    -- Backpack changes
     spawn(function()
-        -- chờ Backpack replicate
         local backpack = player:FindFirstChild("Backpack") or player:WaitForChild("Backpack", 5)
         if backpack then
             backpack.ChildAdded:Connect(function(child)
@@ -314,20 +298,18 @@ local function setupPlayerListeners(player)
     end)
 end
 
--- Tạo switch Chams ESP
+-- Switch ESP
 createSwitch("ESP Theo Role", function(on)
     chamEnabled = on
     updateAllChams()
 end)
 
--- Thiết lập ban đầu cho tất cả players hiện có
+-- Setup initial players
 for _, player in ipairs(Players:GetPlayers()) do
     if player ~= LocalPlayer then
         setupPlayerListeners(player)
     end
 end
-
--- Khi có player mới join
 Players.PlayerAdded:Connect(function(player)
     if player ~= LocalPlayer then
         setupPlayerListeners(player)
@@ -340,13 +322,11 @@ Players.PlayerAdded:Connect(function(player)
         end)
     end
 end)
-
--- Khi có player rời
 Players.PlayerRemoving:Connect(function(player)
     removeHighlightForPlayer(player)
 end)
 
--- mini toggle button để ẩn/hiện window
+-- mini toggle để ẩn/hiện window
 local miniToggle = Instance.new("TextButton", gui)
 miniToggle.Size = UDim2.new(0, 36, 0, 36)
 miniToggle.Position = UDim2.new(0, 50, 1, -50)
@@ -360,7 +340,6 @@ miniToggle.AutoButtonColor = false
 miniToggle.Visible = false
 Instance.new("UICorner", miniToggle).CornerRadius = UDim.new(1, 0)
 
--- Close ("-") button trong topBar
 local closeButton = Instance.new("TextButton", topBar)
 closeButton.Size = UDim2.new(0, 36, 0, 36)
 closeButton.Position = UDim2.new(1, -42, 0, 2)
@@ -370,40 +349,117 @@ closeButton.Font = Enum.Font.GothamBold
 closeButton.TextScaled = true
 closeButton.TextColor3 = Color3.new(1, 1, 1)
 Instance.new("UICorner", closeButton).CornerRadius = UDim.new(1, 0)
-
 closeButton.MouseButton1Click:Connect(function()
     window.Visible = false
     miniToggle.Visible = true
 end)
-
 miniToggle.MouseButton1Click:Connect(function()
     window.Visible = true
     miniToggle.Visible = false
 end)
 
--- Tween-in animation
+-- Tween-in
 TweenService:Create(window, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
     Position = UDim2.new(0.5, 0, 0.5, 0)
 }):Play()
 
--- Handle local player respawn: restore WalkSpeed/JumpPower và reapply ESP cho others nếu bật
+-- Anti features setup function, tái sử dụng cho lần đầu và respawn
+local function setupAntiFeatures()
+    if not Character or not Humanoid or not RootPart then return end
+    -- lastSafeCFrame lưu vị trí + hướng an toàn
+    local lastSafeCFrame = RootPart.CFrame
+
+    -- Lắng nghe statechanged để cập nhật lastSafe khi an toàn
+    Humanoid.StateChanged:Connect(function(oldState, newState)
+        if newState == Enum.HumanoidStateType.Landed
+        or newState == Enum.HumanoidStateType.Running
+        or newState == Enum.HumanoidStateType.Walking
+        or newState == Enum.HumanoidStateType.RunningNoPhysics then
+            if RootPart and RootPart.Parent then
+                -- Chỉ lưu nếu có mặt đất dưới chân
+                if Humanoid.FloorMaterial and Humanoid.FloorMaterial ~= Enum.Material.Air then
+                    lastSafeCFrame = RootPart.CFrame
+                end
+            end
+        end
+    end)
+
+    -- Heartbeat: check anti void, anti linear fling, anti angular fling
+    RunService.Heartbeat:Connect(function()
+        if not RootPart or not RootPart.Parent then return end
+
+        -- ANTI VOID
+        local posY = RootPart.Position.Y
+        local voidY = workspace.FallenPartsDestroyHeight or -500
+        if posY < voidY then
+            pcall(function()
+                RootPart.CFrame = lastSafeCFrame + Vector3.new(0, 5, 0)
+            end)
+        end
+
+        -- ANTI LINEAR FLING
+        local vel = RootPart.AssemblyLinearVelocity
+        if vel.Magnitude > 100 then
+            pcall(function()
+                RootPart.Velocity = Vector3.new(0, 0, 0)
+                RootPart.CFrame = lastSafeCFrame + Vector3.new(0, 5, 0)
+            end)
+        end
+
+        -- ANTI ANGULAR FLING
+        local angVel = RootPart.AssemblyAngularVelocity
+        if angVel.Magnitude > 200 then
+            -- Debug: nếu muốn in giá trị
+            -- print("Angular fling detected:", angVel.Magnitude)
+            pcall(function()
+                RootPart.Velocity = Vector3.new(0, 0, 0)
+                RootPart.RotVelocity = Vector3.new(0, 0, 0)
+                -- Reset orientation về lastSafe yaw
+                local safePos = lastSafeCFrame.Position
+                local _, _, safeY = lastSafeCFrame:ToOrientation()
+                local newCFrame = CFrame.new(safePos) * CFrame.Angles(0, safeY, 0)
+                RootPart.CFrame = newCFrame + Vector3.new(0, 5, 0)
+            end)
+            -- Tạo BodyGyro tạm để khóa hướng
+            if not RootPart:FindFirstChild("AntiFlingGyro") then
+                local bg = Instance.new("BodyGyro")
+                bg.Name = "AntiFlingGyro"
+                bg.Parent = RootPart
+                bg.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+                bg.P = 1e4
+                bg.CFrame = RootPart.CFrame
+                task.delay(0.2, function()
+                    if bg and bg.Parent then bg:Destroy() end
+                end)
+            end
+        end
+    end)
+end
+
+-- Handle local respawn: restore stats, re-setup anti, reapply ESP cho others
 LocalPlayer.CharacterAdded:Connect(function(char)
     Character = char
-    local hum = char:WaitForChild("Humanoid", 5)
-    if hum then
-        Humanoid = hum
+    Humanoid = char:WaitForChild("Humanoid", 5)
+    RootPart = char:WaitForChild("HumanoidRootPart", 5)
+    if Humanoid then
         task.wait(0.2)
         pcall(function()
             Humanoid.WalkSpeed = savedWalkSpeed
             Humanoid.JumpPower = savedJumpPower
         end)
     end
+    -- Setup anti features cho lần respawn
+    setupAntiFeatures()
+    -- Reapply ESP nếu bật
     if chamEnabled then
         task.delay(0.5, function()
             updateAllChams()
         end)
     end
 end)
+
+-- Setup anti lần đầu nếu Character đã có sẵn
+setupAntiFeatures()
 
 -- Notification khi hub load
 task.delay(1, function()
