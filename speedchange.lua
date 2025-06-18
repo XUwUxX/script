@@ -2,245 +2,133 @@ local player = game.Players.LocalPlayer
 local char = player.Character or player.CharacterAdded:Wait()
 local humanoid = char:WaitForChild("Humanoid")
 
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "KevinzHubUI"
-screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-screenGui.Parent = game.CoreGui
+-- UI chính
+local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+gui.Name = "KevinzHub"
+gui.ResetOnSpawn = false
 
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 240, 0, 200)
-frame.Position = UDim2.new(0.5, 0, 0.5, 0)
-frame.AnchorPoint = Vector2.new(0.5, 0.5)
-frame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-frame.BackgroundTransparency = 0.25
+-- TopBar chứa avatar + tên
+local topBar = Instance.new("Frame", gui)
+topBar.Size = UDim2.new(0, 320, 0, 50)
+topBar.Position = UDim2.new(0.5, -160, 0, 20)
+topBar.BackgroundTransparency = 0.2
+topBar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+topBar.Name = "TopBar"
+
+local topCorner = Instance.new("UICorner", topBar)
+topCorner.CornerRadius = UDim.new(0, 10)
+
+-- Avatar (ảnh đại diện)
+local avatar = Instance.new("ImageLabel", topBar)
+avatar.Size = UDim2.new(0, 40, 0, 40)
+avatar.Position = UDim2.new(0, 5, 0.5, -20)
+avatar.BackgroundTransparency = 1
+avatar.Image = string.format("https://www.roblox.com/headshot-thumbnail/image?userId=%d&width=420&height=420&format=png", player.UserId)
+
+local avatarCorner = Instance.new("UICorner", avatar)
+avatarCorner.CornerRadius = UDim.new(1, 0)
+
+-- Tên người chơi
+local nameLabel = Instance.new("TextLabel", topBar)
+nameLabel.Size = UDim2.new(1, -60, 1, 0)
+nameLabel.Position = UDim2.new(0, 55, 0, 0)
+nameLabel.BackgroundTransparency = 1
+nameLabel.Text = player.DisplayName or player.Name
+nameLabel.TextColor3 = Color3.new(1, 1, 1)
+nameLabel.Font = Enum.Font.GothamBold
+nameLabel.TextSize = 20
+nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Frame chỉnh tốc độ
+local frame = Instance.new("Frame", gui)
+frame.Name = "MainFrame"
+frame.Size = UDim2.new(0, 320, 0, 150)
+frame.Position = UDim2.new(0.5, -160, 0, 80)
+frame.BackgroundTransparency = 0.1
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 frame.BorderSizePixel = 0
+frame.ClipsDescendants = true
 frame.Active = true
 frame.Draggable = true
-frame.Parent = screenGui
 
-Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 15)
-local stroke = Instance.new("UIStroke", frame)
-stroke.Thickness = 2
-stroke.Color = Color3.fromRGB(200, 200, 255)
-stroke.Transparency = 0.25
+local frameCorner = Instance.new("UICorner", frame)
+frameCorner.CornerRadius = UDim.new(0, 12)
 
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 30)
-title.Position = UDim2.new(0, 0, 0, 0)
-title.BackgroundTransparency = 1
-title.Text = "Kevinz Hub"
-title.Font = Enum.Font.GothamBold
-title.TextColor3 = Color3.fromRGB(30, 30, 30)
-title.TextScaled = true
-title.Parent = frame
+-- Slider nền
+local sliderBG = Instance.new("Frame", frame)
+sliderBG.Size = UDim2.new(0.8, 0, 0, 20)
+sliderBG.Position = UDim2.new(0.1, 0, 0.4, 0)
+sliderBG.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+sliderBG.Name = "SliderBackground"
 
-local label = Instance.new("TextLabel")
-label.Size = UDim2.new(0.6, 0, 0, 25)
-label.Position = UDim2.new(0.05, 0, 0.2, 0)
-label.BackgroundTransparency = 1
-label.Text = "WalkSpeed:"
-label.Font = Enum.Font.Gotham
-label.TextColor3 = Color3.fromRGB(0, 0, 0)
-label.TextScaled = true
-label.Parent = frame
+local sliderCorner = Instance.new("UICorner", sliderBG)
+sliderCorner.CornerRadius = UDim.new(0, 8)
 
-local inputBox = Instance.new("TextBox")
-inputBox.Size = UDim2.new(0, 60, 0, 25)
-inputBox.Position = UDim2.new(0.6, 0, 0.2, 0)
-inputBox.BackgroundColor3 = Color3.fromRGB(240, 240, 240)
-inputBox.Text = tostring(humanoid.WalkSpeed)
-inputBox.Font = Enum.Font.Gotham
-inputBox.TextColor3 = Color3.fromRGB(0, 0, 0)
-inputBox.TextScaled = true
-inputBox.ClearTextOnFocus = false
-inputBox.Parent = frame
-Instance.new("UICorner", inputBox).CornerRadius = UDim.new(0, 6)
+-- Thanh slider
+local slider = Instance.new("Frame", sliderBG)
+slider.Size = UDim2.new(0.16, 0, 1, 0)
+slider.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+slider.Name = "SliderBar"
 
-local plus = Instance.new("TextButton")
-plus.Size = UDim2.new(0, 40, 0, 25)
-plus.Position = UDim2.new(0.75, 0, 0.2, 0)
-plus.Text = "+"
-plus.Font = Enum.Font.GothamBold
-plus.TextColor3 = Color3.fromRGB(255, 255, 255)
-plus.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-plus.TextScaled = true
-plus.Parent = frame
-Instance.new("UICorner", plus).CornerRadius = UDim.new(0, 6)
+local sliderBarCorner = Instance.new("UICorner", slider)
+sliderBarCorner.CornerRadius = UDim.new(0, 8)
 
-local hideBtn = Instance.new("TextButton")
-hideBtn.Size = UDim2.new(0, 25, 0, 25)
-hideBtn.Position = UDim2.new(0, 5, 0, 5)
-hideBtn.Text = "-"
-hideBtn.Font = Enum.Font.GothamBold
-hideBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-hideBtn.BackgroundColor3 = Color3.fromRGB(200, 100, 100)
-hideBtn.TextScaled = true
-hideBtn.Parent = frame
-Instance.new("UICorner", hideBtn).CornerRadius = UDim.new(1, 0)
+-- Text hiển thị tốc độ
+local speedText = Instance.new("TextLabel", frame)
+speedText.Size = UDim2.new(1, 0, 0, 30)
+speedText.Position = UDim2.new(0, 0, 0.65, 0)
+speedText.BackgroundTransparency = 1
+speedText.TextColor3 = Color3.new(1, 1, 1)
+speedText.Font = Enum.Font.Gotham
+speedText.TextSize = 18
+speedText.Text = "Speed: 16"
 
-local jumpLabel = Instance.new("TextLabel")
-jumpLabel.Size = UDim2.new(0.6, 0, 0, 25)
-jumpLabel.Position = UDim2.new(0.05, 0, 0.5, 0)
-jumpLabel.BackgroundTransparency = 1
-jumpLabel.Text = "JumpPower:"
-jumpLabel.Font = Enum.Font.Gotham
-jumpLabel.TextColor3 = Color3.fromRGB(0, 0, 0)
-jumpLabel.TextScaled = true
-jumpLabel.Parent = frame
+-- Nút toggle ẩn/hiện
+local toggleBtn = Instance.new("TextButton", gui)
+toggleBtn.Size = UDim2.new(0, 40, 0, 40)
+toggleBtn.Position = UDim2.new(0, 10, 0.5, -20)
+toggleBtn.Text = "-"
+toggleBtn.Font = Enum.Font.GothamBold
+toggleBtn.TextSize = 24
+toggleBtn.TextColor3 = Color3.new(1, 1, 1)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 
-local jumpBox = Instance.new("TextBox")
-jumpBox.Size = UDim2.new(0, 60, 0, 25)
-jumpBox.Position = UDim2.new(0.6, 0, 0.5, 0)
-jumpBox.BackgroundColor3 = Color3.fromRGB(240, 240, 240)
-jumpBox.Text = tostring(humanoid.JumpPower)
-jumpBox.Font = Enum.Font.Gotham
-jumpBox.TextColor3 = Color3.fromRGB(0, 0, 0)
-jumpBox.TextScaled = true
-jumpBox.ClearTextOnFocus = false
-jumpBox.Parent = frame
-Instance.new("UICorner", jumpBox).CornerRadius = UDim.new(0, 6)
+local toggleCorner = Instance.new("UICorner", toggleBtn)
+toggleCorner.CornerRadius = UDim.new(1, 0)
 
-local toggleESP = Instance.new("TextButton")
-toggleESP.Size = UDim2.new(0, 80, 0, 25)
-toggleESP.Position = UDim2.new(0.33, 0, 0.75, 0)
-toggleESP.Text = "ESP ON"
-toggleESP.Font = Enum.Font.GothamBold
-toggleESP.TextColor3 = Color3.fromRGB(255, 255, 255)
-toggleESP.BackgroundColor3 = Color3.fromRGB(100, 150, 255)
-toggleESP.TextScaled = true
-toggleESP.Parent = frame
-Instance.new("UICorner", toggleESP).CornerRadius = UDim.new(0, 8)
+-- Logic toggle ẩn/hiện
+local open = true
+toggleBtn.MouseButton1Click:Connect(function()
+	open = not open
+	frame.Visible = open
+	topBar.Visible = open
+	toggleBtn.Text = open and "-" or "+"
+end)
 
-local close = Instance.new("TextButton")
-close.Size = UDim2.new(0, 25, 0, 25)
-close.Position = UDim2.new(1, -30, 0, 5)
-close.Text = "×"
-close.Font = Enum.Font.GothamBold
-close.TextColor3 = Color3.fromRGB(255, 0, 0)
-close.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-close.BackgroundTransparency = 0.2
-close.TextScaled = true
-close.Parent = frame
-Instance.new("UICorner", close).CornerRadius = UDim.new(1, 0)
+-- Slider logic (client-only)
+local uis = game:GetService("UserInputService")
 
-local mini = Instance.new("TextButton")
-mini.Size = UDim2.new(0, 40, 0, 40)
-mini.Position = UDim2.new(0, 20, 0.7, 0)
-mini.Text = "-"
-mini.Font = Enum.Font.GothamBold
-mini.TextColor3 = Color3.fromRGB(255, 255, 255)
-mini.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
-mini.Visible = false
-mini.Active = true
-mini.Draggable = true
-mini.TextScaled = true
-mini.Parent = screenGui
-Instance.new("UICorner", mini).CornerRadius = UDim.new(1, 0)
-
-local function updateSpeed(val)
-	local speed = tonumber(val)
-	if speed then
-		speed = math.clamp(speed, 0, 200)
-		humanoid.WalkSpeed = speed
-		inputBox.Text = tostring(speed)
-	end
+local function updateSpeed(x)
+	local pos = math.clamp((x - sliderBG.AbsolutePosition.X) / sliderBG.AbsoluteSize.X, 0, 1)
+	slider.Size = UDim2.new(pos, 0, 1, 0)
+	local speed = math.floor(pos * 100)
+	speedText.Text = "Speed: " .. speed
+	humanoid.WalkSpeed = speed
 end
 
-plus.MouseButton1Click:Connect(function()
-	updateSpeed(humanoid.WalkSpeed + 5)
-end)
-
-inputBox.FocusLost:Connect(function()
-	updateSpeed(inputBox.Text)
-end)
-
-jumpBox.FocusLost:Connect(function()
-	local val = tonumber(jumpBox.Text)
-	if val then
-		val = math.clamp(val, 0, 200)
-		humanoid.JumpPower = val
-		jumpBox.Text = tostring(val)
+sliderBG.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		updateSpeed(input.Position.X)
+		local moveCon
+		moveCon = uis.InputChanged:Connect(function(move)
+			if move.UserInputType == Enum.UserInputType.MouseMovement then
+				updateSpeed(move.Position.X)
+			end
+		end)
+		uis.InputEnded:Connect(function(endInput)
+			if endInput.UserInputType == Enum.UserInputType.MouseButton1 then
+				moveCon:Disconnect()
+			end
+		end)
 	end
 end)
-
-hideBtn.MouseButton1Click:Connect(function()
-	frame.Visible = false
-	mini.Visible = true
-end)
-
-mini.MouseButton1Click:Connect(function()
-	frame.Visible = true
-	mini.Visible = false
-end)
-
-close.MouseButton1Click:Connect(function()
-	screenGui:Destroy()
-end)
-
-local espEnabled = true
-local beams = {}
-
-local function createLine(from, to, color)
-	local a0 = Instance.new("Attachment", from)
-	local a1 = Instance.new("Attachment", to)
-	local gui = Instance.new("BillboardGui")
-	gui.Adornee = from
-	gui.Size = UDim2.new(4, 0, 4, 0)
-	gui.AlwaysOnTop = true
-	gui.LightInfluence = 0
-	gui.Name = "StickmanLayer"
-	gui.Parent = from
-	local beam = Instance.new("Beam")
-	beam.Attachment0 = a0
-	beam.Attachment1 = a1
-	beam.Color = ColorSequence.new(color)
-	beam.Width0 = 0.4
-	beam.Width1 = 0.4
-	beam.FaceCamera = true
-	beam.LightInfluence = 0
-	beam.Transparency = NumberSequence.new(0)
-	beam.ZIndex = 10
-	beam.Parent = gui
-	table.insert(beams, beam)
-end
-
-local function drawStickman(char)
-	local parts = {
-		Head = char:FindFirstChild("Head"),
-		Torso = char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso"),
-		HRP = char:FindFirstChild("HumanoidRootPart"),
-		LArm = char:FindFirstChild("LeftUpperArm") or char:FindFirstChild("Left Arm"),
-		RArm = char:FindFirstChild("RightUpperArm") or char:FindFirstChild("Right Arm"),
-		LLeg = char:FindFirstChild("LeftUpperLeg") or char:FindFirstChild("Left Leg"),
-		RLeg = char:FindFirstChild("RightUpperLeg") or char:FindFirstChild("Right Leg"),
-	}
-	if not (parts.Head and parts.Torso and parts.LArm and parts.RArm and parts.LLeg and parts.RLeg and parts.HRP) then return end
-	createLine(parts.Head, parts.Torso, Color3.fromRGB(0, 255, 0))
-	createLine(parts.Torso, parts.LArm, Color3.fromRGB(255, 255, 0))
-	createLine(parts.Torso, parts.RArm, Color3.fromRGB(255, 255, 0))
-	createLine(parts.Torso, parts.LLeg, Color3.fromRGB(255, 100, 100))
-	createLine(parts.Torso, parts.RLeg, Color3.fromRGB(255, 100, 100))
-	createLine(parts.Head, parts.HRP, Color3.fromRGB(0, 255, 255))
-end
-
-local function drawAllESP()
-	for _, plr in pairs(game.Players:GetPlayers()) do
-		if plr ~= player and plr.Character then
-			drawStickman(plr.Character)
-		end
-	end
-end
-
-toggleESP.MouseButton1Click:Connect(function()
-	espEnabled = not espEnabled
-	toggleESP.Text = espEnabled and "ESP ON" or "ESP OFF"
-	for _, b in pairs(beams) do
-		b:Destroy()
-	end
-	table.clear(beams)
-	if espEnabled then
-		drawAllESP()
-	end
-end)
-
-drawAllESP()
