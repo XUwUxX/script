@@ -9,12 +9,10 @@ local Camera = workspace.CurrentCamera
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local Humanoid = Character:WaitForChild("Humanoid")
 
--- Store WalkSpeed & JumpPower after changes
 local savedWalkSpeed = Humanoid.WalkSpeed
 local savedJumpPower = Humanoid.JumpPower
-local HUB_VERSION = "v1.3.1"
+local HUB_VERSION = "v1.3.2"
 
--- GUI
 local gui = Instance.new("ScreenGui")
 gui.Name = "KevinzHub"
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Global
@@ -23,7 +21,7 @@ gui.Parent = game.CoreGui
 
 local window = Instance.new("Frame")
 window.AnchorPoint = Vector2.new(0.5, 0.5)
-window.Position = UDim2.fromScale(0.5, 1.2)
+window.Position = UDim2.fromScale(0.5, 0.5)
 window.Size = UDim2.fromOffset(550, 400)
 window.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 window.Active = true
@@ -31,7 +29,6 @@ window.Draggable = true
 Instance.new("UICorner", window).CornerRadius = UDim.new(0, 12)
 window.Parent = gui
 
--- Gradient + Material Effect
 local gradient = Instance.new("UIGradient", window)
 gradient.Rotation = 45
 gradient.Color = ColorSequence.new {
@@ -155,7 +152,6 @@ local function createSwitch(labelText, callback)
     end)
 end
 
--- Inputs
 createInput("WalkSpeed", function() return savedWalkSpeed end, function(v)
     savedWalkSpeed = v
     if Humanoid then Humanoid.WalkSpeed = v end
@@ -170,7 +166,6 @@ createInput("FOV", function() return Camera.FieldOfView end, function(v)
     Camera.FieldOfView = v
 end)
 
--- Chams ESP
 local chamEnabled = false
 local chamHighlights = {}
 
@@ -186,6 +181,8 @@ local function updateChams(enable)
                     highlight.Adornee = char
                     highlight.FillColor = player.TeamColor and player.TeamColor.Color or Color3.fromRGB(0, 255, 0)
                     highlight.OutlineColor = Color3.new(1, 1, 1)
+                    highlight.FillTransparency = 0.6
+                    highlight.OutlineTransparency = 0.3
                     highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
                     highlight.Parent = char
                     chamHighlights[player] = highlight
@@ -215,47 +212,43 @@ Players.PlayerRemoving:Connect(function(p)
     chamHighlights[p] = nil
 end)
 
--- Mini toggle
 local miniToggle = Instance.new("TextButton", gui)
 miniToggle.Size = UDim2.new(0, 36, 0, 36)
-miniToggle.Position = UDim2.new(0.5, -18, 0.5, -18)
+miniToggle.Position = UDim2.new(0, 50, 1, -50)
 miniToggle.AnchorPoint = Vector2.new(0.5, 0.5)
 miniToggle.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-miniToggle.Text = "-"
+miniToggle.Text = "+"
 miniToggle.TextScaled = true
 miniToggle.Font = Enum.Font.GothamBold
 miniToggle.TextColor3 = Color3.new(1, 1, 1)
 miniToggle.AutoButtonColor = false
+miniToggle.Visible = false
 Instance.new("UICorner", miniToggle).CornerRadius = UDim.new(1, 0)
-miniToggle.Active = true
-miniToggle.Draggable = true
 
-local isVisible = true
-miniToggle.MouseButton1Click:Connect(function()
-    isVisible = not isVisible
-    miniToggle.Text = isVisible and "-" or "+"
-    local targetPos = isVisible and UDim2.new(0.5, 0, 0.5, 0) or UDim2.new(0.5, 0, 1.2, 0)
-    TweenService:Create(window, TweenInfo.new(0.5, Enum.EasingStyle.Quad), {
-        Position = targetPos
-    }):Play()
+local closeButton = Instance.new("TextButton", topBar)
+closeButton.Size = UDim2.new(0, 36, 0, 36)
+closeButton.Position = UDim2.new(1, -42, 0, 2)
+closeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+closeButton.Text = "-"
+closeButton.Font = Enum.Font.GothamBold
+closeButton.TextScaled = true
+closeButton.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", closeButton).CornerRadius = UDim.new(1, 0)
 
-    if isVisible then
-        pcall(function()
-            StarterGui:SetCore("SendNotification", {
-                Title = "Kevinz Hub",
-                Text = "Version: " .. HUB_VERSION .. " resumed.",
-                Duration = 3
-            })
-        end)
-    end
+closeButton.MouseButton1Click:Connect(function()
+    window.Visible = false
+    miniToggle.Visible = true
 end)
 
--- Animate on load
+miniToggle.MouseButton1Click:Connect(function()
+    window.Visible = true
+    miniToggle.Visible = false
+end)
+
 TweenService:Create(window, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
     Position = UDim2.new(0.5, 0, 0.5, 0)
 }):Play()
 
--- Reset handler
 LocalPlayer.CharacterAdded:Connect(function(char)
     Character = char
     local hum = char:WaitForChild("Humanoid", 5)
@@ -267,7 +260,6 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     end
 end)
 
--- Show load notification
 task.delay(1, function()
     pcall(function()
         StarterGui:SetCore("SendNotification", {
