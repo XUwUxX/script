@@ -1,8 +1,9 @@
--- Kevinz Hub - Full Script with GUI, WalkSpeed/JumpPower Save, Chams ESP Toggle
+-- Kevinz Hub - Full Script with GUI, WalkSpeed/JumpPower Save, Chams ESP Toggle + Placeholder Update + ESP Loop
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local StarterGui = game:GetService("StarterGui")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
@@ -11,7 +12,7 @@ local Humanoid = Character:WaitForChild("Humanoid")
 
 local savedWalkSpeed = Humanoid.WalkSpeed
 local savedJumpPower = Humanoid.JumpPower
-local HUB_VERSION = "v1.3.2"
+local HUB_VERSION = "v1.3.3"
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "KevinzHub"
@@ -68,6 +69,7 @@ content.Position = UDim2.new(0, 0, 0, 40)
 content.BackgroundTransparency = 1
 
 local inputRow = 0
+local inputs = {}
 
 local function createInput(labelText, getDefault, callback)
     inputRow += 1
@@ -104,52 +106,22 @@ local function createInput(labelText, getDefault, callback)
 
     input.FocusLost:Connect(function()
         local val = tonumber(input.Text)
-        if val then callback(val) end
+        if val then
+            callback(val)
+            input.PlaceholderText = tostring(val)
+        end
         input.Text = ""
     end)
+
+    table.insert(inputs, {getPlaceholder = getDefault, box = input})
 end
 
-local function createSwitch(labelText, callback)
-    inputRow += 1
-    local rowHeight = 40
-    local padding = 10
-    local yOffset = (inputRow - 1) * (rowHeight + padding) + padding
-
-    local container = Instance.new("Frame")
-    container.Size = UDim2.new(1, -40, 0, rowHeight)
-    container.Position = UDim2.new(0, 20, 0, yOffset)
-    container.BackgroundTransparency = 1
-    container.Parent = content
-
-    local label = Instance.new("TextLabel")
-    label.Text = labelText
-    label.Size = UDim2.new(0.6, 0, 1, 0)
-    label.Font = Enum.Font.Gotham
-    label.TextColor3 = Color3.new(1, 1, 1)
-    label.TextScaled = true
-    label.BackgroundTransparency = 1
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = container
-
-    local toggle = Instance.new("TextButton")
-    toggle.Size = UDim2.new(0.4, -10, 1, 0)
-    toggle.Position = UDim2.new(0.6, 10, 0, 0)
-    toggle.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    toggle.Text = "OFF"
-    toggle.Font = Enum.Font.GothamBold
-    toggle.TextScaled = true
-    toggle.TextColor3 = Color3.new(1, 1, 1)
-    toggle.AutoButtonColor = false
-    Instance.new("UICorner", toggle).CornerRadius = UDim.new(0, 6)
-    toggle.Parent = container
-
-    local state = false
-    toggle.MouseButton1Click:Connect(function()
-        state = not state
-        toggle.Text = state and "ON" or "OFF"
-        toggle.BackgroundColor3 = state and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(50, 50, 50)
-        callback(state)
-    end)
+local function updatePlaceholders()
+    for _, v in ipairs(inputs) do
+        pcall(function()
+            v.box.PlaceholderText = tostring(v.getPlaceholder())
+        end)
+    end
 end
 
 createInput("WalkSpeed", function() return savedWalkSpeed end, function(v)
@@ -197,9 +169,58 @@ local function updateChams(enable)
     end
 end
 
+RunService.RenderStepped:Connect(function()
+    if chamEnabled then
+        updateChams(true)
+    end
+    updatePlaceholders()
+end)
+
+local function createSwitch(labelText, callback)
+    inputRow += 1
+    local rowHeight = 40
+    local padding = 10
+    local yOffset = (inputRow - 1) * (rowHeight + padding) + padding
+
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(1, -40, 0, rowHeight)
+    container.Position = UDim2.new(0, 20, 0, yOffset)
+    container.BackgroundTransparency = 1
+    container.Parent = content
+
+    local label = Instance.new("TextLabel")
+    label.Text = labelText
+    label.Size = UDim2.new(0.6, 0, 1, 0)
+    label.Font = Enum.Font.Gotham
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.TextScaled = true
+    label.BackgroundTransparency = 1
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = container
+
+    local toggle = Instance.new("TextButton")
+    toggle.Size = UDim2.new(0.4, -10, 1, 0)
+    toggle.Position = UDim2.new(0.6, 10, 0, 0)
+    toggle.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    toggle.Text = "OFF"
+    toggle.Font = Enum.Font.GothamBold
+    toggle.TextScaled = true
+    toggle.TextColor3 = Color3.new(1, 1, 1)
+    toggle.AutoButtonColor = false
+    Instance.new("UICorner", toggle).CornerRadius = UDim.new(0, 6)
+    toggle.Parent = container
+
+    local state = false
+    toggle.MouseButton1Click:Connect(function()
+        state = not state
+        toggle.Text = state and "ON" or "OFF"
+        toggle.BackgroundColor3 = state and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(50, 50, 50)
+        callback(state)
+    end)
+end
+
 createSwitch("Chams ESP", function(on)
     chamEnabled = on
-    updateChams(on)
 end)
 
 Players.PlayerAdded:Connect(function(p)
@@ -210,62 +231,4 @@ end)
 
 Players.PlayerRemoving:Connect(function(p)
     chamHighlights[p] = nil
-end)
-
-local miniToggle = Instance.new("TextButton", gui)
-miniToggle.Size = UDim2.new(0, 36, 0, 36)
-miniToggle.Position = UDim2.new(0, 50, 1, -50)
-miniToggle.AnchorPoint = Vector2.new(0.5, 0.5)
-miniToggle.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-miniToggle.Text = "+"
-miniToggle.TextScaled = true
-miniToggle.Font = Enum.Font.GothamBold
-miniToggle.TextColor3 = Color3.new(1, 1, 1)
-miniToggle.AutoButtonColor = false
-miniToggle.Visible = false
-Instance.new("UICorner", miniToggle).CornerRadius = UDim.new(1, 0)
-
-local closeButton = Instance.new("TextButton", topBar)
-closeButton.Size = UDim2.new(0, 36, 0, 36)
-closeButton.Position = UDim2.new(1, -42, 0, 2)
-closeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-closeButton.Text = "-"
-closeButton.Font = Enum.Font.GothamBold
-closeButton.TextScaled = true
-closeButton.TextColor3 = Color3.new(1, 1, 1)
-Instance.new("UICorner", closeButton).CornerRadius = UDim.new(1, 0)
-
-closeButton.MouseButton1Click:Connect(function()
-    window.Visible = false
-    miniToggle.Visible = true
-end)
-
-miniToggle.MouseButton1Click:Connect(function()
-    window.Visible = true
-    miniToggle.Visible = false
-end)
-
-TweenService:Create(window, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-    Position = UDim2.new(0.5, 0, 0.5, 0)
-}):Play()
-
-LocalPlayer.CharacterAdded:Connect(function(char)
-    Character = char
-    local hum = char:WaitForChild("Humanoid", 5)
-    if hum then
-        Humanoid = hum
-        task.wait(0.2)
-        Humanoid.WalkSpeed = savedWalkSpeed
-        Humanoid.JumpPower = savedJumpPower
-    end
-end)
-
-task.delay(1, function()
-    pcall(function()
-        StarterGui:SetCore("SendNotification", {
-            Title = "Kevinz Hub Loaded ✅",
-            Text = "Running version: " .. HUB_VERSION,
-            Duration = 5
-        })
-    end)
 end)
