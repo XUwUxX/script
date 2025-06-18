@@ -1,97 +1,111 @@
--- Load UI library (Fluent‑Renewed)
-local Library = loadstring(game:HttpGetAsync("https://github.com/ActualMasterOogway/Fluent-Renewed/releases/latest/download/Fluent.luau"))()
+-- // Load thư viện GUI Fluent-Renewed
+local Library = loadstring(game:HttpGet("https://github.com/ActualMasterOogway/Fluent-Renewed/releases/latest/download/Fluent.luau"))()
 
--- Tạo window chính
-local window = Library:CreateWindow({
-    Title = "Delta Hub",
-    Accent = Color3.fromRGB(255, 50, 50),      -- đỏ nổi bật
-    Theme = Color3.fromRGB(30, 30, 30)         -- xám tối gần đen
+-- // Tạo Window
+local Window = Library:CreateWindow({
+    Title = "Kevinz Hub",
+    Accent = Color3.fromRGB(255, 0, 50),
+    Theme = Color3.fromRGB(20, 20, 20)
 })
 
--- Tạo gradient background + hiệu ứng slide/pop-in
-local mainFrame = window.MainFrame
-do
-    -- Background gradient
-    local grad = Instance.new("UIGradient", mainFrame)
-    grad.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, Color3.new(0,0,0)),
-        ColorSequenceKeypoint.new(0.5, Color3.new(0.15,0,0)),
-        ColorSequenceKeypoint.new(1, Color3.new(0.2,0,0))
-    }
-    grad.Transparency = NumberSequence.new{
-        NumberSequenceKeypoint.new(0, 0),
-        NumberSequenceKeypoint.new(0.5, 0),
-        NumberSequenceKeypoint.new(1, 0.5)
-    }
+local MainFrame = Window.MainFrame
 
-    -- Slide in từ trên xuống khi mở
-    mainFrame.Position = UDim2.new(0.5,0, -1,0)
-    mainFrame:TweenPosition(UDim2.new(0.5,0,0.3,0), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.5, true)
-end
+-- // Gradient nền (đen + đỏ dưới fade)
+local gradient = Instance.new("UIGradient")
+gradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.new(0, 0, 0)),
+    ColorSequenceKeypoint.new(0.5, Color3.new(0.2, 0, 0)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(100, 0, 0))
+}
+gradient.Transparency = NumberSequence.new{
+    NumberSequenceKeypoint.new(0, 0),
+    NumberSequenceKeypoint.new(1, 0.4)
+}
+gradient.Rotation = 90
+gradient.Parent = MainFrame
 
--- Header: avatar headshot + tên người chơi
-do
-    local header = Instance.new("Frame", window.TitleBar)
-    header.Size = UDim2.new(0,200,1,0)
-    header.BackgroundTransparency = 1
+-- // Pop-in & Slide animation khi mở
+MainFrame.Position = UDim2.new(0.5, 0, -1, 0)
+MainFrame.Size = UDim2.new(0, 0, 0, 0)
+MainFrame:TweenPosition(UDim2.new(0.5, 0, 0.3, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.4, true)
+MainFrame:TweenSize(UDim2.new(0, 500, 0, 400), Enum.EasingDirection.Out, Enum.EasingStyle.Back, 0.6, true)
 
-    local img = Instance.new("ImageLabel", header)
-    img.Size = UDim2.new(0,32,0,32)
-    img.Position = UDim2.new(0,8,0.5,-16)
-    img.BackgroundTransparency = 1
-    img.Image = ("https://www.roblox.com/headshot-thumbnail/image?userId=%d&width=420&height=420&format=png"):format(game.Players.LocalPlayer.UserId)
+-- // Headshot + Tên người chơi
+local header = Instance.new("Frame", Window.TitleBar)
+header.Size = UDim2.new(0, 200, 1, 0)
+header.BackgroundTransparency = 1
 
-    local name = Instance.new("TextLabel", header)
-    name.Size = UDim2.new(1,-48,1,0)
-    name.Position = UDim2.new(0,48,0,0)
-    name.BackgroundTransparency = 1
-    name.Text = game.Players.LocalPlayer.Name
-    name.TextColor3 = Color3.new(1,1,1)
-    name.Font = Enum.Font.GothamBold
-    name.TextSize = 20
-end
+local avatar = Instance.new("ImageLabel", header)
+avatar.Size = UDim2.new(0, 30, 0, 30)
+avatar.Position = UDim2.new(0, 6, 0.5, -15)
+avatar.BackgroundTransparency = 1
+avatar.Image = "https://www.roblox.com/headshot-thumbnail/image?userId="..game.Players.LocalPlayer.UserId.."&width=420&height=420&format=png"
 
--- Tạo tab chính
-local tab = window:AddTab("Main")
+local nameLabel = Instance.new("TextLabel", header)
+nameLabel.Size = UDim2.new(1, -42, 1, 0)
+nameLabel.Position = UDim2.new(0, 42, 0, 0)
+nameLabel.BackgroundTransparency = 1
+nameLabel.Text = game.Players.LocalPlayer.DisplayName
+nameLabel.TextColor3 = Color3.new(1,1,1)
+nameLabel.Font = Enum.Font.GothamBold
+nameLabel.TextSize = 20
+nameLabel.TextXAlignment = Enum.TextXAlignment.Left
 
--- Input và slider module
-local ws, jp, fov = 16, 50, workspace.CurrentCamera.FieldOfView
+-- // Tạo tab
+local MainTab = Window:AddTab("Main")
 
-tab:AddLabel("Movement & FOV Settings")
+MainTab:AddLabel("Chỉnh Thông Số Nhân Vật")
 
-tab:AddInput("WalkSpeed", "Set character WalkSpeed", tostring(ws), function(val)
-    local n = tonumber(val) or ws
-    ws = n; game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = n
+MainTab:AddInput("WalkSpeed", "Tốc độ đi", "16", function(txt)
+    local n = tonumber(txt)
+    if n then
+        game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = n
+    end
 end)
 
-tab:AddInput("JumpPower", "Set character JumpPower", tostring(jp), function(val)
-    local n = tonumber(val) or jp
-    jp = n; game.Players.LocalPlayer.Character.Humanoid.JumpPower = n
+MainTab:AddInput("JumpPower", "Độ nhảy", "50", function(txt)
+    local n = tonumber(txt)
+    if n then
+        game.Players.LocalPlayer.Character.Humanoid.JumpPower = n
+    end
 end)
 
-tab:AddInput("FOV", "Set camera FieldOfView", tostring(fov), function(val)
-    local n = tonumber(val) or fov
-    fov = n; workspace.CurrentCamera.FieldOfView = n
+MainTab:AddInput("FOV", "Field of View", tostring(workspace.CurrentCamera.FieldOfView), function(txt)
+    local n = tonumber(txt)
+    if n then
+        workspace.CurrentCamera.FieldOfView = n
+    end
 end)
 
--- Nút Execute Script
-tab:AddButton("Execute Script", "Run actions", function()
+MainTab:AddButton("Execute Script", "Thực thi và thông báo", function()
     local start = tick()
-    -- Bạn có thể đặt đoạn mã exec ở đây
-    -- e.g. game.Players.LocalPlayer.Character.Humanoid.Health = 0
+    -- bạn có thể thêm hành động thực thi thực sự tại đây
 
-    local t = math.floor((tick() - start)*1000)
-    -- Thông báo thành công dùng Roblox Notification
+    local elapsed = math.floor((tick() - start) * 1000)
     game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = "Delta Hub";
-        Text = "Script đã execute thành công trong "..t.." ms";
-        Duration = 3;
+        Title = "Kevinz Hub",
+        Text = "Script đã execute thành công trong "..elapsed.."ms",
+        Duration = 4
     })
 end)
 
--- Pop-in animation khi lần đầu hiện window
-mainFrame.Size = UDim2.new(0, 0, 0, 0)
-mainFrame:TweenSize(UDim2.new(0, 500, 0, 400), Enum.EasingDirection.Out, Enum.EasingStyle.Back, 0.6, true)
+-- // Thêm nút Show/Hide UI ở góc trên bên phải
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(0, 120, 0, 32)
+toggleBtn.Position = UDim2.new(1, -130, 0, 10)
+toggleBtn.AnchorPoint = Vector2.new(0, 0)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+toggleBtn.TextColor3 = Color3.new(1, 1, 1)
+toggleBtn.Font = Enum.Font.GothamBold
+toggleBtn.Text = "Ẩn Kevinz Hub"
+toggleBtn.TextSize = 14
+toggleBtn.Parent = game.CoreGui
+toggleBtn.AutoButtonColor = true
 
--- Mở UI
-window:Toggle()
+local isVisible = true
+
+toggleBtn.MouseButton1Click:Connect(function()
+    isVisible = not isVisible
+    MainFrame.Visible = isVisible
+    toggleBtn.Text = isVisible and "Ẩn Kevinz Hub" or "Hiện Kevinz Hub"
+end)
