@@ -1,5 +1,6 @@
 -- Kevinz Hub - Full Script with GUI, WalkSpeed/JumpPower Save, Role-based ESP for Murder Mystery 2,
--- plus hidden features: anti void, anti linear fling, anti angular fling
+-- plus hidden features: anti void, anti linear fling, anti angular fling,
+-- và ESP tự động cập nhật role mỗi 1s khi bật ESP.
 
 -- Services
 local Players = game:GetService("Players")
@@ -16,7 +17,7 @@ local RootPart = Character:WaitForChild("HumanoidRootPart")
 -- Saved defaults
 local savedWalkSpeed = Humanoid.WalkSpeed
 local savedJumpPower = Humanoid.JumpPower
-local HUB_VERSION = "v1.6.0"  -- cập nhật phiên bản
+local HUB_VERSION = "v1.7.0"  -- cập nhật phiên bản
 
 -- GUI Setup
 local gui = Instance.new("ScreenGui")
@@ -59,7 +60,6 @@ local avatar = Instance.new("ImageLabel", topBar)
 avatar.Size = UDim2.new(0, 32, 0, 32)
 avatar.Position = UDim2.new(0, 6, 0.5, -16)
 avatar.BackgroundTransparency = 1
--- HeadShot thumbnail
 avatar.Image = Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
 
 local nameLabel = Instance.new("TextLabel", topBar)
@@ -106,7 +106,6 @@ local function createInput(labelText, getDefault, callback)
     input.Size = UDim2.new(0.6, -10, 1, 0)
     input.Position = UDim2.new(0.4, 10, 0, 0)
     input.Font = Enum.Font.Gotham
-    -- Placeholder khởi tạo
     local defaultVal = getDefault()
     input.PlaceholderText = tostring(defaultVal)
     input.Text = ""
@@ -259,6 +258,7 @@ local function updateAllChams()
     end
 end
 
+-- Setup listeners để respawn & tool change
 local function setupPlayerListeners(player)
     -- respawn
     player.CharacterAdded:Connect(function(char)
@@ -363,20 +363,17 @@ TweenService:Create(window, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.Easin
     Position = UDim2.new(0.5, 0, 0.5, 0)
 }):Play()
 
--- Anti features setup function, tái sử dụng cho lần đầu và respawn
+-- Anti features setup function
 local function setupAntiFeatures()
     if not Character or not Humanoid or not RootPart then return end
-    -- lastSafeCFrame lưu vị trí + hướng an toàn
     local lastSafeCFrame = RootPart.CFrame
 
-    -- Lắng nghe statechanged để cập nhật lastSafe khi an toàn
     Humanoid.StateChanged:Connect(function(oldState, newState)
         if newState == Enum.HumanoidStateType.Landed
         or newState == Enum.HumanoidStateType.Running
         or newState == Enum.HumanoidStateType.Walking
         or newState == Enum.HumanoidStateType.RunningNoPhysics then
             if RootPart and RootPart.Parent then
-                -- Chỉ lưu nếu có mặt đất dưới chân
                 if Humanoid.FloorMaterial and Humanoid.FloorMaterial ~= Enum.Material.Air then
                     lastSafeCFrame = RootPart.CFrame
                 end
@@ -384,7 +381,6 @@ local function setupAntiFeatures()
         end
     end)
 
-    -- Heartbeat: check anti void, anti linear fling, anti angular fling
     RunService.Heartbeat:Connect(function()
         if not RootPart or not RootPart.Parent then return end
 
@@ -409,18 +405,14 @@ local function setupAntiFeatures()
         -- ANTI ANGULAR FLING
         local angVel = RootPart.AssemblyAngularVelocity
         if angVel.Magnitude > 200 then
-            -- Debug: nếu muốn in giá trị
-            -- print("Angular fling detected:", angVel.Magnitude)
             pcall(function()
-                RootPart.Velocity = Vector3.new(0, 0, 0)
-                RootPart.RotVelocity = Vector3.new(0, 0, 0)
-                -- Reset orientation về lastSafe yaw
+                RootPart.Velocity = Vector3.new(0,0,0)
+                RootPart.RotVelocity = Vector3.new(0,0,0)
                 local safePos = lastSafeCFrame.Position
                 local _, _, safeY = lastSafeCFrame:ToOrientation()
                 local newCFrame = CFrame.new(safePos) * CFrame.Angles(0, safeY, 0)
                 RootPart.CFrame = newCFrame + Vector3.new(0, 5, 0)
             end)
-            -- Tạo BodyGyro tạm để khóa hướng
             if not RootPart:FindFirstChild("AntiFlingGyro") then
                 local bg = Instance.new("BodyGyro")
                 bg.Name = "AntiFlingGyro"
@@ -436,7 +428,7 @@ local function setupAntiFeatures()
     end)
 end
 
--- Handle local respawn: restore stats, re-setup anti, reapply ESP cho others
+-- Handle local respawn: restore stats, re-setup anti, reapply ESP
 LocalPlayer.CharacterAdded:Connect(function(char)
     Character = char
     Humanoid = char:WaitForChild("Humanoid", 5)
@@ -448,17 +440,14 @@ LocalPlayer.CharacterAdded:Connect(function(char)
             Humanoid.JumpPower = savedJumpPower
         end)
     end
-    -- Setup anti features cho lần respawn
     setupAntiFeatures()
-    -- Reapply ESP nếu bật
     if chamEnabled then
         task.delay(0.5, function()
             updateAllChams()
         end)
     end
 end)
-
--- Setup anti lần đầu nếu Character đã có sẵn
+-- Setup anti lần đầu
 setupAntiFeatures()
 
 -- Notification khi hub load
@@ -471,3 +460,24 @@ task.delay(1, function()
         })
     end)
 end)
+
+-- ========== Phần mới: vòng lặp tự động cập nhật role mỗi 1s ==========
+-- Khi ESP bật (chamEnabled = true), chúng ta chạy một vòng lặp định kỳ:
+spawn(function()
+    while true do
+        if chamEnabled then
+            -- Duyệt qua những player đang có highlight (hoặc tất cả player) và cập nhật màu
+            for player, highlight in pairs(chamHighlights) do
+                -- Nếu highlight vẫn tồn tại, cập nhật color; nếu không, bỏ khỏi bảng
+                if highlight and highlight.Parent then
+                    updateHighlightColor(player)
+                else
+                    chamHighlights[player] = nil
+                end
+            end
+        end
+        wait(1)  -- lặp mỗi 1 giây
+    end
+end)
+-- =====================================================================
+
