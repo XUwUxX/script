@@ -30,22 +30,11 @@ gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.ResetOnSpawn = false
 gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
--- Add a UIScale to the main ScreenGui for overall scaling based on resolution
-local uiScale = Instance.new("UIScale")
-uiScale.Parent = gui
--- Adjust this value based on desired UI size on different resolutions.
--- A lower scale will make the UI physically smaller.
--- You might want to tie this to screen resolution if specific scaling is needed.
-uiScale.Scale = 0.9 -- Default scale, can be adjusted for responsiveness
-
-
 local window = Instance.new("Frame")
 window.Name = "MainWindow"
 window.AnchorPoint = Vector2.new(0.5, 0.5)
--- Use scale for position and size to make it more responsive
-window.Position = UDim2.fromScale(0.5, -0.5) -- Start off-screen (relative to screen height)
-window.Size = UDim2.fromScale(0.4, 0.8) -- Make it 40% of screen width and 80% of screen height
-window.MinSize = UDim2.new(0, 300, 0, 450) -- Add a minimum size to prevent it from becoming too small
+window.Position = UDim2.fromScale(0.5, -500) -- Start off-screen
+window.Size = UDim2.new(0.5, 0, 0, 450) -- Tăng chiều cao để chứa thêm controls HP
 window.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
 window.BackgroundTransparency = 0.1
 window.BorderSizePixel = 0
@@ -62,7 +51,7 @@ stroke.Thickness = 1
 -- Top bar
 local topBar = Instance.new("Frame", window)
 topBar.Name = "TopBar"
-topBar.Size = UDim2.new(1, 0, 0.08, 0) -- 8% of window height
+topBar.Size = UDim2.new(1, 0, 0, 30)
 topBar.Position = UDim2.new(0, 0, 0, 0)
 topBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 topBar.BorderSizePixel = 0
@@ -73,18 +62,18 @@ local success, thumb = pcall(function()
 end)
 local avatar = Instance.new("ImageLabel", topBar)
 avatar.Name = "Avatar"
-avatar.Size = UDim2.new(0, 24, 1, -6) -- Fixed width, scale height (with padding)
-avatar.Position = UDim2.new(0, 6, 0, 3) -- Small fixed padding
+avatar.Size = UDim2.new(0, 24, 0, 24)
+avatar.Position = UDim2.new(0, 6, 0.5, -12)
 avatar.BackgroundTransparency = 1
 avatar.Image = success and thumb or ""
 avatar.ImageTransparency = success and 0 or 1
 local avatarCorner = Instance.new("UICorner", avatar)
-avatarCorner.CornerRadius = UDim.new(1, 0) -- Circle
+avatarCorner.CornerRadius = UDim.new(1, 0)
 
 -- DisplayName
 local nameLabel = Instance.new("TextLabel", topBar)
 nameLabel.Name = "NameLabel"
-nameLabel.Size = UDim2.new(1, -60, 1, 0) -- Take full width minus space for avatar and button
+nameLabel.Size = UDim2.new(1, -50, 1, 0)
 nameLabel.Position = UDim2.new(0, 36, 0, 0)
 nameLabel.BackgroundTransparency = 1
 nameLabel.Text = "Kevinz Hub | "..LocalPlayer.DisplayName
@@ -96,8 +85,8 @@ nameLabel.TextXAlignment = Enum.TextXAlignment.Left
 -- Close button
 local closeButton = Instance.new("TextButton", topBar)
 closeButton.Name = "CloseButton"
-closeButton.Size = UDim2.new(0, 28, 1, -4) -- Fixed width, scale height (with padding)
-closeButton.Position = UDim2.new(1, -32, 0, 2)
+closeButton.Size = UDim2.new(0, 28, 0, 28)
+closeButton.Position = UDim2.new(1, -32, 0, 1)
 closeButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 closeButton.Text = "-"
 closeButton.Font = Enum.Font.GothamBold
@@ -109,8 +98,8 @@ Instance.new("UICorner", closeButton).CornerRadius = UDim.new(1, 0)
 -- Content ScrollingFrame
 local content = Instance.new("ScrollingFrame", window)
 content.Name = "ContentFrame"
-content.Size = UDim2.new(1, 0, 0.92, 0) -- Take remaining 92% of window height
-content.Position = UDim2.new(0, 0, 0.08, 0) -- Position below top bar
+content.Size = UDim2.new(1, 0, 1, -30)
+content.Position = UDim2.new(0, 0, 0, 30)
 content.BackgroundTransparency = 1
 content.ScrollBarThickness = 6
 content.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -119,14 +108,14 @@ content.Active = true
 content.ZIndex = 2
 local uiList = Instance.new("UIListLayout", content)
 uiList.SortOrder = Enum.SortOrder.LayoutOrder
-uiList.Padding = UDim.new(0, 8) -- Fixed pixel padding, acceptable for small gaps
+uiList.Padding = UDim.new(0, 8)
 uiList.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
 -- Mini toggle to reopen window
 local miniToggle = Instance.new("TextButton", gui)
 miniToggle.Name = "MiniToggle"
-miniToggle.Size = UDim2.new(0, 28, 0, 28) -- Fixed size for mini toggle (can be scaled too)
-miniToggle.Position = UDim2.new(0.05, 0, 0.95, 0) -- Position relative to screen
+miniToggle.Size = UDim2.new(0, 28, 0, 28)
+miniToggle.Position = UDim2.new(0, 50, 1, -40)
 miniToggle.AnchorPoint = Vector2.new(0.5, 0.5)
 miniToggle.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 miniToggle.Text = "+"
@@ -150,19 +139,19 @@ end)
 task.defer(function()
     window.Visible = true
     TweenService:Create(window, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-        Position = UDim2.fromScale(0.5, 0.5) -- Tween to center of the screen
+        Position = UDim2.fromScale(0.5, 0)
     }):Play()
 end)
 
 -- ================= Helper UI functions =================
 local inputRow = 0
--- ROW_HEIGHT will now be handled by UIListLayout and proportional sizes within the row
+local ROW_HEIGHT = 30
 
 local function createInput(labelText, getDefault, callback)
     inputRow = inputRow + 1
     local container = Instance.new("Frame")
     container.Name = "InputRow_"..inputRow
-    container.Size = UDim2.new(1, -20, 0, 40) -- Fixed height for rows (can be percentage of parent too)
+    container.Size = UDim2.new(1, -20, 0, ROW_HEIGHT)
     container.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
     container.BorderSizePixel = 0
     Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
@@ -171,7 +160,7 @@ local function createInput(labelText, getDefault, callback)
 
     local label = Instance.new("TextLabel", container)
     label.Name = "Label"
-    label.Size = UDim2.new(0.4, 0, 1, 0) -- 40% width of parent row
+    label.Size = UDim2.new(0.4, 0, 1, 0)
     label.Position = UDim2.new(0, 8, 0, 0)
     label.BackgroundTransparency = 1
     label.Text = labelText
@@ -182,7 +171,7 @@ local function createInput(labelText, getDefault, callback)
 
     local input = Instance.new("TextBox", container)
     input.Name = "TextBox"
-    input.Size = UDim2.new(0.6, -16, 1, -4) -- 60% width minus padding, fill height minus padding
+    input.Size = UDim2.new(0.6, -16, 1, -4)
     input.Position = UDim2.new(0.4, 8, 0, 2)
     input.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     input.TextColor3 = Color3.fromRGB(240, 240, 240)
@@ -211,7 +200,7 @@ local function createSwitch(labelText, callback)
     inputRow = inputRow + 1
     local container = Instance.new("Frame")
     container.Name = "SwitchRow_"..inputRow
-    container.Size = UDim2.new(1, -20, 0, 40) -- Fixed height for rows
+    container.Size = UDim2.new(1, -20, 0, ROW_HEIGHT)
     container.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
     container.BorderSizePixel = 0
     Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
@@ -258,7 +247,7 @@ local function createButton(labelText, callback)
     inputRow = inputRow + 1
     local container = Instance.new("Frame")
     container.Name = "ButtonRow_"..inputRow
-    container.Size = UDim2.new(1, -20, 0, 40) -- Fixed height for rows
+    container.Size = UDim2.new(1, -20, 0, ROW_HEIGHT)
     container.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
     container.BorderSizePixel = 0
     Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
@@ -689,7 +678,7 @@ local function setupPlayerListeners(player)
             end)
         end
     end
-end)
+end
 
 -- Initialize for all players
 for _, player in ipairs(Players:GetPlayers()) do
