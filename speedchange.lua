@@ -33,9 +33,8 @@ gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 local window = Instance.new("Frame")
 window.Name = "MainWindow"
 window.AnchorPoint = Vector2.new(0.5, 0.5)
--- Bắt đầu ngoài màn hình, vị trí và kích thước tương đối với màn hình người dùng
-window.Position = UDim2.fromScale(0.5, -0.5) -- Bắt đầu từ 50% chiều rộng, -50% chiều cao (ngoài màn hình lên trên)
-window.Size = UDim2.fromScale(0.5, 0.8) -- 50% chiều rộng, 80% chiều cao của màn hình
+window.Position = UDim2.fromScale(0.5, -500) -- Start off-screen
+window.Size = UDim2.new(0.5, 0, 0, 450) -- Tăng chiều cao để chứa thêm controls HP
 window.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
 window.BackgroundTransparency = 0.1
 window.BorderSizePixel = 0
@@ -99,12 +98,12 @@ Instance.new("UICorner", closeButton).CornerRadius = UDim.new(1, 0)
 -- Content ScrollingFrame
 local content = Instance.new("ScrollingFrame", window)
 content.Name = "ContentFrame"
-content.Size = UDim2.new(1, 0, 1, -30) -- 100% chiều rộng, 100% chiều cao trừ 30px của TopBar
+content.Size = UDim2.new(1, 0, 1, -30)
 content.Position = UDim2.new(0, 0, 0, 30)
 content.BackgroundTransparency = 1
 content.ScrollBarThickness = 6
 content.CanvasSize = UDim2.new(0, 0, 0, 0)
-content.AutomaticCanvasSize = Enum.AutomaticSize.Y -- Tự động điều chỉnh kích thước Canvas theo nội dung trên trục Y
+content.AutomaticCanvasSize = Enum.AutomaticSize.Y
 content.Active = true
 content.ZIndex = 2
 local uiList = Instance.new("UIListLayout", content)
@@ -140,7 +139,7 @@ end)
 task.defer(function()
     window.Visible = true
     TweenService:Create(window, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-        Position = UDim2.fromScale(0.5, 0.5) -- Đặt vị trí cửa sổ vào giữa màn hình
+        Position = UDim2.fromScale(0.5, 0)
     }):Play()
 end)
 
@@ -679,7 +678,7 @@ local function setupPlayerListeners(player)
             end)
         end
     end
-end)
+end
 
 -- Initialize for all players
 for _, player in ipairs(Players:GetPlayers()) do
