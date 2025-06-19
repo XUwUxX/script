@@ -1,11 +1,11 @@
--- Kevinz Hub Full Script với Dark Minimalist GUI, Frosted Glass, Gradient, UI Grid Background “liền” trong window, ESP, Anti Features, Gun Aura, Notification, v.v.
+-- Kevinz Hub Full Script với Dark Minimalist GUI, Gradient, UI Grid Background “liền” trong window, ESP, Anti Features, Gun Aura, Notification, v.v.
+-- Phần blur/overlay đã được loại bỏ hoàn toàn.
 
 -- Services
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local StarterGui = game:GetService("StarterGui")
 local RunService = game:GetService("RunService")
-local Lighting = game:GetService("Lighting")
 
 -- Local player references
 local LocalPlayer = Players.LocalPlayer
@@ -16,7 +16,7 @@ local RootPart = Character:WaitForChild("HumanoidRootPart")
 -- Saved defaults
 local savedWalkSpeed = Humanoid.WalkSpeed
 local savedJumpPower = Humanoid.JumpPower
-local HUB_VERSION = "v1.7.4"
+local HUB_VERSION = "v1.7.5"
 
 -- ================= GUI SETUP =================
 -- ScreenGui
@@ -26,43 +26,6 @@ gui.ZIndexBehavior = Enum.ZIndexBehavior.Global
 gui.ResetOnSpawn = false
 gui.Parent = game.CoreGui
 
--- === Frosted Overlay + BlurEffect ===
-local overlay = Instance.new("Frame")
-overlay.Name = "FrostedOverlay"
-overlay.AnchorPoint = Vector2.new(0.5, 0.5)
-overlay.Position = UDim2.fromScale(0.5, 0.5)
-overlay.Size = UDim2.fromScale(1, 1)
-overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-overlay.BackgroundTransparency = 0.6
-overlay.ZIndex = 1
-overlay.Visible = false
--- Cho phép click-through để không chặn tương tác game phía sau, chỉ làm mờ hậu cảnh
-overlay.InputTransparent = true
-overlay.Parent = gui
-
--- BlurEffect in Lighting (chỉ client)
-local blurEffect = Instance.new("BlurEffect")
-blurEffect.Name = "KevinzHubBlurEffect"
-blurEffect.Size = 0
-blurEffect.Parent = Lighting
-
-local function setBlur(active)
-    if active then
-        overlay.Visible = true
-        TweenService:Create(blurEffect, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            Size = 12
-        }):Play()
-    else
-        local tween = TweenService:Create(blurEffect, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            Size = 0
-        })
-        tween:Play()
-        tween.Completed:Connect(function()
-            overlay.Visible = false
-        end)
-    end
-end
-
 -- Main window
 local window = Instance.new("Frame")
 window.Name = "MainWindow"
@@ -70,7 +33,7 @@ window.AnchorPoint = Vector2.new(0.5, 0.5)
 window.Position = UDim2.fromScale(0.5, 0.5)
 window.Size = UDim2.fromOffset(400, 380)  -- cố định kích thước
 window.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-window.BackgroundTransparency = 0.3  -- semi-translucent để thấy grid UI phía sau
+window.BackgroundTransparency = 0.3  -- semi-translucent để thấy grid UI phía sau nhưng không mờ background game
 window.BorderSizePixel = 0
 window.Active = true
 window.Draggable = true
@@ -92,12 +55,11 @@ gradient.Transparency = NumberSequence.new{
 }
 
 -- === UI Grid Background inside window ===
--- Tạo một Frame chứa các đường kẻ ngang-dọc, nằm ngay dưới content/UI nhưng trên gradient
 local gridContainer = Instance.new("Frame", window)
 gridContainer.Name = "UIGridBackground"
 gridContainer.AnchorPoint = Vector2.new(0, 0)
 gridContainer.Position = UDim2.new(0, 0, 0, 0)
-gridContainer.Size = UDim2.new(1, 1, 1, 0)  -- full window
+gridContainer.Size = UDim2.new(1, 0, 1, 0)  -- full window
 gridContainer.BackgroundTransparency = 1
 gridContainer.ZIndex = 1  -- để dưới content, trên background color+gradient
 
@@ -149,15 +111,12 @@ local function drawUIGrid()
     end
 end
 
--- Kết nối với AbsoluteSize thay đổi (ban đầu window.AbsoluteSize có thể 0 trước khi render, nên dùng task.defer)
+-- Kết nối với AbsoluteSize thay đổi
 window:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-    -- Delay một tick để AbsoluteSize ổn định
     task.defer(drawUIGrid)
 end)
 -- Lần đầu
-task.defer(function()
-    drawUIGrid()
-end)
+task.defer(drawUIGrid)
 
 -- Top bar
 local topBar = Instance.new("Frame", window)
@@ -339,22 +298,18 @@ miniToggle.AutoButtonColor = false
 Instance.new("UICorner", miniToggle).CornerRadius = UDim.new(1, 0)
 miniToggle.Visible = false
 
--- Close / miniToggle behaviors
+-- Close / miniToggle behaviors (chỉ hide/show window, không blur)
 closeButton.MouseButton1Click:Connect(function()
     window.Visible = false
     miniToggle.Visible = true
-    setBlur(false)
 end)
 miniToggle.MouseButton1Click:Connect(function()
     window.Visible = true
-    miniToggle.Visible = false
-    setBlur(true)
 end)
 
--- Show window and blur on initial load
+-- Show window on initial load (không blur)
 task.defer(function()
     window.Visible = true
-    setBlur(true)
     TweenService:Create(window, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
         Position = UDim2.new(0.5, 0, 0.5, 0)
     }):Play()
@@ -467,10 +422,7 @@ local function setupPlayerListeners(player)
     end)
 end
 
--- Switch for ESP
--- Lưu ý: Tạo UI sau khi đã gọi createSwitch, nhưng hàm createSwitch phải được gọi khi tạo GUI (xem phần dưới)
--- Logic: khi bật, gọi updateAllChams
-
+-- Setup ESP listeners
 for _, player in ipairs(Players:GetPlayers()) do
     if player ~= LocalPlayer then
         setupPlayerListeners(player)
@@ -666,7 +618,6 @@ end)
 setupAntiFeatures()
 
 -- ---------- Create Inputs/Switches for core settings ----------
--- Reset inputRow so GUI elements xuất hiện đúng thứ tự
 inputRow = 0
 
 -- WalkSpeed, JumpPower, FOV
@@ -693,8 +644,7 @@ end)
 createInput("Gun Aura Radius", function() return auraRadius end, function(v)
     auraRadius = v
 end)
--- (Không cần Background Grid 3D nữa, vì giờ dùng UI grid)
--- Nếu muốn disable phần 3D grid world, không thêm createSwitch cho nó.
+-- Không còn Background Grid 3D hay blur overlay
 
 -- ---------- CharacterAdded để reapply khi respawn ----------
 LocalPlayer.CharacterAdded:Connect(function(char)
@@ -716,7 +666,7 @@ LocalPlayer.CharacterAdded:Connect(function(char)
             updateAllChams()
         end)
     end
-    -- Gun Aura không cần reinit UI; logic loop kiểm tra workspace
+    -- Gun Aura logic tự chạy trong loop
 end)
 
 -- ========== Kết thúc full script ==========
