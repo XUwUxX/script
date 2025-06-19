@@ -1,4 +1,4 @@
--- Kevinz Hub Full Script with Dark Minimalist GUI, Frosted Glass, Gradient, 3D Grid Background, ESP, Anti Features, Gun Aura, Notification, etc.
+-- Kevinz Hub Full Script với Dark Minimalist GUI, Frosted Glass, Gradient, UI Grid Background “liền” trong window, ESP, Anti Features, Gun Aura, Notification, v.v.
 
 -- Services
 local Players = game:GetService("Players")
@@ -36,9 +36,11 @@ overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 overlay.BackgroundTransparency = 0.6
 overlay.ZIndex = 1
 overlay.Visible = false
+-- Cho phép click-through để không chặn tương tác game phía sau, chỉ làm mờ hậu cảnh
+overlay.InputTransparent = true
 overlay.Parent = gui
 
--- BlurEffect in Lighting
+-- BlurEffect in Lighting (chỉ client)
 local blurEffect = Instance.new("BlurEffect")
 blurEffect.Name = "KevinzHubBlurEffect"
 blurEffect.Size = 0
@@ -66,9 +68,9 @@ local window = Instance.new("Frame")
 window.Name = "MainWindow"
 window.AnchorPoint = Vector2.new(0.5, 0.5)
 window.Position = UDim2.fromScale(0.5, 0.5)
-window.Size = UDim2.fromOffset(400, 380)
+window.Size = UDim2.fromOffset(400, 380)  -- cố định kích thước
 window.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-window.BackgroundTransparency = 0.3
+window.BackgroundTransparency = 0.3  -- semi-translucent để thấy grid UI phía sau
 window.BorderSizePixel = 0
 window.Active = true
 window.Draggable = true
@@ -77,7 +79,7 @@ window.ClipsDescendants = true
 window.Parent = gui
 Instance.new("UICorner", window).CornerRadius = UDim.new(0, 12)
 
--- Gradient overlay inside window
+-- Gradient overlay inside window (đen->đỏ sẫm, mờ)
 local gradient = Instance.new("UIGradient", window)
 gradient.Rotation = 90
 gradient.Color = ColorSequence.new{
@@ -88,6 +90,74 @@ gradient.Transparency = NumberSequence.new{
     NumberSequenceKeypoint.new(0, 0.7),
     NumberSequenceKeypoint.new(1, 0.8),
 }
+
+-- === UI Grid Background inside window ===
+-- Tạo một Frame chứa các đường kẻ ngang-dọc, nằm ngay dưới content/UI nhưng trên gradient
+local gridContainer = Instance.new("Frame", window)
+gridContainer.Name = "UIGridBackground"
+gridContainer.AnchorPoint = Vector2.new(0, 0)
+gridContainer.Position = UDim2.new(0, 0, 0, 0)
+gridContainer.Size = UDim2.new(1, 1, 1, 0)  -- full window
+gridContainer.BackgroundTransparency = 1
+gridContainer.ZIndex = 1  -- để dưới content, trên background color+gradient
+
+-- Hàm vẽ lại grid khi size window thay đổi hoặc khởi tạo
+local function drawUIGrid()
+    -- Xóa các line cũ
+    for _, child in ipairs(gridContainer:GetChildren()) do
+        if child:IsA("Frame") then
+            child:Destroy()
+        end
+    end
+    -- Lấy kích thước thực tế (px)
+    local absSize = window.AbsoluteSize
+    local widthPx = absSize.X
+    local heightPx = absSize.Y
+    -- Chọn spacing (px) cho grid, ví dụ 20 px
+    local spacing = 20
+    local lineThickness = 1
+
+    -- Màu line: nhạt so với background, ví dụ trắng nhẹ với transparency
+    local lineColor = Color3.fromRGB(200, 200, 200)
+    local lineTrans = 0.8
+
+    -- Vẽ đường dọc
+    local x = 0
+    while x <= widthPx do
+        local line = Instance.new("Frame")
+        line.Name = "GridLineV"
+        line.Size = UDim2.new(0, lineThickness, 1, 0)
+        line.Position = UDim2.new(0, x, 0, 0)
+        line.BackgroundColor3 = lineColor
+        line.BackgroundTransparency = lineTrans
+        line.ZIndex = 1
+        line.Parent = gridContainer
+        x = x + spacing
+    end
+    -- Vẽ đường ngang
+    local y = 0
+    while y <= heightPx do
+        local line = Instance.new("Frame")
+        line.Name = "GridLineH"
+        line.Size = UDim2.new(1, 0, 0, lineThickness)
+        line.Position = UDim2.new(0, 0, 0, y)
+        line.BackgroundColor3 = lineColor
+        line.BackgroundTransparency = lineTrans
+        line.ZIndex = 1
+        line.Parent = gridContainer
+        y = y + spacing
+    end
+end
+
+-- Kết nối với AbsoluteSize thay đổi (ban đầu window.AbsoluteSize có thể 0 trước khi render, nên dùng task.defer)
+window:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+    -- Delay một tick để AbsoluteSize ổn định
+    task.defer(drawUIGrid)
+end)
+-- Lần đầu
+task.defer(function()
+    drawUIGrid()
+end)
 
 -- Top bar
 local topBar = Instance.new("Frame", window)
@@ -137,7 +207,7 @@ closeButton.TextColor3 = Color3.fromRGB(240, 240, 240)
 closeButton.AutoButtonColor = false
 Instance.new("UICorner", closeButton).CornerRadius = UDim.new(1, 0)
 
--- Content ScrollingFrame
+-- Content ScrollingFrame (trên gridContainer)
 local content = Instance.new("ScrollingFrame", window)
 content.Name = "ContentFrame"
 content.Size = UDim2.new(1, 0, 1, -30)
@@ -146,6 +216,7 @@ content.BackgroundTransparency = 1
 content.ScrollBarThickness = 6
 content.CanvasSize = UDim2.new(0, 0, 0, 0)
 content.AutomaticCanvasSize = Enum.AutomaticSize.Y
+content.ZIndex = 2  -- trên grid
 
 local uiList = Instance.new("UIListLayout", content)
 uiList.SortOrder = Enum.SortOrder.LayoutOrder
@@ -284,7 +355,6 @@ end)
 task.defer(function()
     window.Visible = true
     setBlur(true)
-    -- Tween-in
     TweenService:Create(window, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
         Position = UDim2.new(0.5, 0, 0.5, 0)
     }):Play()
@@ -398,10 +468,9 @@ local function setupPlayerListeners(player)
 end
 
 -- Switch for ESP
-createSwitch("ESP Theo Role", function(on)
-    chamEnabled = on
-    updateAllChams()
-end)
+-- Lưu ý: Tạo UI sau khi đã gọi createSwitch, nhưng hàm createSwitch phải được gọi khi tạo GUI (xem phần dưới)
+-- Logic: khi bật, gọi updateAllChams
+
 for _, player in ipairs(Players:GetPlayers()) do
     if player ~= LocalPlayer then
         setupPlayerListeners(player)
@@ -420,7 +489,6 @@ end)
 Players.PlayerRemoving:Connect(function(player)
     removeHighlightForPlayer(player)
 end)
--- ESP update loop to refresh colors every 1s
 spawn(function()
     while true do
         if chamEnabled then
@@ -512,13 +580,7 @@ local gunHighlightTable = {}
 local gunAuraEnabled = false
 local auraRadius = 10
 
-createSwitch("Gun Aura", function(on)
-    gunAuraEnabled = on
-end)
-createInput("Gun Aura Radius", function() return auraRadius end, function(v)
-    auraRadius = v
-end)
-
+-- Hàm highlight dropped gun
 local function highlightDroppedGun(tool)
     if gunHighlightTable[tool] then return end
     local adorneeObj = nil
@@ -589,102 +651,6 @@ spawn(function()
     end
 end)
 
--- ---------- Background Grid 3D ----------
-local gridFolder = nil
-local gridEnabled = false
-local GRID_SIZE = 100
-local GRID_SPACING = 10
-local GRID_THICKNESS = 0.2
-local GRID_Y = 0
-
-local function createGrid()
-    if gridFolder then
-        gridFolder:Destroy()
-        gridFolder = nil
-    end
-    gridFolder = Instance.new("Folder")
-    gridFolder.Name = "KevinzHub_GridBackground"
-    gridFolder.Parent = workspace
-
-    -- Lines along X-axis (vary x, fixed z)
-    for i = -GRID_SIZE, GRID_SIZE, GRID_SPACING do
-        local line = Instance.new("Part")
-        line.Name = "GridLineX_"..i
-        line.Size = Vector3.new((GRID_SIZE*2)+GRID_SPACING, GRID_THICKNESS, GRID_THICKNESS)
-        line.Anchored = true
-        line.CanCollide = false
-        line.Material = Enum.Material.SmoothPlastic
-        line.Color = Color3.fromRGB(100, 100, 100)
-        line.Transparency = 0.5
-        line.TopSurface = Enum.SurfaceType.Smooth
-        line.BottomSurface = Enum.SurfaceType.Smooth
-        line.CFrame = CFrame.new(0, GRID_Y, i)
-        line.Parent = gridFolder
-    end
-    -- Lines along Z-axis (vary z, fixed x)
-    for i = -GRID_SIZE, GRID_SIZE, GRID_SPACING do
-        local line = Instance.new("Part")
-        line.Name = "GridLineZ_"..i
-        line.Size = Vector3.new(GRID_THICKNESS, GRID_THICKNESS, (GRID_SIZE*2)+GRID_SPACING)
-        line.Anchored = true
-        line.CanCollide = false
-        line.Material = Enum.Material.SmoothPlastic
-        line.Color = Color3.fromRGB(100, 100, 100)
-        line.Transparency = 0.5
-        line.TopSurface = Enum.SurfaceType.Smooth
-        line.BottomSurface = Enum.SurfaceType.Smooth
-        line.CFrame = CFrame.new(i, GRID_Y, 0)
-        line.Parent = gridFolder
-    end
-end
-
-local function removeGrid()
-    if gridFolder then
-        gridFolder:Destroy()
-        gridFolder = nil
-    end
-end
-
-createSwitch("Background Grid", function(on)
-    gridEnabled = on
-    if on then
-        -- Optionally update GRID_Y based on player position:
-        GRID_Y = RootPart and (RootPart.Position.Y - 5) or GRID_Y
-        createGrid()
-    else
-        removeGrid()
-    end
-end)
-
-LocalPlayer.CharacterAdded:Connect(function(char)
-    Character = char
-    Humanoid = char:WaitForChild("Humanoid", 5)
-    RootPart = char:WaitForChild("HumanoidRootPart", 5)
-    setupAntiFeatures()
-    -- Reset walk/jump values
-    if Humanoid then
-        task.wait(0.2)
-        pcall(function()
-            Humanoid.WalkSpeed = savedWalkSpeed
-            Humanoid.JumpPower = savedJumpPower
-        end)
-    end
-    -- Reapply ESP if needed
-    if chamEnabled then
-        task.delay(0.5, function()
-            updateAllChams()
-        end)
-    end
-    -- Update grid position if enabled
-    if gridEnabled and RootPart then
-        GRID_Y = RootPart.Position.Y - 5
-        createGrid()
-    end
-end)
-
--- Initial setupAntiFeatures
-setupAntiFeatures()
-
 -- ---------- Notification on load ----------
 task.delay(1, function()
     pcall(function()
@@ -696,8 +662,11 @@ task.delay(1, function()
     end)
 end)
 
+-- ---------- Setup Anti Features initially ----------
+setupAntiFeatures()
+
 -- ---------- Create Inputs/Switches for core settings ----------
--- Reset inputRow so GUI elements appear in order
+-- Reset inputRow so GUI elements xuất hiện đúng thứ tự
 inputRow = 0
 
 -- WalkSpeed, JumpPower, FOV
@@ -712,29 +681,42 @@ end)
 createInput("FOV", function() return workspace.CurrentCamera.FieldOfView end, function(v)
     pcall(function() workspace.CurrentCamera.FieldOfView = v end)
 end)
--- ESP switch (already wired above)
--- Gun Aura
--- (The createSwitch and createInput calls for Gun Aura were already made above during GUI setup order)
--- But ensure ordering: if needed, move these calls here:
--- Note: since inputRow was reset, recreate Gun Aura UI after WalkSpeed/JumpPower/FOV:
+-- ESP Theo Role
 createSwitch("ESP Theo Role", function(on)
     chamEnabled = on
     updateAllChams()
 end)
+-- Gun Aura
 createSwitch("Gun Aura", function(on)
     gunAuraEnabled = on
 end)
 createInput("Gun Aura Radius", function() return auraRadius end, function(v)
     auraRadius = v
 end)
-createSwitch("Background Grid", function(on)
-    gridEnabled = on
-    if on then
-        GRID_Y = RootPart and (RootPart.Position.Y - 5) or GRID_Y
-        createGrid()
-    else
-        removeGrid()
+-- (Không cần Background Grid 3D nữa, vì giờ dùng UI grid)
+-- Nếu muốn disable phần 3D grid world, không thêm createSwitch cho nó.
+
+-- ---------- CharacterAdded để reapply khi respawn ----------
+LocalPlayer.CharacterAdded:Connect(function(char)
+    Character = char
+    Humanoid = char:WaitForChild("Humanoid", 5)
+    RootPart = char:WaitForChild("HumanoidRootPart", 5)
+    setupAntiFeatures()
+    -- Reset walk/jump
+    if Humanoid then
+        task.wait(0.2)
+        pcall(function()
+            Humanoid.WalkSpeed = savedWalkSpeed
+            Humanoid.JumpPower = savedJumpPower
+        end)
     end
+    -- Reapply ESP nếu đang bật
+    if chamEnabled then
+        task.delay(0.5, function()
+            updateAllChams()
+        end)
+    end
+    -- Gun Aura không cần reinit UI; logic loop kiểm tra workspace
 end)
 
--- End of full script
+-- ========== Kết thúc full script ==========
