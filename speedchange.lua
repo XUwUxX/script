@@ -1,5 +1,5 @@
--- Kevinz Hub Full Script with Dark Minimalist UI, UI Grid Background, ESP, Anti Features, Gun Aura, Notification, etc.
--- GUI parent vào PlayerGui, không chặn input game
+-- Kevinz Hub Full Script với GUI nền đen mặc định, đầy đủ tính năng: WalkSpeed, JumpPower, FOV, ESP, Anti Features, Gun Aura, Notification, v.v.
+-- GUI parent vào PlayerGui, không chặn input game.
 
 -- Services
 local Players = game:GetService("Players")
@@ -16,7 +16,7 @@ local RootPart = Character:WaitForChild("HumanoidRootPart")
 -- Saved defaults
 local savedWalkSpeed = Humanoid.WalkSpeed
 local savedJumpPower = Humanoid.JumpPower
-local HUB_VERSION = "v1.7.3"
+local HUB_VERSION = "v1.7.4"
 
 -- ================= GUI SETUP =================
 -- ScreenGui parent vào PlayerGui
@@ -32,93 +32,24 @@ window.Name = "MainWindow"
 window.AnchorPoint = Vector2.new(0.5, 0.5)
 window.Position = UDim2.fromScale(0.5, 0.5)
 window.Size = UDim2.fromOffset(400, 380)  -- cố định kích thước
-window.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-window.BackgroundTransparency = 0.3  -- semi-translucent
+-- Nền đen đặc
+window.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+window.BackgroundTransparency = 0  -- opaque
 window.BorderSizePixel = 0
-window.Active = true  -- để ScrollingFrame con có thể nhận input scroll
+window.Active = true  -- cho ScrollingFrame con nhận input scroll
 window.Draggable = true
 window.ZIndex = 2
 window.ClipsDescendants = true
 window.Parent = gui
 Instance.new("UICorner", window).CornerRadius = UDim.new(0, 12)
 
--- Gradient overlay inside window
-local gradient = Instance.new("UIGradient", window)
-gradient.Rotation = 90
-gradient.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 20, 20)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(100, 0, 0)),
-}
-gradient.Transparency = NumberSequence.new{
-    NumberSequenceKeypoint.new(0, 0.7),
-    NumberSequenceKeypoint.new(1, 0.8),
-}
-
--- UI Grid Background inside window (“liền mạch” với UI)
-local gridContainer = Instance.new("Frame", window)
-gridContainer.Name = "UIGridBackground"
-gridContainer.AnchorPoint = Vector2.new(0, 0)
-gridContainer.Position = UDim2.new(0, 0, 0, 0)
-gridContainer.Size = UDim2.new(1, 0, 1, 0)
-gridContainer.BackgroundTransparency = 1
-gridContainer.ZIndex = 1  -- nằm dưới content, trên background color+gradient
-
--- Hàm vẽ lại grid khi size window thay đổi hoặc khởi tạo
-local function drawUIGrid()
-    -- Xóa các đường cũ
-    for _, child in ipairs(gridContainer:GetChildren()) do
-        if child:IsA("Frame") then child:Destroy() end
-    end
-    -- Lấy kích thước thực tế (pixel)
-    local absSize = window.AbsoluteSize
-    local widthPx = absSize.X
-    local heightPx = absSize.Y
-    -- Spacing (pixel) cho grid
-    local spacing = 20
-    local lineThickness = 1
-    local lineColor = Color3.fromRGB(200, 200, 200)
-    local lineTrans = 0.8
-    -- Đường dọc
-    local x = 0
-    while x <= widthPx do
-        local line = Instance.new("Frame")
-        line.Name = "GridLineV"
-        line.Size = UDim2.new(0, lineThickness, 1, 0)
-        line.Position = UDim2.new(0, x, 0, 0)
-        line.BackgroundColor3 = lineColor
-        line.BackgroundTransparency = lineTrans
-        line.ZIndex = 1
-        line.Parent = gridContainer
-        x = x + spacing
-    end
-    -- Đường ngang
-    local y = 0
-    while y <= heightPx do
-        local line = Instance.new("Frame")
-        line.Name = "GridLineH"
-        line.Size = UDim2.new(1, 0, 0, lineThickness)
-        line.Position = UDim2.new(0, 0, 0, y)
-        line.BackgroundColor3 = lineColor
-        line.BackgroundTransparency = lineTrans
-        line.ZIndex = 1
-        line.Parent = gridContainer
-        y = y + spacing
-    end
-end
-
--- Kết nối khi AbsoluteSize thay đổi
-window:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-    task.defer(drawUIGrid)
-end)
--- Lần đầu
-task.defer(drawUIGrid)
-
 -- Top bar
 local topBar = Instance.new("Frame", window)
 topBar.Name = "TopBar"
 topBar.Size = UDim2.new(1, 0, 0, 30)
 topBar.Position = UDim2.new(0, 0, 0, 0)
-topBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+-- có thể để hơi nhạt hơn so với nền chính để phân biệt
+topBar.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 topBar.BorderSizePixel = 0
 Instance.new("UICorner", topBar).CornerRadius = UDim.new(0, 8)
 
@@ -152,7 +83,7 @@ local closeButton = Instance.new("TextButton", topBar)
 closeButton.Name = "CloseButton"
 closeButton.Size = UDim2.new(0, 28, 0, 28)
 closeButton.Position = UDim2.new(1, -32, 0, 1)
-closeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+closeButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 closeButton.Text = "-"
 closeButton.Font = Enum.Font.GothamBold
 closeButton.TextScaled = false
@@ -171,7 +102,7 @@ content.ScrollBarThickness = 6
 content.CanvasSize = UDim2.new(0, 0, 0, 0)
 content.AutomaticCanvasSize = Enum.AutomaticSize.Y
 content.Active = true  -- cho phép kéo scroll
-content.ZIndex = 2  -- trên grid
+content.ZIndex = 2  -- trên nền
 
 local uiList = Instance.new("UIListLayout", content)
 uiList.SortOrder = Enum.SortOrder.LayoutOrder
@@ -206,7 +137,7 @@ end)
 -- Show window on initial load
 task.defer(function()
     window.Visible = true
-    TweenService:Create(window, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+    TweenService:Create(window, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
         Position = UDim2.new(0.5, 0, 0.5, 0)
     }):Play()
 end)
@@ -221,8 +152,8 @@ local function createInput(labelText, getDefault, callback)
     local container = Instance.new("Frame")
     container.Name = "InputRow_"..inputRow
     container.Size = UDim2.new(1, -20, 0, ROW_HEIGHT)
-    container.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    container.BackgroundTransparency = 0.2
+    container.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    container.BackgroundTransparency = 0  -- opaque slightly lighter
     container.BorderSizePixel = 0
     Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
     container.LayoutOrder = inputRow
@@ -272,8 +203,8 @@ local function createSwitch(labelText, callback)
     local container = Instance.new("Frame")
     container.Name = "SwitchRow_"..inputRow
     container.Size = UDim2.new(1, -20, 0, ROW_HEIGHT)
-    container.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    container.BackgroundTransparency = 0.2
+    container.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    container.BackgroundTransparency = 0
     container.BorderSizePixel = 0
     Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
     container.LayoutOrder = inputRow
