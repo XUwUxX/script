@@ -1,4 +1,4 @@
--- Kevinz Hub Full Script v1.7.5 (Fixed)
+-- Kevinz Hub Full Script v1.8 (Fixed)
 -- ESP logic fixed for proper round-to-round persistence and Sheriff vs Hero detection.
 -- Fixed Sheriff gun auto-unequip bug caused by Gun Aura.
 -- Includes full UI, Anti-Features, Gun Aura, Highlight Dropped Gun, and performance optimizations.
@@ -21,7 +21,7 @@ local RootPart = Character:WaitForChild("HumanoidRootPart")
 -- Saved defaults
 local savedWalkSpeed = Humanoid.WalkSpeed
 local savedJumpPower = Humanoid.JumpPower
-local HUB_VERSION = "v1.7.5"
+local HUB_VERSION = "v1.8"
 
 -- ================= GUI SETUP =================
 local gui = Instance.new("ScreenGui")
@@ -105,7 +105,6 @@ nameLabel.TextSize = 10
 nameLabel.TextXAlignment = Enum.TextXAlignment.Center -- Căn giữa text
 nameLabel.TextWrapped = true
 nameLabel.TextScaled = true
--- nameLabel.MinimumTextSize = 10 -- ***Đã xóa: Dòng này gây lỗi vì không tương thích với phiên bản Roblox Studio của bạn***
 nameLabel.LayoutOrder = 2 -- Đặt thứ tự hiển thị
 
 -- Minimize button (nút "-")
@@ -317,137 +316,6 @@ local function createButton(labelText, callback)
     end)
 end
 
--- ================= Helper UI functions =================
-local inputRow = 0
-local ROW_HEIGHT = 30
-
-local function createInput(labelText, getDefault, callback)
-    inputRow = inputRow + 1
-    local container = Instance.new("Frame")
-    container.Name = "InputRow_"..inputRow
-    container.Size = UDim2.new(1, -20, 0, ROW_HEIGHT)
-    container.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-    container.BorderSizePixel = 0
-    Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
-    container.LayoutOrder = inputRow
-    container.Parent = content
-
-    local label = Instance.new("TextLabel", container)
-    label.Name = "Label"
-    label.Size = UDim2.new(0.4, 0, 1, 0)
-    label.Position = UDim2.new(0, 8, 0, 0)
-    label.BackgroundTransparency = 1
-    label.Text = labelText
-    label.TextColor3 = Color3.fromRGB(230, 230, 230)
-    label.Font = Enum.Font.Gotham
-    label.TextSize = 14
-    label.TextXAlignment = Enum.TextXAlignment.Left
-
-    local input = Instance.new("TextBox", container)
-    input.Name = "TextBox"
-    input.Size = UDim2.new(0.6, -16, 1, -4)
-    input.Position = UDim2.new(0.4, 8, 0, 2)
-    input.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    input.TextColor3 = Color3.fromRGB(240, 240, 240)
-    input.Text = ""
-    input.PlaceholderText = tostring(getDefault())
-    input.ClearTextOnFocus = false
-    input.Font = Enum.Font.Gotham
-    input.TextSize = 14
-    Instance.new("UICorner", input).CornerRadius = UDim.new(0, 6)
-
-    input.FocusLost:Connect(function(enterPressed)
-        if enterPressed then
-            local text = input.Text
-            local val = tonumber(text)
-            if val then
-                pcall(function() callback(val) end)
-                input.PlaceholderText = tostring(val)
-            end
-            input.Text = ""
-        end
-    end)
-    return input -- Return input for external updates if needed (e.g. for HP display)
-end
-
-local function createSwitch(labelText, callback)
-    inputRow = inputRow + 1
-    local container = Instance.new("Frame")
-    container.Name = "SwitchRow_"..inputRow
-    container.Size = UDim2.new(1, -20, 0, ROW_HEIGHT)
-    container.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-    container.BorderSizePixel = 0
-    Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
-    container.LayoutOrder = inputRow
-    container.Parent = content
-
-    local label = Instance.new("TextLabel", container)
-    label.Name = "Label"
-    label.Size = UDim2.new(0.6, 0, 1, 0)
-    label.Position = UDim2.new(0, 8, 0, 0)
-    label.BackgroundTransparency = 1
-    label.Text = labelText
-    label.TextColor3 = Color3.fromRGB(230, 230, 230)
-    label.Font = Enum.Font.Gotham
-    label.TextSize = 14
-    label.TextXAlignment = Enum.TextXAlignment.Left
-
-    local toggle = Instance.new("TextButton", container)
-    toggle.Name = "Toggle"
-    toggle.Size = UDim2.new(0.4, -16, 1, -4)
-    toggle.Position = UDim2.new(0.6, 8, 0, 2)
-    toggle.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-    toggle.Text = "OFF"
-    toggle.Font = Enum.Font.GothamBold
-    toggle.TextSize = 14
-    toggle.TextColor3 = Color3.fromRGB(240, 240, 240)
-    toggle.AutoButtonColor = false
-    Instance.new("UICorner", toggle).CornerRadius = UDim.new(0, 6)
-
-    local state = false
-    toggle.MouseButton1Click:Connect(function()
-        state = not state
-        toggle.Text = state and "ON" or "OFF"
-        if state then
-            TweenService:Create(toggle, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0, 150, 0)}):Play()
-        else
-            TweenService:Create(toggle, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(70, 70, 70)}):Play()
-        end
-        pcall(function() callback(state) end)
-    end)
-end
-
-local function createButton(labelText, callback)
-    inputRow = inputRow + 1
-    local container = Instance.new("Frame")
-    container.Name = "ButtonRow_"..inputRow
-    container.Size = UDim2.new(1, -20, 0, ROW_HEIGHT)
-    container.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-    container.BorderSizePixel = 0
-    Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
-    container.LayoutOrder = inputRow
-    container.Parent = content
-
-    local btn = Instance.new("TextButton", container)
-    btn.Name = "Button"
-    btn.Size = UDim2.new(1, 0, 1, 0)
-    btn.Position = UDim2.new(0, 0, 0, 0)
-    btn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-    btn.Text = labelText
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 14
-    btn.TextColor3 = Color3.fromRGB(240, 240, 240)
-    btn.AutoButtonColor = false
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-    btn.MouseButton1Click:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(100, 100, 100)}):Play()
-        task.delay(0.1, function()
-            TweenService:Create(btn, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(70, 70, 70)}):Play()
-        end)
-        pcall(function() callback() end)
-    end)
-end
-
 -- ================= CORE LOGIC =================
 
 --- ESP persistent with proper Sheriff vs Hero detection ---
@@ -456,6 +324,7 @@ local chamHighlights = {}
 local initialGunGiven = {} -- track if player was given Gun at spawn (Sheriff)
 local gameStartedTime = os.time() -- Track game start time for role detection delay
 local gunRoundStartTime = 13 -- Time in seconds until guns/knives appear
+local isSheriffAlive = false -- BIẾN MỚI: Theo dõi trạng thái của Sheriff
 
 -- NEW: Global state for dropped gun highlighting
 local highlightDroppedGunEnabled = false -- This is now controlled by chamEnabled
@@ -467,22 +336,31 @@ local heldItemHighlights = {} -- Stores highlights for currently held guns/knive
 -- Determine role
 local function getRole(player)
     local char = player.Character
-    if char then
-        -- Ưu tiên kiểm tra Murderer
-        if char:FindFirstChild("Knife") or (player.Backpack and player.Backpack:FindFirstChild("Knife")) then
-            return "Murderer"
-        end
-        -- Sau đó kiểm tra Sheriff (người được cấp súng ban đầu)
-        if initialGunGiven[player] then
-            return "Sheriff"
-        end
-        -- Cuối cùng mới kiểm tra Hero (người nhặt được súng sau đó)
-        if char:FindFirstChild("Gun") or (player.Backpack and player.Backpack:FindFirstChild("Gun")) then
+    if not char then return "Innocent" end
+
+    -- Ưu tiên kiểm tra Murderer
+    if char:FindFirstChild("Knife") or (player.Backpack and player.Backpack:FindFirstChild("Knife")) then
+        return "Murderer"
+    end
+    
+    -- Sau đó kiểm tra Sheriff (người được cấp súng ban đầu)
+    if initialGunGiven[player] then
+        return "Sheriff"
+    end
+
+    -- CHỈ XÉT VAI TRÒ HERO SAU KHI ĐÃ QUA THỜI GIAN CẤP SÚNG BAN ĐẦU
+    local timeSinceGameStart = os.time() - gameStartedTime
+    if timeSinceGameStart > (gunRoundStartTime + 1) then -- Thêm 2 giây đệm an toàn
+        -- Nếu đã qua thời gian cấp súng, kiểm tra xem Sheriff có còn sống không
+        if (char:FindFirstChild("Gun") or (player.Backpack and player.Backpack:FindFirstChild("Gun"))) and not isSheriffAlive then
             return "Hero"
         end
     end
+
+    -- Nếu không phải các vai trò trên, hoặc trong thời gian chờ, thì là Innocent
     return "Innocent"
 end
+
 
 -- Update highlight color/transparency based on role
 local function updateHighlightColor(player)
@@ -694,6 +572,7 @@ local function setupPlayerListeners(player)
             local hasGunNow = char:FindFirstChild("Gun") or (player.Backpack and player.Backpack:FindFirstChild("Gun"))
             if hasGunNow then
                 initialGunGiven[player] = true -- Đặt là true Vĩnh viễn cho round này nếu tìm thấy súng
+                isSheriffAlive = true -- ĐÁNH DẤU SHERIFF CÒN SỐNG
                 if chamEnabled and player ~= LocalPlayer then
                     addHighlightForPlayer(player)
                 end
@@ -732,8 +611,14 @@ local function setupPlayerListeners(player)
         if playerHumanoid then
             playerHumanoid.Died:Connect(function()
                 task.delay(0.1, function()
-                    local role = getRole(player)
-                    if role == "Sheriff" then
+                    -- Lấy vai trò TRƯỚC khi người chơi chết hẳn
+                    local roleBeforeDeath = "Innocent"
+                    if initialGunGiven[player] then
+                        roleBeforeDeath = "Sheriff"
+                    end
+                    
+                    if roleBeforeDeath == "Sheriff" then
+                        isSheriffAlive = false -- ĐÁNH DẤU SHERIFF ĐÃ CHẾT
                         pcall(function()
                             StarterGui:SetCore("SendNotification", {
                                 Title = "Sheriff Died!",
@@ -742,27 +627,34 @@ local function setupPlayerListeners(player)
                                 Button1 = "OK"
                             })
                         end)
+            
+                        -- Cập nhật lại tất cả highlight ngay lập tức
+                        -- Điều này sẽ khiến người chơi nhặt được súng chuyển thành Hero
+                        updateAllChams()
+            
                         -- Kiểm tra súng rơi sau khi Sheriff chết
                         task.delay(0.2, function()
                             for _, child in ipairs(workspace:GetChildren()) do
-                                -- Rất quan trọng: Cần xác định chính xác tên của Part/Model súng khi nó rơi.
-                                -- Dùng "GunDrop" như trong hình bạn cung cấp
                                 if (child:IsA("BasePart") or child:IsA("Model")) and child.Name == "GunDrop" then
-                                    if chamEnabled and not gunHighlightTable[child] then -- Only highlight if ESP is on
+                                    if chamEnabled and not gunHighlightTable[child] then
                                         addHighlightForDroppedGun(child)
                                     end
                                 end
                             end
                         end)
-                    elseif role == "Hero" then
-                        pcall(function()
-                            StarterGui:SetCore("SendNotification", {
-                                Title = "Hero Died!",
-                                Text = player.DisplayName.." (Hero) đã chết!",
-                                Duration = 5,
-                                Button1 = "OK"
-                            })
-                        end)
+                    else
+                        -- Vẫn giữ logic thông báo khi Hero chết
+                        local currentRole = getRole(player)
+                        if currentRole == "Hero" then
+                             pcall(function()
+                                StarterGui:SetCore("SendNotification", {
+                                    Title = "Hero Died!",
+                                    Text = player.DisplayName.." (Hero) đã chết!",
+                                    Duration = 5,
+                                    Button1 = "OK"
+                                })
+                            end)
+                        end
                     end
                 end)
             end)
@@ -780,6 +672,7 @@ local function setupPlayerListeners(player)
             local hasGunNow = char:FindFirstChild("Gun") or (player.Backpack and player.Backpack:FindFirstChild("Gun"))
             if hasGunNow then
                 initialGunGiven[player] = true
+                isSheriffAlive = true -- ĐÁNH DẤU SHERIFF CÒN SỐNG
                 if chamEnabled and player ~= LocalPlayer then
                     addHighlightForPlayer(player)
                 end
@@ -819,8 +712,14 @@ local function setupPlayerListeners(player)
         if playerHumanoid then
             playerHumanoid.Died:Connect(function()
                 task.delay(0.1, function()
-                    local role = getRole(player)
-                    if role == "Sheriff" then
+                    -- Lấy vai trò TRƯỚC khi người chơi chết hẳn
+                    local roleBeforeDeath = "Innocent"
+                    if initialGunGiven[player] then
+                        roleBeforeDeath = "Sheriff"
+                    end
+                    
+                    if roleBeforeDeath == "Sheriff" then
+                        isSheriffAlive = false -- ĐÁNH DẤU SHERIFF ĐÃ CHẾT
                         pcall(function()
                             StarterGui:SetCore("SendNotification", {
                                 Title = "Sheriff Died!",
@@ -829,6 +728,12 @@ local function setupPlayerListeners(player)
                                 Button1 = "OK"
                             })
                         end)
+            
+                        -- Cập nhật lại tất cả highlight ngay lập tức
+                        -- Điều này sẽ khiến người chơi nhặt được súng chuyển thành Hero
+                        updateAllChams()
+            
+                        -- Kiểm tra súng rơi sau khi Sheriff chết
                         task.delay(0.2, function()
                             for _, child in ipairs(workspace:GetChildren()) do
                                 if (child:IsA("BasePart") or child:IsA("Model")) and child.Name == "GunDrop" then
@@ -838,15 +743,19 @@ local function setupPlayerListeners(player)
                                 end
                             end
                         end)
-                    elseif role == "Hero" then
-                        pcall(function()
-                            StarterGui:SetCore("SendNotification", {
-                                Title = "Hero Died!",
-                                Text = player.DisplayName.." (Hero) đã chết!",
-                                Duration = 5,
-                                Button1 = "OK"
-                            })
-                        end)
+                    else
+                        -- Vẫn giữ logic thông báo khi Hero chết
+                        local currentRole = getRole(player)
+                        if currentRole == "Hero" then
+                             pcall(function()
+                                StarterGui:SetCore("SendNotification", {
+                                    Title = "Hero Died!",
+                                    Text = player.DisplayName.." (Hero) đã chết!",
+                                    Duration = 5,
+                                    Button1 = "OK"
+                                })
+                            end)
+                        end
                     end
                 end)
             end)
@@ -999,13 +908,33 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Semi-God Mode Logic
+--- LOGIC SEMI-GOD MODE MỚI (RAGDOLL THAY VÌ CHẾT) ---
 local semiGodModeEnabled = false
-RunService.Heartbeat:Connect(function()
-    if semiGodModeEnabled and Humanoid and Humanoid.Parent and Humanoid.Health < Humanoid.MaxHealth then
-        Humanoid.Health = Humanoid.MaxHealth
+
+local function onHealthChanged(health)
+    -- Chỉ chạy logic nếu chức năng được bật và người chơi hợp lệ
+    if not semiGodModeEnabled or not Humanoid or not Humanoid.Parent then return end
+
+    -- Nếu máu xuống dưới hoặc bằng 0 (điều kiện chết)
+    if health <= 0 then
+        -- 1. Ngăn chặn cái chết ngay lập tức bằng cách đặt lại một ít máu
+        Humanoid.Health = 1 
+
+        -- 2. Kích hoạt trạng thái Ragdoll (nhân vật sẽ nằm vật ra)
+        Humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+
+        -- 3. Đặt lịch để tự đứng dậy và hồi máu sau một khoảng thời gian
+        task.delay(2.5, function()
+            -- Kiểm tra lại xem người chơi và humanoid có còn tồn tại không
+            if Humanoid and Humanoid.Parent and Humanoid:GetState() == Enum.HumanoidStateType.Physics then
+                -- Bắt đầu quá trình đứng dậy
+                Humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+                -- Sau khi đứng dậy, hồi đầy máu để sẵn sàng cho lần tấn công tiếp theo
+                Humanoid.Health = Humanoid.MaxHealth
+            end
+        end)
     end
-end)
+end
 
 
 -- Notification on load
@@ -1172,7 +1101,12 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     Humanoid = char:WaitForChild("Humanoid")
     RootPart = char:WaitForChild("HumanoidRootPart")
     
+    isSheriffAlive = false -- RESET TRẠNG THÁI KHI VÒNG MỚI BẮT ĐẦU
+
     setupAntiFeatures()
+
+    -- >>> THÊM VÀO ĐÂY: Kết nối logic Semi-God Mode mới cho nhân vật mới
+    Humanoid.HealthChanged:Connect(onHealthChanged)
 
     task.wait(0.2)
     if Humanoid then
@@ -1181,6 +1115,11 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     end
 
     if chamEnabled then
-        task.delay(0.6, updateAllChams) -- Delay slightly more to ensure roles are set and highlights applied
+        task.delay(0.6, updateAllChams)
     end
 end)
+
+-- >>> THÊM VÀO ĐÂY: Kết nối logic cho nhân vật đã tồn tại khi script chạy
+if Humanoid then
+    Humanoid.HealthChanged:Connect(onHealthChanged)
+end
