@@ -33,16 +33,27 @@ gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 local window = Instance.new("Frame")
 window.Name = "MainWindow"
 window.AnchorPoint = Vector2.new(0.5, 0.5)
-window.Position = UDim2.fromScale(1.5, 0.5) -- Start off-screen to the right
-window.Size = UDim2.new(0.5, 0, 0, 450) -- Tăng chiều cao để chứa thêm controls HP
-window.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
-window.BackgroundTransparency = 0.1
+window.Position = UDim2.fromScale(1.5, 0.5) -- Sẽ được tween về giữa
+window.Size = UDim2.new(0.35, 0, 0.5, 0)
+window.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+window.BackgroundTransparency = 0
 window.BorderSizePixel = 0
 window.Active = true
 window.Draggable = true
 window.ZIndex = 2
 window.ClipsDescendants = true
 window.Parent = gui
+
+-- Thêm UIGradient vào window
+local gradient = Instance.new("UIGradient", window)
+gradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 30, 30)), -- Màu tối ở trên
+    ColorSequenceKeypoint.new(0.7, Color3.fromRGB(25, 15, 15)), -- Chuyển dần sang màu đỏ sẫm hơn
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 0, 0)) -- Màu đỏ sẫm rõ hơn ở phía dưới
+}
+gradient.Rotation = 90 -- Gradient từ trên xuống dưới
+gradient.Transparency = NumberSequence.new(0, 0) -- Đảm bảo gradient hoàn toàn mờ đục
+
 Instance.new("UICorner", window).CornerRadius = UDim.new(0, 8)
 local stroke = Instance.new("UIStroke", window)
 stroke.Color = Color3.fromRGB(80, 80, 80)
@@ -54,7 +65,19 @@ topBar.Name = "TopBar"
 topBar.Size = UDim2.new(1, 0, 0, 30)
 topBar.Position = UDim2.new(0, 0, 0, 0)
 topBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+topBar.BackgroundTransparency = 1 -- Giữ trong suốt để gradient của window hiển thị
 topBar.BorderSizePixel = 0
+
+local topBarListLayout = Instance.new("UIListLayout", topBar)
+topBarListLayout.FillDirection = Enum.FillDirection.Horizontal
+topBarListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+topBarListLayout.Padding = UDim.new(0, 5) -- Khoảng cách giữa các phần tử
+
+local topBarPadding = Instance.new("UIPadding", topBar)
+topBarPadding.PaddingLeft = UDim.new(0, 6)
+topBarPadding.PaddingRight = UDim.new(0, 6)
+topBarPadding.PaddingTop = UDim.new(0, 5)
+topBarPadding.PaddingBottom = UDim.new(0, 5)
 
 -- Avatar
 local success, thumb = pcall(function()
@@ -62,31 +85,33 @@ local success, thumb = pcall(function()
 end)
 local avatar = Instance.new("ImageLabel", topBar)
 avatar.Name = "Avatar"
-avatar.Size = UDim2.new(0, 24, 0, 24)
-avatar.Position = UDim2.new(0, 6, 0.5, -12)
+avatar.Size = UDim2.new(0, 24, 0, 24) -- Chỉ định kích thước cố định
 avatar.BackgroundTransparency = 1
 avatar.Image = success and thumb or ""
 avatar.ImageTransparency = success and 0 or 1
 local avatarCorner = Instance.new("UICorner", avatar)
 avatarCorner.CornerRadius = UDim.new(1, 0)
+avatar.LayoutOrder = 1 -- Đặt thứ tự hiển thị
 
 -- DisplayName
 local nameLabel = Instance.new("TextLabel", topBar)
 nameLabel.Name = "NameLabel"
-nameLabel.Size = UDim2.new(1, -50, 1, 0)
-nameLabel.Position = UDim2.new(0, 36, 0, 0)
+nameLabel.Size = UDim2.new(0.7, 0, 0.7, 0) -- Chiều rộng theo tỷ lệ (scale) để lấp đầy khoảng trống
 nameLabel.BackgroundTransparency = 1
 nameLabel.Text = "Kevinz Hub | "..LocalPlayer.DisplayName
 nameLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
 nameLabel.Font = Enum.Font.GothamBold
-nameLabel.TextSize = 14
-nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+nameLabel.TextSize = 10
+nameLabel.TextXAlignment = Enum.TextXAlignment.Center -- Căn giữa text
+nameLabel.TextWrapped = true
+nameLabel.TextScaled = true
+-- nameLabel.MinimumTextSize = 10 -- ***Đã xóa: Dòng này gây lỗi vì không tương thích với phiên bản Roblox Studio của bạn***
+nameLabel.LayoutOrder = 2 -- Đặt thứ tự hiển thị
 
--- Close button (minimize)
+-- Minimize button (nút "-")
 local minimizeButton = Instance.new("TextButton", topBar)
 minimizeButton.Name = "MinimizeButton"
-minimizeButton.Size = UDim2.new(0, 28, 0, 28)
-minimizeButton.Position = UDim2.new(1, -32, 0, 1) -- Position next to close script button
+minimizeButton.Size = UDim2.new(0, 20, 0, 20) -- Kích thước cố định
 minimizeButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 minimizeButton.Text = "-"
 minimizeButton.Font = Enum.Font.GothamBold
@@ -94,19 +119,20 @@ minimizeButton.TextSize = 16
 minimizeButton.TextColor3 = Color3.fromRGB(240, 240, 240)
 minimizeButton.AutoButtonColor = false
 Instance.new("UICorner", minimizeButton).CornerRadius = UDim.new(1, 0)
+minimizeButton.LayoutOrder = 3 -- Đặt thứ tự hiển thị (trước nút X)
 
--- Close script button (new "X" button)
+-- Close script button (nút "X")
 local closeScriptButton = Instance.new("TextButton", topBar)
 closeScriptButton.Name = "CloseScriptButton"
-closeScriptButton.Size = UDim2.new(0, 28, 0, 28)
-closeScriptButton.Position = UDim2.new(1, -62, 0, 1) -- Position next to minimize button
+closeScriptButton.Size = UDim2.new(0, 20, 0, 20) -- Kích thước cố định
 closeScriptButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 closeScriptButton.Text = "X"
 closeScriptButton.Font = Enum.Font.GothamBold
-closeScriptButton.TextSize = 16
+closeScriptButton.TextSize = 12
 closeScriptButton.TextColor3 = Color3.fromRGB(240, 240, 240)
 closeScriptButton.AutoButtonColor = false
 Instance.new("UICorner", closeScriptButton).CornerRadius = UDim.new(1, 0)
+closeScriptButton.LayoutOrder = 4 -- Đặt thứ tự hiển thị
 
 -- Content ScrollingFrame
 local content = Instance.new("ScrollingFrame", window)
@@ -148,18 +174,148 @@ miniToggle.MouseButton1Click:Connect(function()
     miniToggle.Visible = false
 end)
 
-closeScriptButton.MouseButton1Click:Connect(function()
+closeScriptButton.MouseButton1Click:Connect(function() -- Sử dụng closeScriptButton (nút X)
     gui:Destroy() -- Destroy the entire ScreenGui to close the script
 end)
 
 -- Initial show with tween
 task.delay(2, function() -- Delay for 2 seconds
     window.Visible = true
-    TweenService:Create(window, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { -- Adjust EasingStyle and EasingDirection for slide effect
+    TweenService:Create(window, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
         Position = UDim2.fromScale(0.5, 0.5) -- End in the middle of the screen
     }):Play()
 end)
 
+-- ================= Helper UI functions =================
+local inputRow = 0
+local ROW_HEIGHT = 30
+
+local function createInput(labelText, getDefault, callback)
+    inputRow = inputRow + 1
+    local container = Instance.new("Frame")
+    container.Name = "InputRow_"..inputRow
+    container.Size = UDim2.new(1, -20, 0, ROW_HEIGHT)
+    container.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    container.BorderSizePixel = 0
+    Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
+    container.LayoutOrder = inputRow
+    container.Parent = content
+
+    local label = Instance.new("TextLabel", container)
+    label.Name = "Label"
+    label.Size = UDim2.new(0.4, 0, 1, 0)
+    label.Position = UDim2.new(0, 8, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = labelText
+    label.TextColor3 = Color3.fromRGB(230, 230, 230)
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 14
+    label.TextXAlignment = Enum.TextXAlignment.Left
+
+    local input = Instance.new("TextBox", container)
+    input.Name = "TextBox"
+    input.Size = UDim2.new(0.6, -16, 1, -4)
+    input.Position = UDim2.new(0.4, 8, 0, 2)
+    input.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    input.TextColor3 = Color3.fromRGB(240, 240, 240)
+    input.Text = ""
+    input.PlaceholderText = tostring(getDefault())
+    input.ClearTextOnFocus = false
+    input.Font = Enum.Font.Gotham
+    input.TextSize = 14
+    Instance.new("UICorner", input).CornerRadius = UDim.new(0, 6)
+
+    input.FocusLost:Connect(function(enterPressed)
+        if enterPressed then
+            local text = input.Text
+            local val = tonumber(text)
+            if val then
+                pcall(function() callback(val) end)
+                input.PlaceholderText = tostring(val)
+            end
+            input.Text = ""
+        end
+    end)
+    return input -- Return input for external updates if needed (e.g. for HP display)
+end
+
+local function createSwitch(labelText, callback)
+    inputRow = inputRow + 1
+    local container = Instance.new("Frame")
+    container.Name = "SwitchRow_"..inputRow
+    container.Size = UDim2.new(1, -20, 0, ROW_HEIGHT)
+    container.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    container.BorderSizePixel = 0
+    Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
+    container.LayoutOrder = inputRow
+    container.Parent = content
+
+    local label = Instance.new("TextLabel", container)
+    label.Name = "Label"
+    label.Size = UDim2.new(0.6, 0, 1, 0)
+    label.Position = UDim2.new(0, 8, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = labelText
+    label.TextColor3 = Color3.fromRGB(230, 230, 230)
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 14
+    label.TextXAlignment = Enum.TextXAlignment.Left
+
+    local toggle = Instance.new("TextButton", container)
+    toggle.Name = "Toggle"
+    toggle.Size = UDim2.new(0.4, -16, 1, -4)
+    toggle.Position = UDim2.new(0.6, 8, 0, 2)
+    toggle.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+    toggle.Text = "OFF"
+    toggle.Font = Enum.Font.GothamBold
+    toggle.TextSize = 14
+    toggle.TextColor3 = Color3.fromRGB(240, 240, 240)
+    toggle.AutoButtonColor = false
+    Instance.new("UICorner", toggle).CornerRadius = UDim.new(0, 6)
+
+    local state = false
+    toggle.MouseButton1Click:Connect(function()
+        state = not state
+        toggle.Text = state and "ON" or "OFF"
+        if state then
+            TweenService:Create(toggle, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0, 150, 0)}):Play()
+        else
+            TweenService:Create(toggle, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(70, 70, 70)}):Play()
+        end
+        pcall(function() callback(state) end)
+    end)
+end
+
+local function createButton(labelText, callback)
+    inputRow = inputRow + 1
+    local container = Instance.new("Frame")
+    container.Name = "ButtonRow_"..inputRow
+    container.Size = UDim2.new(1, -20, 0, ROW_HEIGHT)
+    container.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    container.BorderSizePixel = 0
+    Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
+    container.LayoutOrder = inputRow
+    container.Parent = content
+
+    local btn = Instance.new("TextButton", container)
+    btn.Name = "Button"
+    btn.Size = UDim2.new(1, 0, 1, 0)
+    btn.Position = UDim2.new(0, 0, 0, 0)
+    btn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+    btn.Text = labelText
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 14
+    btn.TextColor3 = Color3.fromRGB(240, 240, 240)
+    btn.AutoButtonColor = false
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    btn.MouseButton1Click:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(100, 100, 100)}):Play()
+        task.delay(0.1, function()
+            TweenService:Create(btn, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(70, 70, 70)}):Play()
+        end)
+        pcall(function() callback() end)
+    end)
+end
 
 -- ================= Helper UI functions =================
 local inputRow = 0
