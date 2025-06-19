@@ -1,4 +1,4 @@
--- Kevinz Hub - Full Script với WalkFling cải tiến nhanh nhất, text size 12, gradient black-red fade, dashed rounded border, và các tính năng khác.
+-- Kevinz Hub - Full Script (WalkFling đã bị loại bỏ), text size 12, gradient black-red fade, dashed rounded border, và các tính năng khác.
 
 -- Services
 local Players = game:GetService("Players")
@@ -28,7 +28,7 @@ gui.Parent = game.CoreGui
 local window = Instance.new("Frame")
 window.AnchorPoint = Vector2.new(0.5, 0.5)
 window.Position = UDim2.fromScale(0.5, 0.5)
-window.Size = UDim2.fromOffset(550, 500)
+window.Size = UDim2.fromOffset(400, 380)  -- cố định 400x380
 window.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 window.Active = true
 window.Draggable = true
@@ -51,7 +51,7 @@ gradient.Transparency = NumberSequence.new {
     NumberSequenceKeypoint.new(1, 0.2)
 }
 
--- Top bar with avatar và tên
+-- Top bar với avatar và tên
 local topBar = Instance.new("Frame", window)
 topBar.Size = UDim2.new(1, 0, 0, 30)  -- chiều cao 30
 topBar.Position = UDim2.new(0, 0, 0, 0)
@@ -60,11 +60,15 @@ topBar.BorderSizePixel = 0
 local topBarCorner = Instance.new("UICorner", topBar)
 topBarCorner.CornerRadius = UDim.new(0, 8)
 
+local success, thumb = pcall(function()
+    return Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
+end)
 local avatar = Instance.new("ImageLabel", topBar)
 avatar.Size = UDim2.new(0, 24, 0, 24)
 avatar.Position = UDim2.new(0, 6, 0.5, -12)
 avatar.BackgroundTransparency = 1
-avatar.Image = Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
+avatar.Image = success and thumb or ""
+avatar.ImageTransparency = success and 0 or 1
 
 local nameLabel = Instance.new("TextLabel", topBar)
 nameLabel.Size = UDim2.new(1, -50, 1, 0)
@@ -95,18 +99,22 @@ closeButton.MouseButton1Click:Connect(function()
     miniToggle.Visible = true
 end)
 
--- Content area dưới topBar
-local content = Instance.new("Frame", window)
+-- Content area dưới topBar: dùng ScrollingFrame để scroll khi nội dung vượt khung
+local content = Instance.new("ScrollingFrame", window)
 content.Size = UDim2.new(1, 0, 1, -30)
 content.Position = UDim2.new(0, 0, 0, 30)
 content.BackgroundTransparency = 1
+content.CanvasSize = UDim2.new(0, 0, 0, 0)
+content.AutomaticCanvasSize = Enum.AutomaticSize.Y
+content.ScrollBarThickness = 6
 
 -- Helpers cho các input rows
 local inputRow = 0
+local rowHeight = 30
+local padding = 6
+
 local function createInput(labelText, getDefault, callback)
     inputRow = inputRow + 1
-    local rowHeight = 30    -- giảm từ 40 xuống 30
-    local padding = 6       -- giảm từ 10 xuống 6
     local yOffset = (inputRow - 1) * (rowHeight + padding) + padding
 
     local container = Instance.new("Frame")
@@ -154,8 +162,6 @@ end
 
 local function createSwitch(labelText, callback)
     inputRow = inputRow + 1
-    local rowHeight = 30
-    local padding = 6
     local yOffset = (inputRow - 1) * (rowHeight + padding) + padding
 
     local container = Instance.new("Frame")
@@ -338,6 +344,12 @@ end
 Players.PlayerAdded:Connect(function(player)
     if player ~= LocalPlayer then
         setupPlayerListeners(player)
+        -- nếu ESP đang bật, áp dụng ngay
+        if chamEnabled then
+            task.delay(0.5, function()
+                addHighlightForPlayer(player)
+            end)
+        end
     end
 end)
 Players.PlayerRemoving:Connect(function(player)
@@ -347,6 +359,7 @@ end)
 -- mini toggle để ẩn/hiện window
 local miniToggle = Instance.new("TextButton", gui)
 miniToggle.Size = UDim2.new(0, 28, 0, 28)
+-- Đặt vị trí tương đối với chiều rộng window mới:
 miniToggle.Position = UDim2.new(0, 50, 1, -40)
 miniToggle.AnchorPoint = Vector2.new(0.5, 0.5)
 miniToggle.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
@@ -438,91 +451,6 @@ local function setupAntiFeatures()
         end
     end)
 end
-
--- ================= WalkFling cải tiến =================
--- Phát hiện gần người chơi khác trong radius, fling ngay lập tức với lực mạnh, và cooldown tránh lặp liên tục.
-local walkFlingEnabled = false
-local flingRadius = 5      -- default radius để detect (studs)
-local flingForce = 200     -- default lực fling
-local flingCooldown = 1    -- thời gian cooldown cho mỗi target (giây)
--- Bảng lưu thời gian lần cuối fling mỗi player
-local lastFlingTime = {}
-
--- GUI để chỉnh radius và force WalkFling
-createSwitch("WalkFling (troll)", function(on)
-    walkFlingEnabled = on
-    -- nếu tắt, reset lastFlingTime để khi bật lại có thể fling ngay
-    if not on then
-        lastFlingTime = {}
-    end
-end)
-createInput("WalkFling Radius", function() return flingRadius end, function(v)
-    flingRadius = v
-end)
-createInput("WalkFling Force", function() return flingForce end, function(v)
-    flingForce = v
-end)
-createInput("WalkFling Cooldown", function() return flingCooldown end, function(v)
-    flingCooldown = v
-end)
-
--- Hàm fling một player
-local function flingPlayer(otherRoot)
-    -- Tạo BodyVelocity để đẩy
-    local direction = (otherRoot.Position - RootPart.Position)
-    if direction.Magnitude > 0 then
-        direction = direction.Unit
-    else
-        -- phòng trường hợp trùng vị trí, đẩy lên
-        direction = Vector3.new(0, 1, 0)
-    end
-    -- Tạo BodyVelocity
-    local bv = Instance.new("BodyVelocity")
-    bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
-    bv.Velocity = direction * flingForce + Vector3.new(0, 50, 0)
-    bv.P = 1250
-    bv.Parent = otherRoot
-    -- Tự hủy rất nhanh để giảm khả năng bị “nhìn thấy” áp dụng lâu
-    task.delay(0.1, function()
-        if bv and bv.Parent then
-            bv:Destroy()
-        end
-    end)
-end
-
--- Heartbeat loop phát hiện và fling
-RunService.Heartbeat:Connect(function()
-    if not walkFlingEnabled or not RootPart or not RootPart.Parent then return end
-
-    local now = os.clock()
-    -- Lấy hướng nhìn LocalPlayer để chỉ fling khi ở gần phía trước nếu muốn: (tùy chọn)
-    -- local lookVec = workspace.CurrentCamera.CFrame.LookVector
-
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            local char = player.Character
-            if char then
-                local otherRoot = char:FindFirstChild("HumanoidRootPart")
-                local otherHum = char:FindFirstChildOfClass("Humanoid")
-                if otherRoot and otherHum and otherHum.Health > 0 then
-                    local dist = (otherRoot.Position - RootPart.Position).Magnitude
-                    if dist <= flingRadius then
-                        local lastTime = lastFlingTime[player]
-                        if not lastTime or now - lastTime >= flingCooldown then
-                            -- (Tùy chọn) Có thể thêm điều kiện góc: chỉ fling khi đối tượng nằm trong góc nhìn:
-                            -- local dir = (otherRoot.Position - RootPart.Position).Unit
-                            -- if lookVec:Dot(dir) > 0.5 then
-                                flingPlayer(otherRoot)
-                                lastFlingTime[player] = now
-                            -- end
-                        end
-                    end
-                end
-            end
-        end
-    end
-end)
--- ======================================================
 
 -- Gun Highlight & Gun Aura
 local gunHighlightTable = {}  -- map Tool -> Highlight
@@ -619,8 +547,6 @@ LocalPlayer.CharacterAdded:Connect(function(char)
         end)
     end
     setupAntiFeatures()
-    -- Reset lastFlingTime khi respawn để fling lại ngay
-    lastFlingTime = {}
     if chamEnabled then
         task.delay(0.5, function()
             updateAllChams()
@@ -667,7 +593,9 @@ do
 
     local function drawDashed()
         for _, child in ipairs(borderContainer:GetChildren()) do
-            child:Destroy()
+            if child:IsA("Frame") then
+                child:Destroy()
+            end
         end
         local w = window.AbsoluteSize.X
         local h = window.AbsoluteSize.Y
