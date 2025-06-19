@@ -1,10 +1,11 @@
--- Kevinz Hub - Full Script (WalkFling đã bị loại bỏ), text size 12, gradient black-red fade, dashed rounded border, và các tính năng khác.
+-- Kevinz Hub Full Script with Dark Minimalist GUI, Frosted Glass, Gradient, 3D Grid Background, ESP, Anti Features, Gun Aura, Notification, etc.
 
 -- Services
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local StarterGui = game:GetService("StarterGui")
 local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
 
 -- Local player references
 local LocalPlayer = Players.LocalPlayer
@@ -15,139 +16,183 @@ local RootPart = Character:WaitForChild("HumanoidRootPart")
 -- Saved defaults
 local savedWalkSpeed = Humanoid.WalkSpeed
 local savedJumpPower = Humanoid.JumpPower
-local HUB_VERSION = "v1.7.3"  -- phiên bản cập nhật
+local HUB_VERSION = "v1.7.4"
 
--- GUI Setup
+-- ================= GUI SETUP =================
+-- ScreenGui
 local gui = Instance.new("ScreenGui")
 gui.Name = "KevinzHub"
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Global
 gui.ResetOnSpawn = false
 gui.Parent = game.CoreGui
 
+-- === Frosted Overlay + BlurEffect ===
+local overlay = Instance.new("Frame")
+overlay.Name = "FrostedOverlay"
+overlay.AnchorPoint = Vector2.new(0.5, 0.5)
+overlay.Position = UDim2.fromScale(0.5, 0.5)
+overlay.Size = UDim2.fromScale(1, 1)
+overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+overlay.BackgroundTransparency = 0.6
+overlay.ZIndex = 1
+overlay.Visible = false
+overlay.Parent = gui
+
+-- BlurEffect in Lighting
+local blurEffect = Instance.new("BlurEffect")
+blurEffect.Name = "KevinzHubBlurEffect"
+blurEffect.Size = 0
+blurEffect.Parent = Lighting
+
+local function setBlur(active)
+    if active then
+        overlay.Visible = true
+        TweenService:Create(blurEffect, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = 12
+        }):Play()
+    else
+        local tween = TweenService:Create(blurEffect, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = 0
+        })
+        tween:Play()
+        tween.Completed:Connect(function()
+            overlay.Visible = false
+        end)
+    end
+end
+
 -- Main window
 local window = Instance.new("Frame")
+window.Name = "MainWindow"
 window.AnchorPoint = Vector2.new(0.5, 0.5)
 window.Position = UDim2.fromScale(0.5, 0.5)
-window.Size = UDim2.fromOffset(400, 380)  -- cố định 400x380
-window.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+window.Size = UDim2.fromOffset(400, 380)
+window.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+window.BackgroundTransparency = 0.3
+window.BorderSizePixel = 0
 window.Active = true
 window.Draggable = true
--- Bo góc
-local uic = Instance.new("UICorner", window)
-uic.CornerRadius = UDim.new(0, 12)
--- Cho clip con để dashed border cắt đúng bo góc
+window.ZIndex = 2
 window.ClipsDescendants = true
 window.Parent = gui
+Instance.new("UICorner", window).CornerRadius = UDim.new(0, 12)
 
--- Gradient background: black -> red fade
+-- Gradient overlay inside window
 local gradient = Instance.new("UIGradient", window)
-gradient.Rotation = 45
-gradient.Color = ColorSequence.new {
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(180, 0, 0))
+gradient.Rotation = 90
+gradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 20, 20)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(100, 0, 0)),
 }
-gradient.Transparency = NumberSequence.new {
-    NumberSequenceKeypoint.new(0, 0.1),
-    NumberSequenceKeypoint.new(1, 0.2)
+gradient.Transparency = NumberSequence.new{
+    NumberSequenceKeypoint.new(0, 0.7),
+    NumberSequenceKeypoint.new(1, 0.8),
 }
 
--- Top bar với avatar và tên
+-- Top bar
 local topBar = Instance.new("Frame", window)
-topBar.Size = UDim2.new(1, 0, 0, 30)  -- chiều cao 30
+topBar.Name = "TopBar"
+topBar.Size = UDim2.new(1, 0, 0, 30)
 topBar.Position = UDim2.new(0, 0, 0, 0)
-topBar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+topBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 topBar.BorderSizePixel = 0
-local topBarCorner = Instance.new("UICorner", topBar)
-topBarCorner.CornerRadius = UDim.new(0, 8)
+Instance.new("UICorner", topBar).CornerRadius = UDim.new(0, 8)
 
+-- Avatar
 local success, thumb = pcall(function()
     return Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
 end)
 local avatar = Instance.new("ImageLabel", topBar)
+avatar.Name = "Avatar"
 avatar.Size = UDim2.new(0, 24, 0, 24)
 avatar.Position = UDim2.new(0, 6, 0.5, -12)
 avatar.BackgroundTransparency = 1
 avatar.Image = success and thumb or ""
 avatar.ImageTransparency = success and 0 or 1
 
+-- DisplayName label
 local nameLabel = Instance.new("TextLabel", topBar)
+nameLabel.Name = "NameLabel"
 nameLabel.Size = UDim2.new(1, -50, 1, 0)
 nameLabel.Position = UDim2.new(0, 36, 0, 0)
 nameLabel.BackgroundTransparency = 1
 nameLabel.Text = LocalPlayer.DisplayName
-nameLabel.TextColor3 = Color3.new(1, 1, 1)
+nameLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
 nameLabel.Font = Enum.Font.GothamBold
 nameLabel.TextScaled = false
-nameLabel.TextSize = 12
+nameLabel.TextSize = 14
 nameLabel.TextXAlignment = Enum.TextXAlignment.Left
 
 -- Close button
 local closeButton = Instance.new("TextButton", topBar)
+closeButton.Name = "CloseButton"
 closeButton.Size = UDim2.new(0, 28, 0, 28)
 closeButton.Position = UDim2.new(1, -32, 0, 1)
 closeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 closeButton.Text = "-"
 closeButton.Font = Enum.Font.GothamBold
 closeButton.TextScaled = false
-closeButton.TextSize = 12
-closeButton.TextColor3 = Color3.new(1, 1, 1)
+closeButton.TextSize = 16
+closeButton.TextColor3 = Color3.fromRGB(240, 240, 240)
 closeButton.AutoButtonColor = false
-local closeCorner = Instance.new("UICorner", closeButton)
-closeCorner.CornerRadius = UDim.new(1, 0)
-closeButton.MouseButton1Click:Connect(function()
-    window.Visible = false
-    miniToggle.Visible = true
-end)
+Instance.new("UICorner", closeButton).CornerRadius = UDim.new(1, 0)
 
--- Content area dưới topBar: dùng ScrollingFrame để scroll khi nội dung vượt khung
+-- Content ScrollingFrame
 local content = Instance.new("ScrollingFrame", window)
+content.Name = "ContentFrame"
 content.Size = UDim2.new(1, 0, 1, -30)
 content.Position = UDim2.new(0, 0, 0, 30)
 content.BackgroundTransparency = 1
+content.ScrollBarThickness = 6
 content.CanvasSize = UDim2.new(0, 0, 0, 0)
 content.AutomaticCanvasSize = Enum.AutomaticSize.Y
-content.ScrollBarThickness = 6
 
--- Helpers cho các input rows
+local uiList = Instance.new("UIListLayout", content)
+uiList.SortOrder = Enum.SortOrder.LayoutOrder
+uiList.Padding = UDim.new(0, 8)
+
+-- Helper functions for inputs/switches
 local inputRow = 0
-local rowHeight = 30
-local padding = 6
+local ROW_HEIGHT = 30
 
 local function createInput(labelText, getDefault, callback)
     inputRow = inputRow + 1
-    local yOffset = (inputRow - 1) * (rowHeight + padding) + padding
-
     local container = Instance.new("Frame")
-    container.Size = UDim2.new(1, -20, 0, rowHeight)
-    container.Position = UDim2.new(0, 10, 0, yOffset)
-    container.BackgroundTransparency = 1
+    container.Name = "InputRow_"..inputRow
+    container.Size = UDim2.new(1, -20, 0, ROW_HEIGHT)
+    container.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    container.BackgroundTransparency = 0.2
+    container.BorderSizePixel = 0
+    Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
+    container.LayoutOrder = inputRow
     container.Parent = content
 
-    local label = Instance.new("TextLabel")
-    label.Text = labelText
+    -- Label
+    local label = Instance.new("TextLabel", container)
+    label.Name = "Label"
     label.Size = UDim2.new(0.4, 0, 1, 0)
-    label.Font = Enum.Font.Gotham
-    label.TextColor3 = Color3.new(1, 1, 1)
-    label.TextScaled = false
-    label.TextSize = 12
+    label.Position = UDim2.new(0, 8, 0, 0)
     label.BackgroundTransparency = 1
+    label.Text = labelText
+    label.TextColor3 = Color3.fromRGB(230, 230, 230)
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 14
     label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = container
 
-    local input = Instance.new("TextBox")
-    input.Size = UDim2.new(0.6, -10, 1, 0)
-    input.Position = UDim2.new(0.4, 10, 0, 0)
-    input.Font = Enum.Font.Gotham
-    local defaultVal = getDefault()
-    input.PlaceholderText = tostring(defaultVal)
+    -- TextBox
+    local input = Instance.new("TextBox", container)
+    input.Name = "TextBox"
+    input.Size = UDim2.new(0.6, -16, 1, 0)
+    input.Position = UDim2.new(0.4, 8, 0, 0)
+    input.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    input.BackgroundTransparency = 0
+    input.TextColor3 = Color3.fromRGB(240, 240, 240)
     input.Text = ""
-    input.TextScaled = false
-    input.TextSize = 12
+    input.PlaceholderText = tostring(getDefault())
     input.ClearTextOnFocus = false
-    input.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    input.TextColor3 = Color3.new(1, 1, 1)
+    input.Font = Enum.Font.Gotham
+    input.TextSize = 14
     Instance.new("UICorner", input).CornerRadius = UDim.new(0, 6)
-    input.Parent = container
 
     input.FocusLost:Connect(function(enterPressed)
         local text = input.Text
@@ -162,67 +207,94 @@ end
 
 local function createSwitch(labelText, callback)
     inputRow = inputRow + 1
-    local yOffset = (inputRow - 1) * (rowHeight + padding) + padding
-
     local container = Instance.new("Frame")
-    container.Size = UDim2.new(1, -20, 0, rowHeight)
-    container.Position = UDim2.new(0, 10, 0, yOffset)
-    container.BackgroundTransparency = 1
+    container.Name = "SwitchRow_"..inputRow
+    container.Size = UDim2.new(1, -20, 0, ROW_HEIGHT)
+    container.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    container.BackgroundTransparency = 0.2
+    container.BorderSizePixel = 0
+    Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
+    container.LayoutOrder = inputRow
     container.Parent = content
 
-    local label = Instance.new("TextLabel")
-    label.Text = labelText
+    local label = Instance.new("TextLabel", container)
+    label.Name = "Label"
     label.Size = UDim2.new(0.6, 0, 1, 0)
-    label.Font = Enum.Font.Gotham
-    label.TextColor3 = Color3.new(1, 1, 1)
-    label.TextScaled = false
-    label.TextSize = 12
+    label.Position = UDim2.new(0, 8, 0, 0)
     label.BackgroundTransparency = 1
+    label.Text = labelText
+    label.TextColor3 = Color3.fromRGB(230, 230, 230)
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 14
     label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = container
 
-    local toggle = Instance.new("TextButton")
-    toggle.Size = UDim2.new(0.4, -10, 1, 0)
-    toggle.Position = UDim2.new(0.6, 10, 0, 0)
-    toggle.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    local toggle = Instance.new("TextButton", container)
+    toggle.Name = "Toggle"
+    toggle.Size = UDim2.new(0.4, -16, 1, -4)
+    toggle.Position = UDim2.new(0.6, 8, 0, 2)
+    toggle.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
     toggle.Text = "OFF"
     toggle.Font = Enum.Font.GothamBold
-    toggle.TextScaled = false
-    toggle.TextSize = 12
-    toggle.TextColor3 = Color3.new(1, 1, 1)
+    toggle.TextSize = 14
+    toggle.TextColor3 = Color3.fromRGB(240, 240, 240)
     toggle.AutoButtonColor = false
     Instance.new("UICorner", toggle).CornerRadius = UDim.new(0, 6)
-    toggle.Parent = container
 
     local state = false
     toggle.MouseButton1Click:Connect(function()
         state = not state
         toggle.Text = state and "ON" or "OFF"
-        toggle.BackgroundColor3 = state and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(50, 50, 50)
+        if state then
+            TweenService:Create(toggle, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0, 150, 0)}):Play()
+        else
+            TweenService:Create(toggle, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(70, 70, 70)}):Play()
+        end
         callback(state)
     end)
 end
 
--- Tạo các input: WalkSpeed, JumpPower, FOV
-createInput("WalkSpeed", function() return savedWalkSpeed end, function(v)
-    savedWalkSpeed = v
-    if Humanoid then
-        pcall(function() Humanoid.WalkSpeed = v end)
-    end
+-- Mini toggle to reopen window
+local miniToggle = Instance.new("TextButton", gui)
+miniToggle.Name = "MiniToggle"
+miniToggle.Size = UDim2.new(0, 28, 0, 28)
+miniToggle.Position = UDim2.new(0, 50, 1, -40)
+miniToggle.AnchorPoint = Vector2.new(0.5, 0.5)
+miniToggle.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+miniToggle.Text = "+"
+miniToggle.Font = Enum.Font.GothamBold
+miniToggle.TextSize = 16
+miniToggle.TextColor3 = Color3.fromRGB(240, 240, 240)
+miniToggle.AutoButtonColor = false
+Instance.new("UICorner", miniToggle).CornerRadius = UDim.new(1, 0)
+miniToggle.Visible = false
+
+-- Close / miniToggle behaviors
+closeButton.MouseButton1Click:Connect(function()
+    window.Visible = false
+    miniToggle.Visible = true
+    setBlur(false)
 end)
-createInput("JumpPower", function() return savedJumpPower end, function(v)
-    savedJumpPower = v
-    if Humanoid then
-        pcall(function() Humanoid.JumpPower = v end)
-    end
-end)
-createInput("FOV", function() return workspace.CurrentCamera.FieldOfView end, function(v)
-    pcall(function() workspace.CurrentCamera.FieldOfView = v end)
+miniToggle.MouseButton1Click:Connect(function()
+    window.Visible = true
+    miniToggle.Visible = false
+    setBlur(true)
 end)
 
--- ESP theo role Murder Mystery 2
+-- Show window and blur on initial load
+task.defer(function()
+    window.Visible = true
+    setBlur(true)
+    -- Tween-in
+    TweenService:Create(window, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Position = UDim2.new(0.5, 0, 0.5, 0)
+    }):Play()
+end)
+
+-- ================= CORE LOGIC =================
+
+-- ---------- ESP theo Role (Murder Mystery 2) ----------
 local chamEnabled = false
-local chamHighlights = {}  -- map Player -> Highlight
+local chamHighlights = {}
 
 local function getRole(player)
     local char = player.Character
@@ -258,8 +330,6 @@ local function addHighlightForPlayer(player)
     end
     local highlight = Instance.new("Highlight")
     highlight.Adornee = player.Character
-    highlight.FillColor = Color3.fromRGB(255, 255, 255)
-    highlight.OutlineColor = Color3.new(1, 1, 1)
     highlight.FillTransparency = 0.6
     highlight.OutlineTransparency = 0.3
     highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
@@ -290,7 +360,6 @@ local function updateAllChams()
     end
 end
 
--- Setup listeners để respawn & tool change
 local function setupPlayerListeners(player)
     player.CharacterAdded:Connect(function(char)
         task.delay(0.5, function()
@@ -311,7 +380,6 @@ local function setupPlayerListeners(player)
             end
         end)
     end)
-    -- Backpack changes
     spawn(function()
         local backpack = player:FindFirstChild("Backpack") or player:WaitForChild("Backpack", 5)
         if backpack then
@@ -329,13 +397,11 @@ local function setupPlayerListeners(player)
     end)
 end
 
--- Switch ESP
+-- Switch for ESP
 createSwitch("ESP Theo Role", function(on)
     chamEnabled = on
     updateAllChams()
 end)
-
--- Setup initial players listeners
 for _, player in ipairs(Players:GetPlayers()) do
     if player ~= LocalPlayer then
         setupPlayerListeners(player)
@@ -344,7 +410,6 @@ end
 Players.PlayerAdded:Connect(function(player)
     if player ~= LocalPlayer then
         setupPlayerListeners(player)
-        -- nếu ESP đang bật, áp dụng ngay
         if chamEnabled then
             task.delay(0.5, function()
                 addHighlightForPlayer(player)
@@ -355,33 +420,23 @@ end)
 Players.PlayerRemoving:Connect(function(player)
     removeHighlightForPlayer(player)
 end)
-
--- mini toggle để ẩn/hiện window
-local miniToggle = Instance.new("TextButton", gui)
-miniToggle.Size = UDim2.new(0, 28, 0, 28)
--- Đặt vị trí tương đối với chiều rộng window mới:
-miniToggle.Position = UDim2.new(0, 50, 1, -40)
-miniToggle.AnchorPoint = Vector2.new(0.5, 0.5)
-miniToggle.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-miniToggle.Text = "+"
-miniToggle.Font = Enum.Font.GothamBold
-miniToggle.TextScaled = false
-miniToggle.TextSize = 12
-miniToggle.TextColor3 = Color3.new(1, 1, 1)
-miniToggle.AutoButtonColor = false
-miniToggle.Visible = false
-Instance.new("UICorner", miniToggle).CornerRadius = UDim.new(1, 0)
-miniToggle.MouseButton1Click:Connect(function()
-    window.Visible = true
-    miniToggle.Visible = false
+-- ESP update loop to refresh colors every 1s
+spawn(function()
+    while true do
+        if chamEnabled then
+            for player, highlight in pairs(chamHighlights) do
+                if highlight and highlight.Parent then
+                    updateHighlightColor(player)
+                else
+                    chamHighlights[player] = nil
+                end
+            end
+        end
+        wait(1)
+    end
 end)
 
--- Tween-in khi mở window
-TweenService:Create(window, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-    Position = UDim2.new(0.5, 0, 0.5, 0)
-}):Play()
-
--- Anti features setup function (cải tiến không return khi nhảy)
+-- ---------- Anti Features ----------
 local function setupAntiFeatures()
     if not Character or not Humanoid or not RootPart then return end
     local lastSafeCFrame = RootPart.CFrame
@@ -452,10 +507,10 @@ local function setupAntiFeatures()
     end)
 end
 
--- Gun Highlight & Gun Aura
-local gunHighlightTable = {}  -- map Tool -> Highlight
+-- ---------- Gun Highlight & Gun Aura ----------
+local gunHighlightTable = {}
 local gunAuraEnabled = false
-local auraRadius = 10  -- mặc định
+local auraRadius = 10
 
 createSwitch("Gun Aura", function(on)
     gunAuraEnabled = on
@@ -534,11 +589,79 @@ spawn(function()
     end
 end)
 
--- Anti features và reapply khi respawn
+-- ---------- Background Grid 3D ----------
+local gridFolder = nil
+local gridEnabled = false
+local GRID_SIZE = 100
+local GRID_SPACING = 10
+local GRID_THICKNESS = 0.2
+local GRID_Y = 0
+
+local function createGrid()
+    if gridFolder then
+        gridFolder:Destroy()
+        gridFolder = nil
+    end
+    gridFolder = Instance.new("Folder")
+    gridFolder.Name = "KevinzHub_GridBackground"
+    gridFolder.Parent = workspace
+
+    -- Lines along X-axis (vary x, fixed z)
+    for i = -GRID_SIZE, GRID_SIZE, GRID_SPACING do
+        local line = Instance.new("Part")
+        line.Name = "GridLineX_"..i
+        line.Size = Vector3.new((GRID_SIZE*2)+GRID_SPACING, GRID_THICKNESS, GRID_THICKNESS)
+        line.Anchored = true
+        line.CanCollide = false
+        line.Material = Enum.Material.SmoothPlastic
+        line.Color = Color3.fromRGB(100, 100, 100)
+        line.Transparency = 0.5
+        line.TopSurface = Enum.SurfaceType.Smooth
+        line.BottomSurface = Enum.SurfaceType.Smooth
+        line.CFrame = CFrame.new(0, GRID_Y, i)
+        line.Parent = gridFolder
+    end
+    -- Lines along Z-axis (vary z, fixed x)
+    for i = -GRID_SIZE, GRID_SIZE, GRID_SPACING do
+        local line = Instance.new("Part")
+        line.Name = "GridLineZ_"..i
+        line.Size = Vector3.new(GRID_THICKNESS, GRID_THICKNESS, (GRID_SIZE*2)+GRID_SPACING)
+        line.Anchored = true
+        line.CanCollide = false
+        line.Material = Enum.Material.SmoothPlastic
+        line.Color = Color3.fromRGB(100, 100, 100)
+        line.Transparency = 0.5
+        line.TopSurface = Enum.SurfaceType.Smooth
+        line.BottomSurface = Enum.SurfaceType.Smooth
+        line.CFrame = CFrame.new(i, GRID_Y, 0)
+        line.Parent = gridFolder
+    end
+end
+
+local function removeGrid()
+    if gridFolder then
+        gridFolder:Destroy()
+        gridFolder = nil
+    end
+end
+
+createSwitch("Background Grid", function(on)
+    gridEnabled = on
+    if on then
+        -- Optionally update GRID_Y based on player position:
+        GRID_Y = RootPart and (RootPart.Position.Y - 5) or GRID_Y
+        createGrid()
+    else
+        removeGrid()
+    end
+end)
+
 LocalPlayer.CharacterAdded:Connect(function(char)
     Character = char
     Humanoid = char:WaitForChild("Humanoid", 5)
     RootPart = char:WaitForChild("HumanoidRootPart", 5)
+    setupAntiFeatures()
+    -- Reset walk/jump values
     if Humanoid then
         task.wait(0.2)
         pcall(function()
@@ -546,112 +669,72 @@ LocalPlayer.CharacterAdded:Connect(function(char)
             Humanoid.JumpPower = savedJumpPower
         end)
     end
-    setupAntiFeatures()
+    -- Reapply ESP if needed
     if chamEnabled then
         task.delay(0.5, function()
             updateAllChams()
         end)
     end
+    -- Update grid position if enabled
+    if gridEnabled and RootPart then
+        GRID_Y = RootPart.Position.Y - 5
+        createGrid()
+    end
 end)
+
+-- Initial setupAntiFeatures
 setupAntiFeatures()
 
--- Notification khi hub load
+-- ---------- Notification on load ----------
 task.delay(1, function()
     pcall(function()
         StarterGui:SetCore("SendNotification", {
             Title = "Kevinz Hub Loaded ✅",
-            Text = "Running version: " .. HUB_VERSION,
+            Text = "Version: "..HUB_VERSION,
             Duration = 5
         })
     end)
 end)
 
--- ESP update loop: auto cập nhật role mỗi 1s
-spawn(function()
-    while true do
-        if chamEnabled then
-            for player, highlight in pairs(chamHighlights) do
-                if highlight and highlight.Parent then
-                    updateHighlightColor(player)
-                else
-                    chamHighlights[player] = nil
-                end
-            end
-        end
-        wait(1)
+-- ---------- Create Inputs/Switches for core settings ----------
+-- Reset inputRow so GUI elements appear in order
+inputRow = 0
+
+-- WalkSpeed, JumpPower, FOV
+createInput("WalkSpeed", function() return savedWalkSpeed end, function(v)
+    savedWalkSpeed = v
+    if Humanoid then pcall(function() Humanoid.WalkSpeed = v end) end
+end)
+createInput("JumpPower", function() return savedJumpPower end, function(v)
+    savedJumpPower = v
+    if Humanoid then pcall(function() Humanoid.JumpPower = v end) end
+end)
+createInput("FOV", function() return workspace.CurrentCamera.FieldOfView end, function(v)
+    pcall(function() workspace.CurrentCamera.FieldOfView = v end)
+end)
+-- ESP switch (already wired above)
+-- Gun Aura
+-- (The createSwitch and createInput calls for Gun Aura were already made above during GUI setup order)
+-- But ensure ordering: if needed, move these calls here:
+-- Note: since inputRow was reset, recreate Gun Aura UI after WalkSpeed/JumpPower/FOV:
+createSwitch("ESP Theo Role", function(on)
+    chamEnabled = on
+    updateAllChams()
+end)
+createSwitch("Gun Aura", function(on)
+    gunAuraEnabled = on
+end)
+createInput("Gun Aura Radius", function() return auraRadius end, function(v)
+    auraRadius = v
+end)
+createSwitch("Background Grid", function(on)
+    gridEnabled = on
+    if on then
+        GRID_Y = RootPart and (RootPart.Position.Y - 5) or GRID_Y
+        createGrid()
+    else
+        removeGrid()
     end
 end)
 
--- ===== Thêm dashed border quanh window =====
-do
-    local borderContainer = Instance.new("Frame", window)
-    borderContainer.Name = "DashedBorderContainer"
-    borderContainer.BackgroundTransparency = 1
-    borderContainer.Size = UDim2.new(1, 0, 1, 0)
-    borderContainer.Position = UDim2.new(0, 0, 0, 0)
-    borderContainer.ZIndex = window.ZIndex + 1
-
-    local function drawDashed()
-        for _, child in ipairs(borderContainer:GetChildren()) do
-            if child:IsA("Frame") then
-                child:Destroy()
-            end
-        end
-        local w = window.AbsoluteSize.X
-        local h = window.AbsoluteSize.Y
-        if w <= 0 or h <= 0 then return end
-
-        local dashLen = 10    -- độ dài mỗi đoạn (có thể chỉnh)
-        local gapLen = 5      -- gap giữa đoạn
-        local thickness = 2   -- độ dày border
-        local color = Color3.fromRGB(255, 255, 255)  -- màu border
-
-        -- Top edge
-        local x = 0
-        while x < w do
-            local seg = Instance.new("Frame", borderContainer)
-            seg.BackgroundColor3 = color
-            seg.BorderSizePixel = 0
-            local segWidth = math.min(dashLen, w - x)
-            seg.Size = UDim2.new(0, segWidth, 0, thickness)
-            seg.Position = UDim2.new(0, x, 0, 0)
-            x = x + dashLen + gapLen
-        end
-        -- Bottom edge
-        x = 0
-        while x < w do
-            local seg = Instance.new("Frame", borderContainer)
-            seg.BackgroundColor3 = color
-            seg.BorderSizePixel = 0
-            local segWidth = math.min(dashLen, w - x)
-            seg.Size = UDim2.new(0, segWidth, 0, thickness)
-            seg.Position = UDim2.new(0, x, 1, -thickness)
-            x = x + dashLen + gapLen
-        end
-        -- Left edge
-        local y = 0
-        while y < h do
-            local seg = Instance.new("Frame", borderContainer)
-            seg.BackgroundColor3 = color
-            seg.BorderSizePixel = 0
-            local segHeight = math.min(dashLen, h - y)
-            seg.Size = UDim2.new(0, thickness, 0, segHeight)
-            seg.Position = UDim2.new(0, 0, 0, y)
-            y = y + dashLen + gapLen
-        end
-        -- Right edge
-        y = 0
-        while y < h do
-            local seg = Instance.new("Frame", borderContainer)
-            seg.BackgroundColor3 = color
-            seg.BorderSizePixel = 0
-            local segHeight = math.min(dashLen, h - y)
-            seg.Size = UDim2.new(0, thickness, 0, segHeight)
-            seg.Position = UDim2.new(1, -thickness, 0, y)
-            y = y + dashLen + gapLen
-        end
-    end
-
-    window:GetPropertyChangedSignal("AbsoluteSize"):Connect(drawDashed)
-    task.defer(drawDashed)
-end
+-- End of full script
