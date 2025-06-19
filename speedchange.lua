@@ -33,7 +33,7 @@ gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 local window = Instance.new("Frame")
 window.Name = "MainWindow"
 window.AnchorPoint = Vector2.new(0.5, 0.5)
-window.Position = UDim2.fromScale(0.5, -500) -- Start off-screen
+window.Position = UDim2.fromScale(1.5, 0.5) -- Start off-screen to the right
 window.Size = UDim2.new(0.5, 0, 0, 450) -- Tăng chiều cao để chứa thêm controls HP
 window.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
 window.BackgroundTransparency = 0.1
@@ -82,18 +82,31 @@ nameLabel.Font = Enum.Font.GothamBold
 nameLabel.TextSize = 14
 nameLabel.TextXAlignment = Enum.TextXAlignment.Left
 
--- Close button
-local closeButton = Instance.new("TextButton", topBar)
-closeButton.Name = "CloseButton"
-closeButton.Size = UDim2.new(0, 28, 0, 28)
-closeButton.Position = UDim2.new(1, -32, 0, 1)
-closeButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-closeButton.Text = "-"
-closeButton.Font = Enum.Font.GothamBold
-closeButton.TextSize = 16
-closeButton.TextColor3 = Color3.fromRGB(240, 240, 240)
-closeButton.AutoButtonColor = false
-Instance.new("UICorner", closeButton).CornerRadius = UDim.new(1, 0)
+-- Close button (minimize)
+local minimizeButton = Instance.new("TextButton", topBar)
+minimizeButton.Name = "MinimizeButton"
+minimizeButton.Size = UDim2.new(0, 28, 0, 28)
+minimizeButton.Position = UDim2.new(1, -32, 0, 1) -- Position next to close script button
+minimizeButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+minimizeButton.Text = "-"
+minimizeButton.Font = Enum.Font.GothamBold
+minimizeButton.TextSize = 16
+minimizeButton.TextColor3 = Color3.fromRGB(240, 240, 240)
+minimizeButton.AutoButtonColor = false
+Instance.new("UICorner", minimizeButton).CornerRadius = UDim.new(1, 0)
+
+-- Close script button (new "X" button)
+local closeScriptButton = Instance.new("TextButton", topBar)
+closeScriptButton.Name = "CloseScriptButton"
+closeScriptButton.Size = UDim2.new(0, 28, 0, 28)
+closeScriptButton.Position = UDim2.new(1, -62, 0, 1) -- Position next to minimize button
+closeScriptButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+closeScriptButton.Text = "X"
+closeScriptButton.Font = Enum.Font.GothamBold
+closeScriptButton.TextSize = 16
+closeScriptButton.TextColor3 = Color3.fromRGB(240, 240, 240)
+closeScriptButton.AutoButtonColor = false
+Instance.new("UICorner", closeScriptButton).CornerRadius = UDim.new(1, 0)
 
 -- Content ScrollingFrame
 local content = Instance.new("ScrollingFrame", window)
@@ -126,7 +139,7 @@ miniToggle.AutoButtonColor = false
 Instance.new("UICorner", miniToggle).CornerRadius = UDim.new(1, 0)
 miniToggle.Visible = false
 
-closeButton.MouseButton1Click:Connect(function()
+minimizeButton.MouseButton1Click:Connect(function()
     window.Visible = false
     miniToggle.Visible = true
 end)
@@ -135,13 +148,18 @@ miniToggle.MouseButton1Click:Connect(function()
     miniToggle.Visible = false
 end)
 
+closeScriptButton.MouseButton1Click:Connect(function()
+    gui:Destroy() -- Destroy the entire ScreenGui to close the script
+end)
+
 -- Initial show with tween
-task.defer(function()
+task.delay(2, function() -- Delay for 2 seconds
     window.Visible = true
-    TweenService:Create(window, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-        Position = UDim2.fromScale(0.5, 0)
+    TweenService:Create(window, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { -- Adjust EasingStyle and EasingDirection for slide effect
+        Position = UDim2.fromScale(0.5, 0.5) -- End in the middle of the screen
     }):Play()
 end)
+
 
 -- ================= Helper UI functions =================
 local inputRow = 0
