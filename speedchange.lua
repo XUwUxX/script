@@ -465,7 +465,7 @@ local function optimizePerformance()
         end
         -- Thiết bầu trời midnight
         Lighting.ClockTime = 0
-        Lighting.Brightness = 18
+        Lighting.Brightness = 35
         Lighting.Ambient = Color3.new(0, 0, 0)
         Lighting.OutdoorAmbient = Color3.new(0, 0, 0)
         Lighting.FogColor = Color3.new(0, 0, 0)
