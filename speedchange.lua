@@ -1,8 +1,10 @@
--- Kevinz Hub Full Script v1.8 (Fixed)
--- ESP logic fixed for proper round-to-round persistence and Sheriff vs Hero detection.
--- Fixed Sheriff gun auto-unequip bug caused by Gun Aura.
--- Includes full UI, Anti-Features, Gun Aura, Highlight Dropped Gun, and performance optimizations.
--- GUI nền đen, parent vào PlayerGui, chạy client-side. Re-inject hoặc queue_on_teleport nếu game teleport giữa places.
+-- Kevinz Hub Full Script v1.18
+-- - Manual dragging UI
+-- - ESP Outline theo role + Weapon Highlight + Drop Highlight (GunDrop hồng đậm, KnifeDrop tím), loop 0.7s
+-- - Gun Aura (auto grab GunDrop) độc lập với ESP, với Aura Distance và Aura Cooldown
+-- - Notification khi Sheriff/Hero chết, khi GunDrop/KnifeDrop xuất hiện (khi ESP bật)
+-- - Anti Features, Semi-God Mode, Movement Settings, Health Settings, Utilities
+-- - OptimizePerformanceWithListener: tối ưu sâu: midnight sky, tắt hiệu ứng, giảm render chi tiết, override print/warn, event-driven disable object mới.
 
 -- Services
 local Players = game:GetService("Players")
@@ -10,7 +12,7 @@ local TweenService = game:GetService("TweenService")
 local StarterGui = game:GetService("StarterGui")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
-local UserSettings = UserSettings() -- global
+local UserSettings = UserSettings()
 
 -- Local refs
 local LocalPlayer = Players.LocalPlayer
@@ -21,7 +23,7 @@ local RootPart = Character:WaitForChild("HumanoidRootPart")
 -- Saved defaults
 local savedWalkSpeed = Humanoid.WalkSpeed
 local savedJumpPower = Humanoid.JumpPower
-local HUB_VERSION = "v1.8"
+local HUB_VERSION = "v1.18"
 
 -- ================= GUI SETUP =================
 local gui = Instance.new("ScreenGui")
@@ -30,87 +32,88 @@ gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.ResetOnSpawn = false
 gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
+-- Main window
 local window = Instance.new("Frame")
 window.Name = "MainWindow"
 window.AnchorPoint = Vector2.new(0.5, 0.5)
-window.Position = UDim2.fromScale(1.5, 0.5) -- Sẽ được tween về giữa
-window.Size = UDim2.new(0.35, 0, 0.5, 0)
+window.Position = UDim2.fromScale(0.5, 0.5)
+window.Size = UDim2.new(0.35, 0, 0.6, 0)
 window.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-window.BackgroundTransparency = 0
 window.BorderSizePixel = 0
-window.Active = true
-window.Draggable = true
 window.ZIndex = 2
 window.ClipsDescendants = true
 window.Parent = gui
 
--- Thêm UIGradient vào window
+-- Gradient black-red
 local gradient = Instance.new("UIGradient", window)
 gradient.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 30, 30)), -- Màu tối ở trên
-    ColorSequenceKeypoint.new(0.7, Color3.fromRGB(25, 15, 15)), -- Chuyển dần sang màu đỏ sẫm hơn
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 0, 0)) -- Màu đỏ sẫm rõ hơn ở phía dưới
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 30, 30)),
+    ColorSequenceKeypoint.new(0.7, Color3.fromRGB(25, 15, 15)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 0, 0))
 }
-gradient.Rotation = 90 -- Gradient từ trên xuống dưới
-gradient.Transparency = NumberSequence.new(0, 0) -- Đảm bảo gradient hoàn toàn mờ đục
-
+gradient.Rotation = 90
+gradient.Transparency = NumberSequence.new(0, 0)
 Instance.new("UICorner", window).CornerRadius = UDim.new(0, 8)
-local stroke = Instance.new("UIStroke", window)
-stroke.Color = Color3.fromRGB(80, 80, 80)
-stroke.Thickness = 1
+do
+    local stroke = Instance.new("UIStroke", window)
+    stroke.Color = Color3.fromRGB(80, 80, 80)
+    stroke.Thickness = 1
+end
 
--- Top bar
+-- Top bar (dùng để drag)
 local topBar = Instance.new("Frame", window)
 topBar.Name = "TopBar"
 topBar.Size = UDim2.new(1, 0, 0, 30)
 topBar.Position = UDim2.new(0, 0, 0, 0)
-topBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-topBar.BackgroundTransparency = 1 -- Giữ trong suốt để gradient của window hiển thị
+topBar.BackgroundTransparency = 1
 topBar.BorderSizePixel = 0
-
-local topBarListLayout = Instance.new("UIListLayout", topBar)
-topBarListLayout.FillDirection = Enum.FillDirection.Horizontal
-topBarListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-topBarListLayout.Padding = UDim.new(0, 5) -- Khoảng cách giữa các phần tử
-
-local topBarPadding = Instance.new("UIPadding", topBar)
-topBarPadding.PaddingLeft = UDim.new(0, 6)
-topBarPadding.PaddingRight = UDim.new(0, 6)
-topBarPadding.PaddingTop = UDim.new(0, 5)
-topBarPadding.PaddingBottom = UDim.new(0, 5)
+do
+    local layout = Instance.new("UIListLayout", topBar)
+    layout.FillDirection = Enum.FillDirection.Horizontal
+    layout.VerticalAlignment = Enum.VerticalAlignment.Center
+    layout.Padding = UDim.new(0, 5)
+    local pad = Instance.new("UIPadding", topBar)
+    pad.PaddingLeft = UDim.new(0, 6)
+    pad.PaddingTop = UDim.new(0, 5)
+    pad.PaddingBottom = UDim.new(0, 5)
+end
 
 -- Avatar
-local success, thumb = pcall(function()
-    return Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
-end)
-local avatar = Instance.new("ImageLabel", topBar)
-avatar.Name = "Avatar"
-avatar.Size = UDim2.new(0, 24, 0, 24) -- Chỉ định kích thước cố định
-avatar.BackgroundTransparency = 1
-avatar.Image = success and thumb or ""
-avatar.ImageTransparency = success and 0 or 1
-local avatarCorner = Instance.new("UICorner", avatar)
-avatarCorner.CornerRadius = UDim.new(1, 0)
-avatar.LayoutOrder = 1 -- Đặt thứ tự hiển thị
+do
+    local success, thumb = pcall(function()
+        return Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
+    end)
+    local avatar = Instance.new("ImageLabel", topBar)
+    avatar.Name = "Avatar"
+    avatar.Size = UDim2.new(0, 24, 0, 24)
+    avatar.BackgroundTransparency = 1
+    avatar.Image = success and thumb or ""
+    avatar.ImageTransparency = success and 0 or 1
+    local avatarCorner = Instance.new("UICorner", avatar)
+    avatarCorner.CornerRadius = UDim.new(1, 0)
+    avatar.LayoutOrder = 1
+end
 
--- DisplayName
-local nameLabel = Instance.new("TextLabel", topBar)
-nameLabel.Name = "NameLabel"
-nameLabel.Size = UDim2.new(0.7, 0, 0.7, 0) -- Chiều rộng theo tỷ lệ (scale) để lấp đầy khoảng trống
-nameLabel.BackgroundTransparency = 1
-nameLabel.Text = "Kevinz Hub | "..LocalPlayer.DisplayName
-nameLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
-nameLabel.Font = Enum.Font.GothamBold
-nameLabel.TextSize = 10
-nameLabel.TextXAlignment = Enum.TextXAlignment.Center -- Căn giữa text
-nameLabel.TextWrapped = true
-nameLabel.TextScaled = true
-nameLabel.LayoutOrder = 2 -- Đặt thứ tự hiển thị
+-- Title label
+do
+    local nameLabel = Instance.new("TextLabel", topBar)
+    nameLabel.Name = "NameLabel"
+    nameLabel.Size = UDim2.new(0.7, 0, 0.7, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = "Kevinz Hub | " .. LocalPlayer.DisplayName
+    nameLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.TextSize = 12
+    nameLabel.TextXAlignment = Enum.TextXAlignment.Center
+    nameLabel.TextWrapped = true
+    nameLabel.TextScaled = true
+    nameLabel.LayoutOrder = 2
+end
 
--- Minimize button (nút "-")
+-- Minimize & Close buttons
 local minimizeButton = Instance.new("TextButton", topBar)
 minimizeButton.Name = "MinimizeButton"
-minimizeButton.Size = UDim2.new(0, 20, 0, 20) -- Kích thước cố định
+minimizeButton.Size = UDim2.new(0, 20, 0, 20)
 minimizeButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 minimizeButton.Text = "-"
 minimizeButton.Font = Enum.Font.GothamBold
@@ -118,12 +121,11 @@ minimizeButton.TextSize = 16
 minimizeButton.TextColor3 = Color3.fromRGB(240, 240, 240)
 minimizeButton.AutoButtonColor = false
 Instance.new("UICorner", minimizeButton).CornerRadius = UDim.new(1, 0)
-minimizeButton.LayoutOrder = 3 -- Đặt thứ tự hiển thị (trước nút X)
+minimizeButton.LayoutOrder = 3
 
--- Close script button (nút "X")
 local closeScriptButton = Instance.new("TextButton", topBar)
 closeScriptButton.Name = "CloseScriptButton"
-closeScriptButton.Size = UDim2.new(0, 20, 0, 20) -- Kích thước cố định
+closeScriptButton.Size = UDim2.new(0, 20, 0, 20)
 closeScriptButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 closeScriptButton.Text = "X"
 closeScriptButton.Font = Enum.Font.GothamBold
@@ -131,23 +133,30 @@ closeScriptButton.TextSize = 12
 closeScriptButton.TextColor3 = Color3.fromRGB(240, 240, 240)
 closeScriptButton.AutoButtonColor = false
 Instance.new("UICorner", closeScriptButton).CornerRadius = UDim.new(1, 0)
-closeScriptButton.LayoutOrder = 4 -- Đặt thứ tự hiển thị
+closeScriptButton.LayoutOrder = 4
 
 -- Content ScrollingFrame
 local content = Instance.new("ScrollingFrame", window)
 content.Name = "ContentFrame"
-content.Size = UDim2.new(1, 0, 1, -30)
-content.Position = UDim2.new(0, 0, 0, 30)
+content.Size = UDim2.new(1, -10, 1, -40)
+content.Position = UDim2.new(0, 5, 0, 30)
 content.BackgroundTransparency = 1
 content.ScrollBarThickness = 6
 content.CanvasSize = UDim2.new(0, 0, 0, 0)
 content.AutomaticCanvasSize = Enum.AutomaticSize.Y
 content.Active = true
 content.ZIndex = 2
-local uiList = Instance.new("UIListLayout", content)
-uiList.SortOrder = Enum.SortOrder.LayoutOrder
-uiList.Padding = UDim.new(0, 8)
-uiList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+do
+    local uiList = Instance.new("UIListLayout", content)
+    uiList.SortOrder = Enum.SortOrder.LayoutOrder
+    uiList.Padding = UDim.new(0, 12)
+    uiList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    local pad = Instance.new("UIPadding", content)
+    pad.PaddingLeft = UDim.new(0, 8)
+    pad.PaddingRight = UDim.new(0, 8)
+    pad.PaddingTop = UDim.new(0, 8)
+    pad.PaddingBottom = UDim.new(0, 8)
+end
 
 -- Mini toggle to reopen window
 local miniToggle = Instance.new("TextButton", gui)
@@ -172,16 +181,44 @@ miniToggle.MouseButton1Click:Connect(function()
     window.Visible = true
     miniToggle.Visible = false
 end)
-
-closeScriptButton.MouseButton1Click:Connect(function() -- Sử dụng closeScriptButton (nút X)
-    gui:Destroy() -- Destroy the entire ScreenGui to close the script
+closeScriptButton.MouseButton1Click:Connect(function()
+    gui:Destroy()
 end)
 
+-- Manual dragging for window via topBar
+do
+    local dragging = false
+    local dragStart = nil
+    local startPos = nil
+    local function onInputChanged(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = input.Position - dragStart
+            -- window.Position is UDim2: combine scale + offset
+            local newX = startPos.X.Offset + delta.X
+            local newY = startPos.Y.Offset + delta.Y
+            window.Position = UDim2.new(startPos.X.Scale, newX, startPos.Y.Scale, newY)
+        end
+    end
+    topBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = window.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    topBar.InputChanged:Connect(onInputChanged)
+end
+
 -- Initial show with tween
-task.delay(2, function() -- Delay for 2 seconds
+task.delay(2, function()
     window.Visible = true
     TweenService:Create(window, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-        Position = UDim2.fromScale(0.5, 0.5) -- End in the middle of the screen
+        Position = UDim2.fromScale(0.5, 0.5)
     }):Play()
 end)
 
@@ -189,11 +226,28 @@ end)
 local inputRow = 0
 local ROW_HEIGHT = 30
 
+-- Section header
+local function createSection(title)
+    inputRow = inputRow + 1
+    local lbl = Instance.new("TextLabel")
+    lbl.Name = "Section_" .. inputRow
+    lbl.Size = UDim2.new(1, 0, 0, 24)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = title
+    lbl.TextColor3 = Color3.fromRGB(200, 200, 200)
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextSize = 16
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.LayoutOrder = inputRow
+    lbl.Parent = content
+end
+
+-- Input row
 local function createInput(labelText, getDefault, callback)
     inputRow = inputRow + 1
     local container = Instance.new("Frame")
-    container.Name = "InputRow_"..inputRow
-    container.Size = UDim2.new(1, -20, 0, ROW_HEIGHT)
+    container.Name = "InputRow_" .. inputRow
+    container.Size = UDim2.new(1, 0, 0, ROW_HEIGHT)
     container.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
     container.BorderSizePixel = 0
     Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
@@ -235,14 +289,15 @@ local function createInput(labelText, getDefault, callback)
             input.Text = ""
         end
     end)
-    return input -- Return input for external updates if needed (e.g. for HP display)
+    return input
 end
 
+-- Switch row
 local function createSwitch(labelText, callback)
     inputRow = inputRow + 1
     local container = Instance.new("Frame")
-    container.Name = "SwitchRow_"..inputRow
-    container.Size = UDim2.new(1, -20, 0, ROW_HEIGHT)
+    container.Name = "SwitchRow_" .. inputRow
+    container.Size = UDim2.new(1, 0, 0, ROW_HEIGHT)
     container.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
     container.BorderSizePixel = 0
     Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
@@ -283,13 +338,15 @@ local function createSwitch(labelText, callback)
         end
         pcall(function() callback(state) end)
     end)
+    return toggle
 end
 
+-- Button row
 local function createButton(labelText, callback)
     inputRow = inputRow + 1
     local container = Instance.new("Frame")
-    container.Name = "ButtonRow_"..inputRow
-    container.Size = UDim2.new(1, -20, 0, ROW_HEIGHT)
+    container.Name = "ButtonRow_" .. inputRow
+    container.Size = UDim2.new(1, 0, 0, ROW_HEIGHT)
     container.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
     container.BorderSizePixel = 0
     Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
@@ -318,521 +375,7 @@ end
 
 -- ================= CORE LOGIC =================
 
---- ESP persistent with proper Sheriff vs Hero detection ---
-local chamEnabled = false
-local chamHighlights = {}
-local initialGunGiven = {} -- track if player was given Gun at spawn (Sheriff)
-local gameStartedTime = os.time() -- Track game start time for role detection delay
-local gunRoundStartTime = 13 -- Time in seconds until guns/knives appear
-local isSheriffAlive = false -- BIẾN MỚI: Theo dõi trạng thái của Sheriff
-
--- NEW: Global state for dropped gun highlighting
-local highlightDroppedGunEnabled = false -- This is now controlled by chamEnabled
-local gunHighlightTable = {} -- Stores Highlight instances for dropped guns
-local knifeHighlightTable = {} -- Stores Highlight instances for dropped/thrown knives
-
-local heldItemHighlights = {} -- Stores highlights for currently held guns/knives
-
--- Determine role
-local function getRole(player)
-    local char = player.Character
-    if not char then return "Innocent" end
-
-    -- Ưu tiên kiểm tra Murderer
-    if char:FindFirstChild("Knife") or (player.Backpack and player.Backpack:FindFirstChild("Knife")) then
-        return "Murderer"
-    end
-    
-    -- Sau đó kiểm tra Sheriff (người được cấp súng ban đầu)
-    if initialGunGiven[player] then
-        return "Sheriff"
-    end
-
-    -- CHỈ XÉT VAI TRÒ HERO SAU KHI ĐÃ QUA THỜI GIAN CẤP SÚNG BAN ĐẦU
-    local timeSinceGameStart = os.time() - gameStartedTime
-    if timeSinceGameStart > (gunRoundStartTime + 1) then -- Thêm 2 giây đệm an toàn
-        -- Nếu đã qua thời gian cấp súng, kiểm tra xem Sheriff có còn sống không
-        if (char:FindFirstChild("Gun") or (player.Backpack and player.Backpack:FindFirstChild("Gun"))) and not isSheriffAlive then
-            return "Hero"
-        end
-    end
-
-    -- Nếu không phải các vai trò trên, hoặc trong thời gian chờ, thì là Innocent
-    return "Innocent"
-end
-
-
--- Update highlight color/transparency based on role
-local function updateHighlightColor(player)
-    local h = chamHighlights[player]
-    if not h or not h.Parent then return end
-    local role = getRole(player)
-    
-    if role == "Murderer" then
-        h.FillColor = Color3.fromRGB(200, 0, 0); h.FillTransparency = 0.4
-        h.OutlineColor = Color3.fromRGB(255, 50, 50); h.OutlineTransparency = 0.2
-    elseif role == "Sheriff" then
-        h.FillColor = Color3.fromRGB(0, 100, 200); h.FillTransparency = 0.4
-        h.OutlineColor = Color3.fromRGB(100, 150, 255); h.OutlineTransparency = 0.2
-    elseif role == "Hero" then
-        h.FillColor = Color3.fromRGB(255, 200, 0); h.FillTransparency = 0.4
-        h.OutlineColor = Color3.fromRGB(255, 255, 100); h.OutlineTransparency = 0.2
-    else -- Innocent
-        h.FillColor = Color3.fromRGB(255, 255, 255); h.FillTransparency = 0.5
-        h.OutlineColor = Color3.fromRGB(200, 200, 200); h.OutlineTransparency = 0.2
-    end
-end
-
--- Add Highlight for a player if not already present
-local function addHighlightForPlayer(player)
-    if not player.Character or not player.Character.Parent then return end
-    if chamHighlights[player] and chamHighlights[player].Parent then
-        updateHighlightColor(player)
-        return
-    end
-    local highlight = Instance.new("Highlight")
-    highlight.Adornee = player.Character
-    highlight.FillTransparency = 0.5; highlight.OutlineTransparency = 0.2
-    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    highlight.Parent = player.Character
-    chamHighlights[player] = highlight
-    updateHighlightColor(player)
-end
-
--- Remove highlight
-local function removeHighlightForPlayer(player)
-    if chamHighlights[player] then
-        chamHighlights[player]:Destroy()
-        chamHighlights[player] = nil
-    end
-    initialGunGiven[player] = nil
-end
-
--- Add Highlight for a dropped Gun object
-local function addHighlightForDroppedGun(droppedItem)
-    if not (droppedItem:IsA("BasePart") or droppedItem:IsA("Model")) or droppedItem.Name ~= "GunDrop" then return end
-
-    if gunHighlightTable[droppedItem] and gunHighlightTable[droppedItem].Parent then return end -- Already highlighted
-
-    local hl = Instance.new("Highlight")
-    hl.FillColor = Color3.fromRGB(0, 120, 255)
-    hl.OutlineColor = Color3.fromRGB(100, 180, 255)
-    hl.FillTransparency = 0.4
-    hl.OutlineTransparency = 0.2
-    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    hl.Adornee = droppedItem
-    hl.Parent = droppedItem
-    gunHighlightTable[droppedItem] = hl
-
-    -- Send notification if it's a new highlight
-    pcall(function()
-        StarterGui:SetCore("SendNotification", {
-            Title = "Gun Dropped!",
-            Text = "Một khẩu súng đã bị rơi ở gần!",
-            Duration = 4,
-            Button1 = "OK"
-        })
-    end)
-end
-
--- Remove Highlight for a dropped Gun object
-local function removeHighlightForDroppedGun(droppedItem)
-    if gunHighlightTable[droppedItem] then
-        gunHighlightTable[droppedItem]:Destroy()
-        gunHighlightTable[droppedItem] = nil
-    end
-end
-
--- NEW: Add Highlight for a dropped/thrown Knife object
-local function addHighlightForKnife(knifeItem)
-    if not (knifeItem:IsA("BasePart") or knifeItem:IsA("Model")) or (knifeItem.Name ~= "Knife" and knifeItem.Name ~= "Knife_Model") then return end
-
-    if knifeHighlightTable[knifeItem] and knifeHighlightTable[knifeItem].Parent then return end
-
-    local hl = Instance.new("Highlight")
-    hl.FillColor = Color3.fromRGB(128, 0, 128) -- Purple
-    hl.OutlineColor = Color3.fromRGB(180, 50, 180)
-    hl.FillTransparency = 0.4
-    hl.OutlineTransparency = 0.2
-    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    hl.Adornee = knifeItem
-    hl.Parent = knifeItem
-    knifeHighlightTable[knifeItem] = hl
-end
-
--- NEW: Remove Highlight for a dropped/thrown Knife object
-local function removeHighlightForKnife(knifeItem)
-    if knifeHighlightTable[knifeItem] then
-        knifeHighlightTable[knifeItem]:Destroy()
-        knifeHighlightTable[knifeItem] = nil
-    end
-end
-
--- NEW: Add Highlight for held Gun/Knife
-local function addHighlightForHeldItem(tool)
-    if heldItemHighlights[tool] then return end
-
-    local handle = tool:FindFirstChild("Handle")
-    if not handle then return end
-
-    local hl = Instance.new("Highlight")
-    if tool.Name == "Gun" then
-        hl.FillColor = Color3.fromRGB(0, 200, 0) -- Green
-        hl.OutlineColor = Color3.fromRGB(50, 255, 50)
-    elseif tool.Name == "Knife" then
-        hl.FillColor = Color3.fromRGB(128, 0, 128) -- Purple
-        hl.OutlineColor = Color3.fromRGB(180, 50, 180)
-    else
-        hl:Destroy()
-        return
-    end
-
-    hl.FillTransparency = 0.4
-    hl.OutlineTransparency = 0.2
-    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    hl.Adornee = handle
-    hl.Parent = handle
-    heldItemHighlights[tool] = hl
-end
-
--- NEW: Remove Highlight for held Gun/Knife
-local function removeHighlightForHeldItem(tool)
-    if heldItemHighlights[tool] then
-        heldItemHighlights[tool]:Destroy()
-        heldItemHighlights[tool] = nil
-    end
-end
-
-
--- MODIFIED: Update all highlights based on chamEnabled state, including dropped guns and knives
-local function updateAllChams()
-    if chamEnabled then
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character and player.Character.Parent then
-                addHighlightForPlayer(player)
-            end
-            -- Check for held items on all players (including local player for consistent logic)
-            if player.Character then
-                local heldTool = player.Character:FindFirstChildOfClass("Tool")
-                if heldTool and (heldTool.Name == "Gun" or heldTool.Name == "Knife") then
-                    addHighlightForHeldItem(heldTool)
-                end
-            end
-        end
-        -- Add/Update highlight for dropped guns if enabled
-        for _, child in ipairs(workspace:GetChildren()) do
-            if (child:IsA("BasePart") or child:IsA("Model")) and child.Name == "GunDrop" then
-                addHighlightForDroppedGun(child)
-            elseif (child:IsA("BasePart") or child:IsA("Model")) and (child.Name == "Knife" or child.Name == "Knife_Model") then
-                addHighlightForKnife(child)
-            end
-        end
-    else
-        for player, _ in pairs(chamHighlights) do
-            removeHighlightForPlayer(player)
-        end
-        -- Remove highlights for all dropped guns
-        for droppedItem, _ in pairs(gunHighlightTable) do
-            removeHighlightForDroppedGun(droppedItem)
-        end
-        -- Remove highlights for all dropped/thrown knives
-        for knifeItem, _ in pairs(knifeHighlightTable) do
-            removeHighlightForKnife(knifeItem)
-        end
-        -- Remove highlights for all held items
-        for tool, _ in pairs(heldItemHighlights) do
-            removeHighlightForHeldItem(tool)
-        end
-    end
-end
-
--- Setup listeners for a given player
-local function setupPlayerListeners(player)
-    -- Proactively clean up highlights when character is removed (on respawn/round end)
-    player.CharacterRemoving:Connect(function(char)
-        removeHighlightForPlayer(player)
-        -- Also remove highlights for any held items that might still be highlighted
-        for tool, hl in pairs(heldItemHighlights) do
-            if tool.Parent == char then
-                removeHighlightForHeldItem(tool)
-            end
-        end
-    end)
-
-    -- CharacterAdded: reset state and detect role
-    player.CharacterAdded:Connect(function(char)
-        -- Reset flag for the new character
-        initialGunGiven[player] = false -- Reset mỗi khi nhân vật mới xuất hiện
-
-        -- MODIFIED: Logic kiểm tra súng Sheriff sau thời gian chờ 13 giây
-        -- Đảm bảo chỉ kiểm tra sau khi game đã cấp súng/dao
-        local function checkAndSetInitialGun()
-            if not player.Character or player.Character ~= char then return end -- Đảm bảo vẫn là cùng char
-
-            local hasGunNow = char:FindFirstChild("Gun") or (player.Backpack and player.Backpack:FindFirstChild("Gun"))
-            if hasGunNow then
-                initialGunGiven[player] = true -- Đặt là true Vĩnh viễn cho round này nếu tìm thấy súng
-                isSheriffAlive = true -- ĐÁNH DẤU SHERIFF CÒN SỐNG
-                if chamEnabled and player ~= LocalPlayer then
-                    addHighlightForPlayer(player)
-                end
-                return true -- Đã tìm thấy súng, ngừng kiểm tra
-            end
-            -- Nếu chưa có súng, không cần lặp lại kiểm tra vì logic game là cấp súng ở giây thứ 13
-            -- Chỉ cần kiểm tra sau 13 giây là đủ.
-            return false
-        end
-
-        -- Wait 13 seconds + a small buffer for gun to be given
-        task.delay(gunRoundStartTime + 1, function() -- Wait 13s + 1s buffer
-            checkAndSetInitialGun()
-        end)
-
-        -- Listen for tool changes to update role/color in real-time and highlight held items
-        local backpack = player:WaitForChild("Backpack")
-        char.ChildAdded:Connect(function(child)
-            task.wait()
-            updateHighlightColor(player)
-            if chamEnabled and (child:IsA("Tool") and (child.Name == "Gun" or child.Name == "Knife")) then
-                addHighlightForHeldItem(child)
-            end
-        end)
-        char.ChildRemoved:Connect(function(child)
-            task.wait()
-            updateHighlightColor(player)
-            if child:IsA("Tool") and (child.Name == "Gun" or child.Name == "Knife") then
-                removeHighlightForHeldItem(child)
-            end
-        end)
-        backpack.ChildAdded:Connect(function() task.wait() updateHighlightColor(player) end)
-        backpack.ChildRemoved:Connect(function() task.wait() updateHighlightColor(player) end)
-
-        local playerHumanoid = char:WaitForChild("Humanoid", 5)
-        if playerHumanoid then
-            playerHumanoid.Died:Connect(function()
-                task.delay(0.1, function()
-                    -- Lấy vai trò TRƯỚC khi người chơi chết hẳn
-                    local roleBeforeDeath = "Innocent"
-                    if initialGunGiven[player] then
-                        roleBeforeDeath = "Sheriff"
-                    end
-                    
-                    if roleBeforeDeath == "Sheriff" then
-                        isSheriffAlive = false -- ĐÁNH DẤU SHERIFF ĐÃ CHẾT
-                        pcall(function()
-                            StarterGui:SetCore("SendNotification", {
-                                Title = "Sheriff Died!",
-                                Text = player.DisplayName.." (Sheriff) đã chết!",
-                                Duration = 5,
-                                Button1 = "OK"
-                            })
-                        end)
-            
-                        -- Cập nhật lại tất cả highlight ngay lập tức
-                        -- Điều này sẽ khiến người chơi nhặt được súng chuyển thành Hero
-                        updateAllChams()
-            
-                        -- Kiểm tra súng rơi sau khi Sheriff chết
-                        task.delay(0.2, function()
-                            for _, child in ipairs(workspace:GetChildren()) do
-                                if (child:IsA("BasePart") or child:IsA("Model")) and child.Name == "GunDrop" then
-                                    if chamEnabled and not gunHighlightTable[child] then
-                                        addHighlightForDroppedGun(child)
-                                    end
-                                end
-                            end
-                        end)
-                    else
-                        -- Vẫn giữ logic thông báo khi Hero chết
-                        local currentRole = getRole(player)
-                        if currentRole == "Hero" then
-                             pcall(function()
-                                StarterGui:SetCore("SendNotification", {
-                                    Title = "Hero Died!",
-                                    Text = player.DisplayName.." (Hero) đã chết!",
-                                    Duration = 5,
-                                    Button1 = "OK"
-                                })
-                            end)
-                        end
-                    end
-                end)
-            end)
-        end
-    end)
-
-    -- If Character already exists (script injected mid-round)
-    if player.Character and player.Character.Parent then
-        local char = player.Character
-        initialGunGiven[player] = false
-
-        local function checkAndSetInitialGunExistingChar()
-            if not player.Character or player.Character ~= char then return end
-
-            local hasGunNow = char:FindFirstChild("Gun") or (player.Backpack and player.Backpack:FindFirstChild("Gun"))
-            if hasGunNow then
-                initialGunGiven[player] = true
-                isSheriffAlive = true -- ĐÁNH DẤU SHERIFF CÒN SỐNG
-                if chamEnabled and player ~= LocalPlayer then
-                    addHighlightForPlayer(player)
-                end
-                return true
-            end
-            return false
-        end
-        
-        -- If injected mid-round, check immediately after 13s (or if 13s already passed)
-        local timeElapsed = os.time() - gameStartedTime
-        if timeElapsed >= gunRoundStartTime then
-            task.delay(0.5, checkAndSetInitialGunExistingChar) -- Short delay if already past time
-        else
-            task.delay(gunRoundStartTime - timeElapsed + 0.5, checkAndSetInitialGunExistingChar) -- Wait remaining time + buffer
-        end
-
-        -- Listen for tool changes
-        local backpack = player:WaitForChild("Backpack")
-        char.ChildAdded:Connect(function(child)
-            task.wait()
-            updateHighlightColor(player)
-            if chamEnabled and (child:IsA("Tool") and (child.Name == "Gun" or child.Name == "Knife")) then
-                addHighlightForHeldItem(child)
-            end
-        end)
-        char.ChildRemoved:Connect(function(child)
-            task.wait()
-            updateHighlightColor(player)
-            if child:IsA("Tool") and (child.Name == "Gun" or child.Name == "Knife") then
-                removeHighlightForHeldItem(child)
-            end
-        end)
-        backpack.ChildAdded:Connect(function() task.wait() updateHighlightColor(player) end)
-        backpack.ChildRemoved:Connect(function() task.wait() updateHighlightColor(player) end)
-
-        local playerHumanoid = char:FindFirstChild("Humanoid")
-        if playerHumanoid then
-            playerHumanoid.Died:Connect(function()
-                task.delay(0.1, function()
-                    -- Lấy vai trò TRƯỚC khi người chơi chết hẳn
-                    local roleBeforeDeath = "Innocent"
-                    if initialGunGiven[player] then
-                        roleBeforeDeath = "Sheriff"
-                    end
-                    
-                    if roleBeforeDeath == "Sheriff" then
-                        isSheriffAlive = false -- ĐÁNH DẤU SHERIFF ĐÃ CHẾT
-                        pcall(function()
-                            StarterGui:SetCore("SendNotification", {
-                                Title = "Sheriff Died!",
-                                Text = player.DisplayName.." (Sheriff) đã chết!",
-                                Duration = 5,
-                                Button1 = "OK"
-                            })
-                        end)
-            
-                        -- Cập nhật lại tất cả highlight ngay lập tức
-                        -- Điều này sẽ khiến người chơi nhặt được súng chuyển thành Hero
-                        updateAllChams()
-            
-                        -- Kiểm tra súng rơi sau khi Sheriff chết
-                        task.delay(0.2, function()
-                            for _, child in ipairs(workspace:GetChildren()) do
-                                if (child:IsA("BasePart") or child:IsA("Model")) and child.Name == "GunDrop" then
-                                    if chamEnabled and not gunHighlightTable[child] then
-                                        addHighlightForDroppedGun(child)
-                                    end
-                                end
-                            end
-                        end)
-                    else
-                        -- Vẫn giữ logic thông báo khi Hero chết
-                        local currentRole = getRole(player)
-                        if currentRole == "Hero" then
-                             pcall(function()
-                                StarterGui:SetCore("SendNotification", {
-                                    Title = "Hero Died!",
-                                    Text = player.DisplayName.." (Hero) đã chết!",
-                                    Duration = 5,
-                                    Button1 = "OK"
-                                })
-                            end)
-                        end
-                    end
-                end)
-            end)
-        end
-    end
-end
-
--- Initialize for all players
-for _, player in ipairs(Players:GetPlayers()) do
-    if player ~= LocalPlayer then
-        setupPlayerListeners(player)
-    end
-end
--- When new player joins
-Players.PlayerAdded:Connect(function(player)
-    setupPlayerListeners(player)
-    if chamEnabled then
-        if player.Character then
-            addHighlightForPlayer(player)
-            local heldTool = player.Character:FindFirstChildOfClass("Tool")
-            if heldTool and (heldTool.Name == "Gun" or heldTool.Name == "Knife") then
-                addHighlightForHeldItem(heldTool)
-            end
-        else
-            player.CharacterAdded:Wait()
-            addHighlightForPlayer(player)
-            local heldTool = player.Character:FindFirstChildOfClass("Tool")
-            if heldTool and (heldTool.Name == "Gun" or heldTool.Name == "Knife") then
-                addHighlightForHeldItem(heldTool)
-            end
-        end
-    end
-end)
--- When player leaves
-Players.PlayerRemoving:Connect(function(player)
-    removeHighlightForPlayer(player)
-    for tool, hl in pairs(heldItemHighlights) do
-        if tool.Parent == player.Character then -- If they leave while holding it
-            removeHighlightForHeldItem(tool)
-        end
-    end
-end)
-
--- Initial setup for dropped guns and knives when script runs
--- Lắng nghe ChildAdded cho BasePart/Model có tên "GunDrop" hoặc "Knife"
-workspace.ChildAdded:Connect(function(child)
-    if chamEnabled then -- Only highlight if ESP is on
-        if (child:IsA("BasePart") or child:IsA("Model")) and child.Name == "GunDrop" then
-            addHighlightForDroppedGun(child)
-        elseif (child:IsA("BasePart") or child:IsA("Model")) and (child.Name == "Knife" or child.Name == "Knife_Model") then
-            addHighlightForKnife(child)
-        end
-    end
-end)
-
--- Phát hiện súng/dao đã có sẵn trong workspace khi script chạy (Part/Model)
-for _, child in ipairs(workspace:GetChildren()) do
-    if chamEnabled then -- Only highlight if ESP is on
-        if (child:IsA("BasePart") or child:IsA("Model")) and child.Name == "GunDrop" then
-            addHighlightForDroppedGun(child)
-        elseif (child:IsA("BasePart") or child:IsA("Model")) and (child.Name == "Knife" or child.Name == "Knife_Model") then
-            addHighlightForKnife(child)
-        end
-    end
-end
-
--- Khi item Gun/Knife bị xóa (nhặt hoặc hủy)
-workspace.ChildRemoved:Connect(function(child)
-    if (child:IsA("BasePart") or child:IsA("Model")) and child.Name == "GunDrop" then
-        removeHighlightForDroppedGun(child)
-    elseif (child:IsA("BasePart") or child:IsA("Model")) and (child.Name == "Knife" or child.Name == "Knife_Model") then
-        removeHighlightForKnife(child)
-    end
-end)
-
-
---- Anti Features ---
+--- Anti Features setup ---
 local function setupAntiFeatures()
     Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
     Humanoid = Character:WaitForChild("Humanoid", 5)
@@ -866,200 +409,234 @@ local function setupAntiFeatures()
     end)
 end
 
---- Gun Aura (Auto Pickup) Logic ---
-local gunAuraEnabled = false
-local auraRadius = 30 -- Bán kính tự động nhặt súng
-
--- Auto Pickup Function
-local function attemptAutoPickup(droppedGunPart)
-    if not droppedGunPart or not droppedGunPart.Parent then return end
-
-    -- To auto-pickup, you need to find the RemoteEvent the game uses to handle pickup.
-    -- Or, if the game handles it via touch, you can try teleporting LocalPlayer.HumanoidRootPart to the gun's center.
-    -- This part is highly game-dependent. Without knowing the specific game's events,
-    -- this will only serve as a placeholder or a hint for manual exploitation.
-    
-    warn("Auto-pickup logic not fully implemented. Need to find game's specific pickup RemoteEvent or mechanic.")
-    return false -- Return false if unable to pick up
-end
-
--- Gun Aura: heartbeat kiểm tra liên tục để highlight và auto-pickup.
-RunService.Heartbeat:Connect(function()
-    if not (RootPart and RootPart.Parent) then
-        local char = LocalPlayer.Character
-        if char then RootPart = char:FindFirstChild("HumanoidRootPart") end
-        if not RootPart then return end
-    end
-
-    -- Loop through currently highlighted guns (which are all "GunDrop" parts)
-    for droppedItem, hl in pairs(gunHighlightTable) do
-        if not (droppedItem and droppedItem.Parent and droppedItem:IsDescendantOf(workspace)) then
-            removeHighlightForDroppedGun(droppedItem)
-            continue
-        end
-        
-        -- MODIFIED: Add Auto-pickup logic here
-        if gunAuraEnabled then -- Check if Gun Aura (auto-pickup) is enabled
-            if (RootPart.Position - droppedItem.Position).Magnitude <= auraRadius then
-                -- Attempt to auto-pickup if within range
-                attemptAutoPickup(droppedItem)
-            end
-        end
-    end
-end)
-
---- LOGIC SEMI-GOD MODE MỚI (RAGDOLL THAY VÌ CHẾT) ---
+--- Semi-God Mode (Ragdoll thay vì chết) ---
 local semiGodModeEnabled = false
-
 local function onHealthChanged(health)
-    -- Chỉ chạy logic nếu chức năng được bật và người chơi hợp lệ
     if not semiGodModeEnabled or not Humanoid or not Humanoid.Parent then return end
-
-    -- Nếu máu xuống dưới hoặc bằng 0 (điều kiện chết)
     if health <= 0 then
-        -- 1. Ngăn chặn cái chết ngay lập tức bằng cách đặt lại một ít máu
-        Humanoid.Health = 1 
-
-        -- 2. Kích hoạt trạng thái Ragdoll (nhân vật sẽ nằm vật ra)
+        Humanoid.Health = 1
         Humanoid:ChangeState(Enum.HumanoidStateType.Physics)
-
-        -- 3. Đặt lịch để tự đứng dậy và hồi máu sau một khoảng thời gian
         task.delay(2.5, function()
-            -- Kiểm tra lại xem người chơi và humanoid có còn tồn tại không
             if Humanoid and Humanoid.Parent and Humanoid:GetState() == Enum.HumanoidStateType.Physics then
-                -- Bắt đầu quá trình đứng dậy
                 Humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
-                -- Sau khi đứng dậy, hồi đầy máu để sẵn sàng cho lần tấn công tiếp theo
                 Humanoid.Health = Humanoid.MaxHealth
             end
         end)
     end
 end
 
+-- Notification helper
+local function notify(title, text, duration)
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {
+            Title = title,
+            Text = text,
+            Duration = duration or 3,
+            Button1 = "OK"
+        })
+    end)
+end
 
 -- Notification on load
 task.delay(1, function()
-    pcall(function()
-        StarterGui:SetCore("SendNotification", {
-            Title = "Kevinz Hub Loaded ✅",
-            Text = "Version: "..HUB_VERSION,
-            Duration = 5
-        })
-    end)
+    notify("Kevinz Hub Loaded ✅", "Version: " .. HUB_VERSION, 4)
 end)
 
--- Setup Anti Features initially
+-- Setup Anti Features
 setupAntiFeatures()
 
--- ================= “Fix Lag + Lower CPU Load” with extended optimizations =================
-local hideAccessoriesEnabled = false
+-- ================= “Fix Lag + Lower CPU Load” tối ưu sâu =================
 
+-- optimizePerformance: thực hiện một lần
 local function optimizePerformance()
-    pcall(function() Lighting.GlobalShadows = false end)
-    pcall(function() Lighting.Brightness = 1 end)
-    pcall(function() Lighting.OutdoorAmbient = Color3.fromRGB(50, 50, 50) end)
+    -- Override print/warn để clear log
+    pcall(function()
+        print = function(...) end
+        warn = function(...) end
+    end)
 
-    for _, v in ipairs(workspace:GetDescendants()) do
-        if v:IsA("BasePart") then
-            pcall(function() v.CastShadow = false; v.Reflectance = 0 end)
-        elseif v:IsA("PostEffect") or v:IsA("Atmosphere") then
-            pcall(function() v.Enabled = false end)
-        elseif v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Smoke") or v:IsA("Fire") or v:IsA("Sparkles") then
-            pcall(function() v.Enabled = false end)
-        elseif v:IsA("Decal") or v:IsA("Texture") then
-            pcall(function() v.Transparency = 1 end)
+    -- Lighting tối: midnight sky, tắt hiệu ứng
+    pcall(function()
+        -- Xóa mọi Sky có sẵn
+        for _, child in ipairs(Lighting:GetChildren()) do
+            if child:IsA("Sky") then
+                child:Destroy()
+            end
         end
-    end
-    
-    local ugs = UserSettings:GetService("UserGameSettings")
-    if ugs.SetRenderingQualityLevel then
-        pcall(function() ugs:SetRenderingQualityLevel(1) end)
-    elseif ugs.SetGraphicsQualityLevel then
-        pcall(function() ugs:SetGraphicsQualityLevel(1) end)
-    end
+        -- Thiết bầu trời midnight
+        Lighting.ClockTime = 0
+        Lighting.Brightness = 0
+        Lighting.Ambient = Color3.new(0, 0, 0)
+        Lighting.OutdoorAmbient = Color3.new(0, 0, 0)
+        Lighting.FogColor = Color3.new(0, 0, 0)
+        Lighting.FogStart = 0
+        Lighting.FogEnd = 1e3
+        Lighting.GlobalShadows = false
+        Lighting.EnvironmentDiffuseScale = 0
+        Lighting.EnvironmentSpecularScale = 0
+        -- Tắt mọi PostEffect trong Lighting
+        for _, eff in ipairs(Lighting:GetDescendants()) do
+            if eff:IsA("PostEffect") then
+                pcall(function() eff.Enabled = false end)
+            end
+        end
+    end)
 
-    local terrain = workspace:FindFirstChildOfClass("Terrain")
-    if terrain then
-        terrain.WaterWaveSize = 0; terrain.WaterWaveSpeed = 0
-        terrain.WaterReflectance = 0; terrain.WaterTransparency = 1
-    end
-    
+    -- Giảm chi tiết render trong Workspace
+    pcall(function()
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") then
+                pcall(function()
+                    obj.CastShadow = false
+                    obj.Reflectance = 0
+                    -- Nếu muốn, có thể chuyển Material về Plastic, nhưng nhiều game cấm:
+                    -- obj.Material = Enum.Material.Plastic
+                end)
+            end
+            if obj:IsA("PointLight") or obj:IsA("SurfaceLight") or obj:IsA("SpotLight") then
+                pcall(function() obj.Enabled = false end)
+            end
+            if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Smoke") or obj:IsA("Fire") or obj:IsA("Sparkles") then
+                pcall(function() obj.Enabled = false end)
+            end
+            if obj:IsA("Decal") or obj:IsA("Texture") then
+                pcall(function() obj.Transparency = 1 end)
+            end
+            if obj:IsA("SpecialMesh") then
+                pcall(function() obj.Scale = Vector3.new(0.1,0.1,0.1) end)
+            end
+        end
+    end)
+
+    -- Giảm chất lượng Graphics Level
+    pcall(function()
+        local ugs = UserSettings:GetService("UserGameSettings")
+        if ugs.SetRenderingQualityLevel then
+            ugs:SetRenderingQualityLevel(1)
+        elseif ugs.SetGraphicsQualityLevel then
+            ugs:SetGraphicsQualityLevel(1)
+        end
+    end)
+
+    -- Terrain: tắt water effects
+    pcall(function()
+        local terrain = workspace:FindFirstChildOfClass("Terrain")
+        if terrain then
+            terrain.WaterWaveSize = 0
+            terrain.WaterWaveSpeed = 0
+            terrain.WaterReflectance = 0
+            terrain.WaterTransparency = 1
+            terrain.CastShadow = false
+        end
+    end)
+
+    -- Camera: tắt PostEffect con (nếu có)
+    pcall(function()
+        local cam = workspace.CurrentCamera
+        if cam then
+            for _, eff in ipairs(cam:GetDescendants()) do
+                if eff:IsA("PostEffect") then
+                    pcall(function() eff.Enabled = false end)
+                end
+            end
+        end
+    end)
+
+    -- Thông báo hoàn thành
     pcall(function()
         StarterGui:SetCore("SendNotification", {
             Title = "Optimization Applied",
-            Text = "Đã áp dụng tối ưu sâu cho máy yếu.",
+            Text = "Tối ưu sâu đã áp dụng: Midnight sky, tắt hiệu ứng, giảm render chi tiết.",
             Duration = 5
         })
+    end)
+end
+
+-- optimizePerformanceWithListener: chạy một lần rồi kết nối để disable object mới
+local optimized = false
+local function optimizePerformanceWithListener()
+    if optimized then return end
+    optimized = true
+    optimizePerformance()
+    -- Kết nối event để disable object thêm mới
+    workspace.DescendantAdded:Connect(function(obj)
+        -- Disable tương tự khi optimizePerformance
+        if obj:IsA("Sky") and obj.Parent == Lighting then
+            pcall(function() obj:Destroy() end)
+        end
+        if obj:IsA("BasePart") then
+            pcall(function()
+                obj.CastShadow = false
+                obj.Reflectance = 0
+                -- obj.Material = Enum.Material.Plastic
+            end)
+        end
+        if obj:IsA("PointLight") or obj:IsA("SurfaceLight") or obj:IsA("SpotLight") then
+            pcall(function() obj.Enabled = false end)
+        end
+        if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Smoke") or obj:IsA("Fire") or obj:IsA("Sparkles") then
+            pcall(function() obj.Enabled = false end)
+        end
+        if obj:IsA("Decal") or obj:IsA("Texture") then
+            pcall(function() obj.Transparency = 1 end)
+        end
+        if obj:IsA("SpecialMesh") then
+            pcall(function() obj.Scale = Vector3.new(0.1,0.1,0.1) end)
+        end
     end)
 end
 
 -- ================= UI controls =================
 inputRow = 0
 
--- WalkSpeed
+-- Group 1: Movement Settings
+createSection("Movement Settings")
 createInput("WalkSpeed", function() return 16 end, function(v)
     savedWalkSpeed = v
     if Humanoid then Humanoid.WalkSpeed = v end
 end)
--- JumpPower
 createInput("JumpPower", function() return 50 end, function(v)
     savedJumpPower = v
     if Humanoid then Humanoid.JumpPower = v end
 end)
--- FOV
 createInput("FOV", function() return 70 end, function(v)
     if workspace.CurrentCamera then workspace.CurrentCamera.FieldOfView = v end
 end)
 
--- NEW: HP Display
-local hpDisplayInput = nil -- Biến để lưu trữ tham chiếu đến TextBox hiển thị HP
-
-createInput("Current HP", function() return 100 end, function(v)
-    -- This function for setting HP is client-side only and will likely be reverted by the server.
-    -- For actual HP modification, you would need to find a server-sided RemoteEvent/vulnerability.
-    if Humanoid then
-        Humanoid.Health = math.clamp(v, 0, Humanoid.MaxHealth)
-        pcall(function()
-            StarterGui:SetCore("SendNotification", {
-                Title = "HP Adjustment Attempted",
-                Text = "Đã cố gắng điều chỉnh HP thành "..v..". Lưu ý: Server có thể không chấp nhận thay đổi này.",
-                Duration = 4
-            })
-        end)
-    end
-end)
--- Cập nhật HP display liên tục
-RunService.Heartbeat:Connect(function()
-    if hpDisplayInput and Humanoid and Humanoid.Parent then
-        -- Cập nhật PlaceholderText thay vì Text để không xóa input của người dùng
-        hpDisplayInput.PlaceholderText = string.format("HP: %.0f/%.0f", Humanoid.Health, Humanoid.MaxHealth)
-    end
-end)
-
--- Store the reference to the HP input after creation
-local hpInputContainer = content:WaitForChild("InputRow_" .. inputRow)
-if hpInputContainer then
-    hpDisplayInput = hpInputContainer:FindFirstChild("TextBox")
+-- Group 2: Health & Semi-God
+createSection("Health Settings")
+do
+    local hpDisplayInput
+    createInput("Set HP (Attempt)", function() return 100 end, function(v)
+        if Humanoid then
+            Humanoid.Health = math.clamp(v, 0, Humanoid.MaxHealth)
+            notify("HP Adjustment", "Đã cố gắng điều chỉnh HP thành " .. v .. ". Server có thể override.", 3)
+        end
+    end)
+    RunService.Heartbeat:Connect(function()
+        if hpDisplayInput == nil then
+            local cont = content:FindFirstChild("InputRow_" .. inputRow)
+            if cont then
+                hpDisplayInput = cont:FindFirstChild("TextBox")
+            end
+        end
+        if hpDisplayInput and Humanoid and Humanoid.Parent then
+            hpDisplayInput.PlaceholderText = string.format("HP: %.0f/%.0f", Humanoid.Health, Humanoid.MaxHealth)
+        end
+    end)
 end
+createSwitch("Semi-God Mode", function(on)
+    semiGodModeEnabled = on
+    if on then
+        notify("Semi-God Mode", "Bật: HP sẽ hồi lại khi chết.", 3)
+    else
+        notify("Semi-God Mode", "Tắt: hoạt động bình thường.", 3)
+    end
+end)
 
-
--- ESP Theo Role (giờ đã bao gồm highlight dropped gun và knife)
-createSwitch("ESP Theo Role", function(on)
-    chamEnabled = on
-    updateAllChams() -- Gọi hàm này để cập nhật tất cả highlights (người chơi, súng rơi, dao rơi, súng/dao cầm tay)
-end)
--- Gun Aura (chỉ điều khiển auto-pickup)
-createSwitch("Gun Aura (Auto Pickup)", function(on)
-    gunAuraEnabled = on
-end)
--- Gun Aura Radius
-createInput("Gun Aura Radius", function() return auraRadius end, function(v)
-    auraRadius = v
-end)
--- Hide Accessories
+-- Group 3: Utilities
+createSection("Utilities")
 createSwitch("Hide Accessories", function(on)
-    hideAccessoriesEnabled = on
-    -- This part is illustrative. A full implementation would need to handle new players and respawns.
     if on and LocalPlayer.Character then
         for _, item in ipairs(LocalPlayer.Character:GetChildren()) do
             if item:IsA("Accessory") then
@@ -1069,57 +646,436 @@ createSwitch("Hide Accessories", function(on)
         end
     end
 end)
+createButton("Fix Lag + Lower CPU Load", optimizePerformanceWithListener)
 
--- NEW: Semi-God Mode
-createSwitch("Semi-God Mode", function(on)
-    semiGodModeEnabled = on
-    if on then
-        pcall(function()
-            StarterGui:SetCore("SendNotification", {
-                Title = "Semi-God Mode ON",
-                Text = "HP của bạn sẽ liên tục được hồi đầy.",
-                Duration = 3
-            })
-        end)
-    else
-        pcall(function()
-            StarterGui:SetCore("SendNotification", {
-                Title = "Semi-God Mode OFF",
-                Text = "HP của bạn sẽ hoạt động bình thường.",
-                Duration = 3
-            })
-        end)
+-- ================= Outline Highlight ESP + Weapon Highlight via loop =================
+
+local espEnabled = false
+local roleColors = {
+    Murderer = Color3.fromRGB(255, 50, 50),
+    Sheriff  = Color3.fromRGB(50, 150, 255),
+    Hero     = Color3.fromRGB(255, 255, 70),
+    Innocent = Color3.fromRGB(50, 255, 80),
+    Unknown  = Color3.fromRGB(180, 180, 180)
+}
+local lastRole = {}
+local lastCharacter = {}
+_G._KevinzHub_WeaponHighlights = {}
+-- Tables for drop highlights and Gun Aura
+local gunDropESP = {}
+_G._KevinzHub_KnifeHighlights = _G._KevinzHub_KnifeHighlights or {}
+
+-- Gun Aura variables
+local gunAuraEnabled = false
+local auraDistance = 100  -- default distance
+local auraCooldown = 0.5  -- default cooldown (s)
+local lastAuraTime = 0
+
+-- Clear outline highlight
+local function clearOutlineHighlight(char)
+    for _, inst in ipairs(char:GetChildren()) do
+        if inst:IsA("Highlight") and inst.Name == "_ESP_OUTLINE" then
+            inst:Destroy()
+        end
+    end
+end
+
+-- Clear weapon highlights for player
+local function clearWeaponHighlightsForPlayer(player)
+    local tbl = _G._KevinzHub_WeaponHighlights[player]
+    if tbl then
+        for tool, hl in pairs(tbl) do
+            if hl and hl.Parent then
+                hl:Destroy()
+            end
+        end
+    end
+    _G._KevinzHub_WeaponHighlights[player] = nil
+end
+
+-- Determine role
+local function getRole(player)
+    if not player.Character then return "Unknown" end
+    if player:FindFirstChild("Backpack") then
+        for _, tool in ipairs(player.Backpack:GetChildren()) do
+            if typeof(tool.Name) == "string" then
+                local n = tool.Name:lower()
+                if n:find("knife") or n:find("blade") then
+                    return "Murderer"
+                end
+                if n:find("gun") or n:find("revolver") then
+                    return "Sheriff"
+                end
+            end
+        end
+    end
+    local char = player.Character
+    for _, tool in ipairs(char:GetChildren()) do
+        if tool:IsA("Tool") and typeof(tool.Name) == "string" then
+            local n = tool.Name:lower()
+            if n:find("knife") or n:find("blade") then
+                return "Murderer"
+            end
+            if n:find("gun") or n:find("revolver") then
+                return "Hero"
+            end
+        end
+    end
+    return "Innocent"
+end
+
+-- Add outline highlight
+local function addOutline(player, role)
+    if player == LocalPlayer then return end
+    local char = player.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    clearOutlineHighlight(char)
+    local color = roleColors[role] or roleColors.Unknown
+    for i = 1, 2 do
+        local hl = Instance.new("Highlight")
+        hl.Name = "_ESP_OUTLINE"
+        hl.FillTransparency = 1
+        hl.OutlineColor = color
+        hl.OutlineTransparency = (i == 1) and 0.35 or 0.08
+        hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        hl.Adornee = char
+        hl.Parent = char
+    end
+end
+
+-- Add weapon highlight
+local function addWeaponHighlight(player, toolInstance)
+    if not espEnabled then return end
+    if not toolInstance or not toolInstance:IsA("Tool") then return end
+    if not _G._KevinzHub_WeaponHighlights[player] then
+        _G._KevinzHub_WeaponHighlights[player] = {}
+    end
+    if _G._KevinzHub_WeaponHighlights[player][toolInstance] then return end
+
+    local nameLower = toolInstance.Name:lower()
+    local color = Color3.fromRGB(255, 255, 255)
+    if nameLower:find("knife") or nameLower:find("blade") then
+        color = Color3.fromRGB(160, 32, 240)  -- tím
+    elseif nameLower:find("gun") or nameLower:find("revolver") then
+        color = Color3.fromRGB(100, 150, 255)
+    end
+
+    local handle = toolInstance:FindFirstChildWhichIsA("BasePart") or toolInstance:FindFirstChild("Handle")
+    if not handle then return end
+
+    local hl = Instance.new("Highlight")
+    hl.Name = "_ESP_WEAPON"
+    hl.FillTransparency = 1
+    hl.OutlineColor = color
+    hl.OutlineTransparency = 0.2
+    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    hl.Adornee = handle
+    hl.Parent = handle
+
+    _G._KevinzHub_WeaponHighlights[player][toolInstance] = hl
+end
+
+-- Remove weapon highlight
+local function removeWeaponHighlight(player, toolInstance)
+    if not _G._KevinzHub_WeaponHighlights[player] then return end
+    local hl = _G._KevinzHub_WeaponHighlights[player][toolInstance]
+    if hl and hl.Parent then
+        hl:Destroy()
+    end
+    _G._KevinzHub_WeaponHighlights[player][toolInstance] = nil
+end
+
+-- Highlight GunDrop when ESP on
+local function highlightGunDrop(obj)
+    if not espEnabled then return end
+    if gunDropESP[obj] and gunDropESP[obj].Parent then return end
+    if not obj:IsA("BasePart") then return end
+    local hl = Instance.new("Highlight")
+    hl.Name = "_ESP_GUNDROP"
+    hl.Adornee = obj
+    hl.FillColor = Color3.fromRGB(255, 20, 147)   -- hồng đậm
+    hl.OutlineColor = Color3.fromRGB(255, 20, 147)
+    hl.FillTransparency = 0.8
+    hl.OutlineTransparency = 0.2
+    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    hl.Parent = obj
+    gunDropESP[obj] = hl
+end
+
+-- Remove GunDrop highlight
+local function removeGunDropESP(obj)
+    if gunDropESP[obj] then
+        if gunDropESP[obj].Parent then
+            gunDropESP[obj]:Destroy()
+        end
+        gunDropESP[obj] = nil
+    end
+end
+
+-- Scan existing GunDrop under ESP
+local function scanGunDrops()
+    if not espEnabled then return end
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and obj.Name == "GunDrop" then
+            highlightGunDrop(obj)
+        end
+    end
+end
+
+-- Connect workspace descendant added/removed for GunDrop and KnifeDrop
+workspace.DescendantAdded:Connect(function(obj)
+    -- GunDrop highlight + notify nếu ESP bật
+    if obj:IsA("BasePart") and obj.Name == "GunDrop" then
+        if espEnabled then
+            highlightGunDrop(obj)
+            notify("Gun Dropped", "Một khẩu súng đã rơi!", 4)
+        end
+    elseif obj:IsA("BasePart") and obj.Name == "KnifeDrop" then
+        if espEnabled then
+            -- KnifeDrop highlight tím
+            local hl = Instance.new("Highlight")
+            hl.Name = "_ESP_KNIFEDROP"
+            hl.Adornee = obj
+            hl.FillColor = Color3.fromRGB(160, 32, 240)
+            hl.OutlineColor = Color3.fromRGB(200, 100, 200)
+            hl.FillTransparency = 0.8
+            hl.OutlineTransparency = 0.2
+            hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            hl.Parent = obj
+            _G._KevinzHub_KnifeHighlights[obj] = hl
+            notify("Knife Dropped", "Một con dao đã rơi!", 4)
+        end
+    end
+end)
+workspace.DescendantRemoving:Connect(function(obj)
+    if obj.Name == "GunDrop" then
+        removeGunDropESP(obj)
+    elseif obj.Name == "KnifeDrop" then
+        if _G._KevinzHub_KnifeHighlights[obj] then
+            local hl = _G._KevinzHub_KnifeHighlights[obj]
+            if hl and hl.Parent then hl:Destroy() end
+            _G._KevinzHub_KnifeHighlights[obj] = nil
+        end
     end
 end)
 
--- Button Fix Lag + Lower CPU Load
-createButton("Fix Lag + Lower CPU Load", optimizePerformance)
+-- Auto grab GunDrop (Gun Aura) logic
+local function attemptAutoGrabGun(gunPart)
+    if not gunPart or not gunPart.Parent then return end
+    if not RootPart or not RootPart.Parent then return end
+    if firetouchinterest then
+        firetouchinterest(RootPart, gunPart, 0)
+        task.wait(0.08)
+        firetouchinterest(RootPart, gunPart, 1)
+    elseif getgenv and getgenv().firetouchinterest then
+        getgenv().firetouchinterest(RootPart, gunPart, 0)
+        task.wait(0.08)
+        getgenv().firetouchinterest(RootPart, gunPart, 1)
+    else
+        -- fallback minimal bump
+        RootPart.CFrame = RootPart.CFrame + Vector3.new(0, 0.0001, 0)
+    end
+end
 
--- CharacterAdded reapply settings
+RunService.Heartbeat:Connect(function()
+    if gunAuraEnabled then
+        local now = tick()
+        if now >= lastAuraTime + auraCooldown then
+            lastAuraTime = now
+            -- scan all GunDrop in workspace
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                if obj:IsA("BasePart") and obj.Name == "GunDrop" then
+                    -- check distance
+                    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    if hrp and obj:IsDescendantOf(workspace) then
+                        local success, dist = pcall(function()
+                            return (hrp.Position - obj.Position).Magnitude
+                        end)
+                        if success and dist <= auraDistance then
+                            attemptAutoGrabGun(obj)
+                            notify("Gun Aura", "Đã cố gắng nhặt GunDrop khi lại gần!", 1)
+                            break
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- Update per player in loop
+local function updatePlayer(player)
+    local char = player.Character
+    if char then
+        if lastCharacter[player] ~= char then
+            lastRole[player] = nil
+            clearWeaponHighlightsForPlayer(player)
+            lastCharacter[player] = char
+            -- Connect death notification
+            local hum = char:FindFirstChild("Humanoid")
+            if hum then
+                hum.Died:Connect(function()
+                    local role = getRole(player)
+                    if role == "Sheriff" or role == "Hero" then
+                        notify(role .. " Died", player.Name .. " (" .. role .. ") đã chết.", 4)
+                    end
+                end)
+            end
+        end
+    else
+        lastRole[player] = nil
+        clearWeaponHighlightsForPlayer(player)
+        lastCharacter[player] = nil
+        return
+    end
+
+    if not espEnabled then
+        if char then clearOutlineHighlight(char) end
+        clearWeaponHighlightsForPlayer(player)
+        lastRole[player] = nil
+        return
+    end
+
+    -- Outline role
+    if player ~= LocalPlayer then
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            local role = getRole(player)
+            if lastRole[player] ~= role then
+                addOutline(player, role)
+                lastRole[player] = role
+            end
+        end
+    end
+
+    -- Weapon highlight: remove stale, add new
+    local tbl = _G._KevinzHub_WeaponHighlights[player]
+    if tbl then
+        for toolInst, hl in pairs(tbl) do
+            if not (toolInst and toolInst.Parent == char) then
+                if hl and hl.Parent then hl:Destroy() end
+                tbl[toolInst] = nil
+            end
+        end
+    end
+    for _, child in ipairs(char:GetChildren()) do
+        if child:IsA("Tool") then
+            if not (_G._KevinzHub_WeaponHighlights[player] and _G._KevinzHub_WeaponHighlights[player][child]) then
+                addWeaponHighlight(player, child)
+            end
+        end
+    end
+end
+
+-- Loop ESP liên tục mỗi 0.7s
+local espLoopRunning = false
+local espLoopInterval = 0.7
+local function startEspLoop()
+    if espLoopRunning then return end
+    espLoopRunning = true
+    task.spawn(function()
+        while espEnabled do
+            -- Update players
+            for _, player in ipairs(Players:GetPlayers()) do
+                updatePlayer(player)
+            end
+            -- GunDrop scan for highlight
+            scanGunDrops()
+            task.wait(espLoopInterval)
+        end
+        -- Khi espEnabled=false, remove all GunDrop highlights
+        for obj, _ in pairs(gunDropESP) do
+            removeGunDropESP(obj)
+        end
+        -- Also remove KnifeDrop highlights
+        for obj, hl in pairs(_G._KevinzHub_KnifeHighlights) do
+            if hl and hl.Parent then hl:Destroy() end
+            _G._KevinzHub_KnifeHighlights[obj] = nil
+        end
+        espLoopRunning = false
+    end)
+end
+
+-- ================= Setup notification when existing players die =================
+for _, player in ipairs(Players:GetPlayers()) do
+    if player.Character and player.Character:FindFirstChild("Humanoid") then
+        local hum = player.Character:FindFirstChild("Humanoid")
+        hum.Died:Connect(function()
+            local role = getRole(player)
+            if role == "Sheriff" or role == "Hero" then
+                notify(role .. " Died", player.Name .. " (" .. role .. ") đã chết.", 4)
+            end
+        end)
+    end
+end
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function(char)
+        local hum = char:WaitForChild("Humanoid", 5)
+        if hum then
+            hum.Died:Connect(function()
+                local role = getRole(player)
+                if role == "Sheriff" or role == "Hero" then
+                    notify(role .. " Died", player.Name .. " (" .. role .. ") đã chết.", 4)
+                end
+            end)
+        end
+    end)
+end)
+
+-- ================= UI: ESP section =================
+createSection("ESP Settings")
+createSwitch("ESP Theo Role + Highlight Vũ Khí & Drop", function(on)
+    espEnabled = on
+    if espEnabled then
+        startEspLoop()
+        notify("ESP Enabled", "Outline, Weapon Highlight và Drop Highlight đã bật.", 3)
+    else
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player.Character then
+                clearOutlineHighlight(player.Character)
+            end
+            clearWeaponHighlightsForPlayer(player)
+            lastRole[player] = nil
+            lastCharacter[player] = nil
+        end
+        -- Drop highlights removed in loop end
+        notify("ESP Disabled", "Outline, Weapon Highlight và Drop Highlight đã tắt.", 3)
+    end
+end)
+
+-- ================= UI: Gun Aura section =================
+createSection("Gun Aura Settings")
+createSwitch("Gun Aura (Auto Grab GunDrop)", function(on)
+    gunAuraEnabled = on
+    if on then
+        notify("Gun Aura", "Auto Grab GunDrop đã bật.", 3)
+    else
+        notify("Gun Aura", "Auto Grab GunDrop đã tắt.", 3)
+    end
+end)
+createInput("Aura Distance", function() return auraDistance end, function(v)
+    auraDistance = v
+    notify("Gun Aura", "Đã đặt Aura Distance = " .. tostring(v), 2)
+end)
+createInput("Aura Cooldown (s)", function() return auraCooldown end, function(v)
+    auraCooldown = v
+    notify("Gun Aura", "Đã đặt Aura Cooldown = " .. tostring(v) .. "s", 2)
+end)
+
+-- ================= UI: Optimization section =================
+-- (Đã gắn callback optimizePerformanceWithListener lên nút "Fix Lag + Lower CPU Load" phía trên)
+
+-- ================= CharacterAdded initial: reapply settings =================
 LocalPlayer.CharacterAdded:Connect(function(char)
     Character = char
     Humanoid = char:WaitForChild("Humanoid")
     RootPart = char:WaitForChild("HumanoidRootPart")
-    
-    isSheriffAlive = false -- RESET TRẠNG THÁI KHI VÒNG MỚI BẮT ĐẦU
-
     setupAntiFeatures()
-
-    -- >>> THÊM VÀO ĐÂY: Kết nối logic Semi-God Mode mới cho nhân vật mới
     Humanoid.HealthChanged:Connect(onHealthChanged)
-
     task.wait(0.2)
     if Humanoid then
         Humanoid.WalkSpeed = savedWalkSpeed
         Humanoid.JumpPower = savedJumpPower
     end
-
-    if chamEnabled then
-        task.delay(0.6, updateAllChams)
-    end
 end)
 
--- >>> THÊM VÀO ĐÂY: Kết nối logic cho nhân vật đã tồn tại khi script chạy
-if Humanoid then
-    Humanoid.HealthChanged:Connect(onHealthChanged)
-end
+-- End of script v1.18
