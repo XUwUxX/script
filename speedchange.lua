@@ -648,39 +648,84 @@ createSwitch("Hide Accessories", function(on)
 end)
 createButton("Fix Lag + Lower CPU Load", optimizePerformanceWithListener)
 
--- ================= Outline Highlight ESP + Weapon Highlight via loop =================
+-- ================= DOT ESP + WEAPON/DROP HIGHLIGHT (ĐÃ FIX) =================
 
 local espEnabled = false
 local roleColors = {
-    Murderer = Color3.fromRGB(255, 50, 50),
-    Sheriff  = Color3.fromRGB(50, 150, 255),
-    Hero     = Color3.fromRGB(255, 255, 70),
-    Innocent = Color3.fromRGB(50, 255, 80),
-    Unknown  = Color3.fromRGB(180, 180, 180)
+    Murderer = Color3.fromRGB(255, 50, 50),        -- Đỏ
+    SheriffOrHero = Color3.fromRGB(50, 150, 255),  -- Xanh dương (Sheriff + Hero)
+    Innocent = Color3.fromRGB(50, 255, 80),        -- Xanh lá
+    Unknown  = Color3.fromRGB(180, 180, 180)       -- Xám
 }
 local lastRole = {}
 local lastCharacter = {}
 _G._KevinzHub_WeaponHighlights = {}
--- Tables for drop highlights and Gun Aura
 local gunDropESP = {}
 _G._KevinzHub_KnifeHighlights = _G._KevinzHub_KnifeHighlights or {}
 
--- Gun Aura variables
-local gunAuraEnabled = false
-local auraDistance = 100  -- default distance
-local auraCooldown = 0.5  -- default cooldown (s)
-local lastAuraTime = 0
+local function getRole(player)
+    local hasKnife, hasGun = false, false
+    for _, tool in ipairs(player.Backpack:GetChildren()) do
+        local n = tool.Name:lower()
+        if n:find("knife") or n:find("blade") then hasKnife = true end
+        if n:find("gun") or n:find("revolver") then hasGun = true end
+    end
+    for _, tool in ipairs((player.Character and player.Character:GetChildren()) or {}) do
+        if tool:IsA("Tool") then
+            local n = tool.Name:lower()
+            if n:find("knife") or n:find("blade") then hasKnife = true end
+            if n:find("gun") or n:find("revolver") then hasGun = true end
+        end
+    end
+    if hasKnife and not hasGun then return "Murderer"
+    elseif hasGun and not hasKnife then return "SheriffOrHero"
+    elseif hasGun and hasKnife then return "Unknown"
+    else return "Innocent"
+    end
+end
 
--- Clear outline highlight
-local function clearOutlineHighlight(char)
-    for _, inst in ipairs(char:GetChildren()) do
-        if inst:IsA("Highlight") and inst.Name == "_ESP_OUTLINE" then
-            inst:Destroy()
+local function updateDotESP(player)
+    if player == LocalPlayer then return end
+    local char = player.Character
+    if not char or not char:FindFirstChild("Head") then return end
+    local color = roleColors[getRole(player)] or roleColors.Unknown
+
+    local head = char.Head
+    local gui = head:FindFirstChild("DotESP")
+    if not gui then
+        gui = Instance.new("BillboardGui")
+        gui.Name = "DotESP"
+        gui.Adornee = head
+        gui.Size = UDim2.new(0, 12, 0, 12)
+        gui.AlwaysOnTop = true
+        gui.LightInfluence = 0
+        gui.StudsOffset = Vector3.new(0, 1, 0)
+        gui.Parent = head
+
+        local frame = Instance.new("Frame")
+        frame.Name = "Dot"
+        frame.BackgroundColor3 = color
+        frame.BackgroundTransparency = 0
+        frame.BorderSizePixel = 0
+        frame.AnchorPoint = Vector2.new(0.5,0.5)
+        frame.Position = UDim2.new(0.5,0,0.5,0)
+        frame.Size = UDim2.new(1,0,1,0)
+        frame.Parent = gui
+    else
+        local frame = gui:FindFirstChild("Dot")
+        if frame then
+            frame.BackgroundColor3 = color
         end
     end
 end
 
--- Clear weapon highlights for player
+local function clearDotESP(char)
+    if char and char:FindFirstChild("Head") then
+        local e = char.Head:FindFirstChild("DotESP")
+        if e then e:Destroy() end
+    end
+end
+
 local function clearWeaponHighlightsForPlayer(player)
     local tbl = _G._KevinzHub_WeaponHighlights[player]
     if tbl then
@@ -693,57 +738,6 @@ local function clearWeaponHighlightsForPlayer(player)
     _G._KevinzHub_WeaponHighlights[player] = nil
 end
 
--- Determine role
-local function getRole(player)
-    if not player.Character then return "Unknown" end
-    if player:FindFirstChild("Backpack") then
-        for _, tool in ipairs(player.Backpack:GetChildren()) do
-            if typeof(tool.Name) == "string" then
-                local n = tool.Name:lower()
-                if n:find("knife") or n:find("blade") then
-                    return "Murderer"
-                end
-                if n:find("gun") or n:find("revolver") then
-                    return "Sheriff"
-                end
-            end
-        end
-    end
-    local char = player.Character
-    for _, tool in ipairs(char:GetChildren()) do
-        if tool:IsA("Tool") and typeof(tool.Name) == "string" then
-            local n = tool.Name:lower()
-            if n:find("knife") or n:find("blade") then
-                return "Murderer"
-            end
-            if n:find("gun") or n:find("revolver") then
-                return "Hero"
-            end
-        end
-    end
-    return "Innocent"
-end
-
--- Add outline highlight
-local function addOutline(player, role)
-    if player == LocalPlayer then return end
-    local char = player.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-    clearOutlineHighlight(char)
-    local color = roleColors[role] or roleColors.Unknown
-    for i = 1, 2 do
-        local hl = Instance.new("Highlight")
-        hl.Name = "_ESP_OUTLINE"
-        hl.FillTransparency = 1
-        hl.OutlineColor = color
-        hl.OutlineTransparency = (i == 1) and 0.35 or 0.08
-        hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        hl.Adornee = char
-        hl.Parent = char
-    end
-end
-
--- Add weapon highlight
 local function addWeaponHighlight(player, toolInstance)
     if not espEnabled then return end
     if not toolInstance or not toolInstance:IsA("Tool") then return end
@@ -755,7 +749,7 @@ local function addWeaponHighlight(player, toolInstance)
     local nameLower = toolInstance.Name:lower()
     local color = Color3.fromRGB(255, 255, 255)
     if nameLower:find("knife") or nameLower:find("blade") then
-        color = Color3.fromRGB(160, 32, 240)  -- tím
+        color = Color3.fromRGB(160, 32, 240)
     elseif nameLower:find("gun") or nameLower:find("revolver") then
         color = Color3.fromRGB(100, 150, 255)
     end
@@ -775,7 +769,6 @@ local function addWeaponHighlight(player, toolInstance)
     _G._KevinzHub_WeaponHighlights[player][toolInstance] = hl
 end
 
--- Remove weapon highlight
 local function removeWeaponHighlight(player, toolInstance)
     if not _G._KevinzHub_WeaponHighlights[player] then return end
     local hl = _G._KevinzHub_WeaponHighlights[player][toolInstance]
@@ -785,7 +778,6 @@ local function removeWeaponHighlight(player, toolInstance)
     _G._KevinzHub_WeaponHighlights[player][toolInstance] = nil
 end
 
--- Highlight GunDrop when ESP on
 local function highlightGunDrop(obj)
     if not espEnabled then return end
     if gunDropESP[obj] and gunDropESP[obj].Parent then return end
@@ -793,7 +785,7 @@ local function highlightGunDrop(obj)
     local hl = Instance.new("Highlight")
     hl.Name = "_ESP_GUNDROP"
     hl.Adornee = obj
-    hl.FillColor = Color3.fromRGB(255, 20, 147)   -- hồng đậm
+    hl.FillColor = Color3.fromRGB(255, 20, 147)
     hl.OutlineColor = Color3.fromRGB(255, 20, 147)
     hl.FillTransparency = 0.8
     hl.OutlineTransparency = 0.2
@@ -802,7 +794,6 @@ local function highlightGunDrop(obj)
     gunDropESP[obj] = hl
 end
 
--- Remove GunDrop highlight
 local function removeGunDropESP(obj)
     if gunDropESP[obj] then
         if gunDropESP[obj].Parent then
@@ -812,142 +803,42 @@ local function removeGunDropESP(obj)
     end
 end
 
--- Scan existing GunDrop under ESP
-local function scanGunDrops()
-    if not espEnabled then return end
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("BasePart") and obj.Name == "GunDrop" then
-            highlightGunDrop(obj)
-        end
-    end
-end
-
--- Connect workspace descendant added/removed for GunDrop and KnifeDrop
-workspace.DescendantAdded:Connect(function(obj)
-    -- GunDrop highlight + notify nếu ESP bật
-    if obj:IsA("BasePart") and obj.Name == "GunDrop" then
-        if espEnabled then
-            highlightGunDrop(obj)
-            notify("Gun Dropped", "Một khẩu súng đã rơi!", 4)
-        end
-    elseif obj:IsA("BasePart") and obj.Name == "KnifeDrop" then
-        if espEnabled then
-            -- KnifeDrop highlight tím
-            local hl = Instance.new("Highlight")
-            hl.Name = "_ESP_KNIFEDROP"
-            hl.Adornee = obj
-            hl.FillColor = Color3.fromRGB(160, 32, 240)
-            hl.OutlineColor = Color3.fromRGB(200, 100, 200)
-            hl.FillTransparency = 0.8
-            hl.OutlineTransparency = 0.2
-            hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-            hl.Parent = obj
-            _G._KevinzHub_KnifeHighlights[obj] = hl
-            notify("Knife Dropped", "Một con dao đã rơi!", 4)
-        end
-    end
-end)
-workspace.DescendantRemoving:Connect(function(obj)
-    if obj.Name == "GunDrop" then
-        removeGunDropESP(obj)
-    elseif obj.Name == "KnifeDrop" then
-        if _G._KevinzHub_KnifeHighlights[obj] then
-            local hl = _G._KevinzHub_KnifeHighlights[obj]
-            if hl and hl.Parent then hl:Destroy() end
-            _G._KevinzHub_KnifeHighlights[obj] = nil
-        end
-    end
-end)
-
--- Auto grab GunDrop (Gun Aura) logic
-local function attemptAutoGrabGun(gunPart)
-    if not gunPart or not gunPart.Parent then return end
-    if not RootPart or not RootPart.Parent then return end
-    if firetouchinterest then
-        firetouchinterest(RootPart, gunPart, 0)
-        task.wait(0.08)
-        firetouchinterest(RootPart, gunPart, 1)
-    elseif getgenv and getgenv().firetouchinterest then
-        getgenv().firetouchinterest(RootPart, gunPart, 0)
-        task.wait(0.08)
-        getgenv().firetouchinterest(RootPart, gunPart, 1)
-    else
-        -- fallback minimal bump
-        RootPart.CFrame = RootPart.CFrame + Vector3.new(0, 0.0001, 0)
-    end
-end
-
-RunService.Heartbeat:Connect(function()
-    if gunAuraEnabled then
-        local now = tick()
-        if now >= lastAuraTime + auraCooldown then
-            lastAuraTime = now
-            -- scan all GunDrop in workspace
-            for _, obj in ipairs(workspace:GetDescendants()) do
-                if obj:IsA("BasePart") and obj.Name == "GunDrop" then
-                    -- check distance
-                    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                    if hrp and obj:IsDescendantOf(workspace) then
-                        local success, dist = pcall(function()
-                            return (hrp.Position - obj.Position).Magnitude
-                        end)
-                        if success and dist <= auraDistance then
-                            attemptAutoGrabGun(obj)
-                            notify("Gun Aura", "Đã cố gắng nhặt GunDrop khi lại gần!", 1)
-                            break
-                        end
-                    end
-                end
-            end
-        end
-    end
-end)
-
--- Update per player in loop
 local function updatePlayer(player)
     local char = player.Character
     if char then
         if lastCharacter[player] ~= char then
             lastRole[player] = nil
             clearWeaponHighlightsForPlayer(player)
+            clearDotESP(lastCharacter[player])
             lastCharacter[player] = char
-            -- Connect death notification
-            local hum = char:FindFirstChild("Humanoid")
-            if hum then
-                hum.Died:Connect(function()
-                    local role = getRole(player)
-                    if role == "Sheriff" or role == "Hero" then
-                        notify(role .. " Died", player.Name .. " (" .. role .. ") đã chết.", 4)
-                    end
-                end)
-            end
         end
     else
         lastRole[player] = nil
         clearWeaponHighlightsForPlayer(player)
+        clearDotESP(lastCharacter[player])
         lastCharacter[player] = nil
         return
     end
 
     if not espEnabled then
-        if char then clearOutlineHighlight(char) end
         clearWeaponHighlightsForPlayer(player)
+        clearDotESP(char)
         lastRole[player] = nil
         return
     end
 
-    -- Outline role
+    -- Dot ESP
     if player ~= LocalPlayer then
-        if char and char:FindFirstChild("HumanoidRootPart") then
+        if char and char:FindFirstChild("Head") then
             local role = getRole(player)
             if lastRole[player] ~= role then
-                addOutline(player, role)
+                updateDotESP(player)
                 lastRole[player] = role
             end
         end
     end
 
-    -- Weapon highlight: remove stale, add new
+    -- Weapon highlight
     local tbl = _G._KevinzHub_WeaponHighlights[player]
     if tbl then
         for toolInst, hl in pairs(tbl) do
@@ -966,7 +857,6 @@ local function updatePlayer(player)
     end
 end
 
--- Loop ESP liên tục mỗi 0.7s
 local espLoopRunning = false
 local espLoopInterval = 0.7
 local function startEspLoop()
@@ -974,19 +864,19 @@ local function startEspLoop()
     espLoopRunning = true
     task.spawn(function()
         while espEnabled do
-            -- Update players
             for _, player in ipairs(Players:GetPlayers()) do
                 updatePlayer(player)
             end
-            -- GunDrop scan for highlight
-            scanGunDrops()
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                if obj:IsA("BasePart") and obj.Name == "GunDrop" then
+                    highlightGunDrop(obj)
+                end
+            end
             task.wait(espLoopInterval)
         end
-        -- Khi espEnabled=false, remove all GunDrop highlights
         for obj, _ in pairs(gunDropESP) do
             removeGunDropESP(obj)
         end
-        -- Also remove KnifeDrop highlights
         for obj, hl in pairs(_G._KevinzHub_KnifeHighlights) do
             if hl and hl.Parent then hl:Destroy() end
             _G._KevinzHub_KnifeHighlights[obj] = nil
@@ -994,6 +884,87 @@ local function startEspLoop()
         espLoopRunning = false
     end)
 end
+
+local function setupPlayer(player)
+    if player == LocalPlayer then return end
+    player.CharacterAdded:Connect(function(char)
+        char:WaitForChild("Head", 3)
+        updateDotESP(player)
+        char.ChildAdded:Connect(function() updateDotESP(player) end)
+        char.ChildRemoved:Connect(function() updateDotESP(player) end)
+    end)
+    if player.Character and player.Character:FindFirstChild("Head") then
+        updateDotESP(player)
+    end
+    player.Backpack.ChildAdded:Connect(function() updateDotESP(player) end)
+    player.Backpack.ChildRemoved:Connect(function() updateDotESP(player) end)
+end
+
+for _, player in ipairs(Players:GetPlayers()) do
+    setupPlayer(player)
+end
+Players.PlayerAdded:Connect(setupPlayer)
+
+workspace.DescendantAdded:Connect(function(obj)
+    if obj:IsA("BasePart") and obj.Name == "GunDrop" then
+        if espEnabled then highlightGunDrop(obj) end
+    elseif obj:IsA("BasePart") and obj.Name == "KnifeDrop" then
+        if espEnabled then
+            local hl = Instance.new("Highlight")
+            hl.Name = "_ESP_KNIFEDROP"
+            hl.Adornee = obj
+            hl.FillColor = Color3.fromRGB(160, 32, 240)
+            hl.OutlineColor = Color3.fromRGB(200, 100, 200)
+            hl.FillTransparency = 0.8
+            hl.OutlineTransparency = 0.2
+            hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            hl.Parent = obj
+            _G._KevinzHub_KnifeHighlights[obj] = hl
+        end
+    end
+end)
+workspace.DescendantRemoving:Connect(function(obj)
+    if obj.Name == "GunDrop" then
+        removeGunDropESP(obj)
+    elseif obj.Name == "KnifeDrop" then
+        if _G._KevinzHub_KnifeHighlights[obj] then
+            local hl = _G._KevinzHub_KnifeHighlights[obj]
+            if hl and hl.Parent then hl:Destroy() end
+            _G._KevinzHub_KnifeHighlights[obj] = nil
+        end
+    end
+end)
+Players.PlayerRemoving:Connect(function(player)
+    clearWeaponHighlightsForPlayer(player)
+    clearDotESP(player.Character)
+    lastRole[player] = nil
+    lastCharacter[player] = nil
+end)
+
+createSection("ESP Settings")
+createSwitch("ESP MM2 Dot + Vũ Khí & Drop", function(on)
+    espEnabled = on
+    if espEnabled then
+        startEspLoop()
+        StarterGui:SetCore("SendNotification", {
+            Title = "ESP Enabled",
+            Text = "Dot ESP, Weapon & Drop Highlight đã bật.",
+            Duration = 3
+        })
+    else
+        for _, player in ipairs(Players:GetPlayers()) do
+            clearWeaponHighlightsForPlayer(player)
+            clearDotESP(player.Character)
+            lastRole[player] = nil
+            lastCharacter[player] = nil
+        end
+        StarterGui:SetCore("SendNotification", {
+            Title = "ESP Disabled",
+            Text = "Đã tắt Dot ESP, Weapon & Drop Highlight.",
+            Duration = 3
+        })
+    end
+end)
 
 -- ================= Setup notification when existing players die =================
 for _, player in ipairs(Players:GetPlayers()) do
