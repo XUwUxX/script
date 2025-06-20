@@ -1,12 +1,8 @@
--- Kevinz Hub Full Script v1.18
--- - Manual dragging UI
--- - ESP Outline theo role + Weapon Highlight + Drop Highlight (GunDrop hồng đậm, KnifeDrop tím), loop 0.7s
--- - Gun Aura (auto grab GunDrop) độc lập với ESP, với Aura Distance và Aura Cooldown
--- - Notification khi Sheriff/Hero chết, khi GunDrop/KnifeDrop xuất hiện (khi ESP bật)
--- - Anti Features, Semi-God Mode, Movement Settings, Health Settings, Utilities
--- - OptimizePerformanceWithListener: tối ưu sâu: midnight sky, tắt hiệu ứng, giảm render chi tiết, override print/warn, event-driven disable object mới.
+-- Kevinz Hub Refactored Script v1.23
+-- Chạy client, LocalScript trong StarterPlayerScripts hoặc StarterGui
+-- Tối ưu GunAura và FPS Booster để giảm lag
 
--- Services
+-- ================= Services =================
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local StarterGui = game:GetService("StarterGui")
@@ -14,25 +10,69 @@ local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
 local UserSettings = UserSettings()
 
--- Local refs
+-- ================= Biến toàn cục =================
 local LocalPlayer = Players.LocalPlayer
-local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local Humanoid = Character:WaitForChild("Humanoid")
-local RootPart = Character:WaitForChild("HumanoidRootPart")
+local Character, Humanoid, RootPart = nil, nil, nil
 
 -- Saved defaults
-local savedWalkSpeed = Humanoid.WalkSpeed
-local savedJumpPower = Humanoid.JumpPower
-local HUB_VERSION = "v1.18"
+local savedWalkSpeed = 16
+local savedJumpPower = 50
+local HUB_VERSION = "v1"
 
--- ================= GUI SETUP =================
+-- Anti Features state
+local lastSafeCFrame = nil
+
+-- Semi-God Mode
+local semiGodModeEnabled = false
+
+-- Gun Aura state
+local gunAuraEnabled = false
+local auraDistance = 10
+local auraCooldown = 5
+local lastAuraTimes = {}   -- [dropInstance] = lastTime
+local gunDropList = {}     -- [dropInstance] = true
+
+-- Optimize Performance state
+local midnightEnabled = false
+local fpsBoosterEnabled = false
+
+-- Lưu original Lighting settings
+local originalLightingSettings = {
+    ClockTime = Lighting.ClockTime,
+    Brightness = Lighting.Brightness,
+    Ambient = Lighting.Ambient,
+    OutdoorAmbient = Lighting.OutdoorAmbient,
+    FogColor = Lighting.FogColor,
+    FogStart = Lighting.FogStart,
+    FogEnd = Lighting.FogEnd,
+    GlobalShadows = Lighting.GlobalShadows,
+    EnvironmentDiffuseScale = Lighting.EnvironmentDiffuseScale,
+    EnvironmentSpecularScale = Lighting.EnvironmentSpecularScale,
+}
+
+-- ================= Notification helper =================
+local function notify(title, text, duration)
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {
+            Title = title,
+            Text = text,
+            Duration = duration or 3,
+            Button1 = "OK"
+        })
+    end)
+end
+
+task.delay(1, function()
+    notify("Kevinz Hub Loaded ✅", "Version: " .. HUB_VERSION, 4)
+end)
+
+-- ================= UI Setup =================
 local gui = Instance.new("ScreenGui")
 gui.Name = "KevinzHub"
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.ResetOnSpawn = false
 gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
--- Main window
 local window = Instance.new("Frame")
 window.Name = "MainWindow"
 window.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -43,30 +83,25 @@ window.BorderSizePixel = 0
 window.ZIndex = 2
 window.ClipsDescendants = true
 window.Parent = gui
-
--- Gradient black-red
-local gradient = Instance.new("UIGradient", window)
-gradient.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 30, 30)),
-    ColorSequenceKeypoint.new(0.7, Color3.fromRGB(25, 15, 15)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 0, 0))
-}
-gradient.Rotation = 90
-gradient.Transparency = NumberSequence.new(0, 0)
-Instance.new("UICorner", window).CornerRadius = UDim.new(0, 8)
 do
+    local gradient = Instance.new("UIGradient", window)
+    gradient.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 30, 30)),
+        ColorSequenceKeypoint.new(0.7, Color3.fromRGB(25, 15, 15)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 0, 0))
+    }
+    gradient.Rotation = 90
+    Instance.new("UICorner", window).CornerRadius = UDim.new(0, 8)
     local stroke = Instance.new("UIStroke", window)
     stroke.Color = Color3.fromRGB(80, 80, 80)
     stroke.Thickness = 1
 end
 
--- Top bar (dùng để drag)
 local topBar = Instance.new("Frame", window)
 topBar.Name = "TopBar"
 topBar.Size = UDim2.new(1, 0, 0, 30)
 topBar.Position = UDim2.new(0, 0, 0, 0)
 topBar.BackgroundTransparency = 1
-topBar.BorderSizePixel = 0
 do
     local layout = Instance.new("UIListLayout", topBar)
     layout.FillDirection = Enum.FillDirection.Horizontal
@@ -77,8 +112,6 @@ do
     pad.PaddingTop = UDim.new(0, 5)
     pad.PaddingBottom = UDim.new(0, 5)
 end
-
--- Avatar
 do
     local success, thumb = pcall(function()
         return Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
@@ -89,12 +122,9 @@ do
     avatar.BackgroundTransparency = 1
     avatar.Image = success and thumb or ""
     avatar.ImageTransparency = success and 0 or 1
-    local avatarCorner = Instance.new("UICorner", avatar)
-    avatarCorner.CornerRadius = UDim.new(1, 0)
+    Instance.new("UICorner", avatar).CornerRadius = UDim.new(1, 0)
     avatar.LayoutOrder = 1
 end
-
--- Title label
 do
     local nameLabel = Instance.new("TextLabel", topBar)
     nameLabel.Name = "NameLabel"
@@ -109,8 +139,6 @@ do
     nameLabel.TextScaled = true
     nameLabel.LayoutOrder = 2
 end
-
--- Minimize & Close buttons
 local minimizeButton = Instance.new("TextButton", topBar)
 minimizeButton.Name = "MinimizeButton"
 minimizeButton.Size = UDim2.new(0, 20, 0, 20)
@@ -122,7 +150,6 @@ minimizeButton.TextColor3 = Color3.fromRGB(240, 240, 240)
 minimizeButton.AutoButtonColor = false
 Instance.new("UICorner", minimizeButton).CornerRadius = UDim.new(1, 0)
 minimizeButton.LayoutOrder = 3
-
 local closeScriptButton = Instance.new("TextButton", topBar)
 closeScriptButton.Name = "CloseScriptButton"
 closeScriptButton.Size = UDim2.new(0, 20, 0, 20)
@@ -135,7 +162,6 @@ closeScriptButton.AutoButtonColor = false
 Instance.new("UICorner", closeScriptButton).CornerRadius = UDim.new(1, 0)
 closeScriptButton.LayoutOrder = 4
 
--- Content ScrollingFrame
 local content = Instance.new("ScrollingFrame", window)
 content.Name = "ContentFrame"
 content.Size = UDim2.new(1, -10, 1, -40)
@@ -158,7 +184,6 @@ do
     pad.PaddingBottom = UDim.new(0, 8)
 end
 
--- Mini toggle to reopen window
 local miniToggle = Instance.new("TextButton", gui)
 miniToggle.Name = "MiniToggle"
 miniToggle.Size = UDim2.new(0, 28, 0, 28)
@@ -184,19 +209,14 @@ end)
 closeScriptButton.MouseButton1Click:Connect(function()
     gui:Destroy()
 end)
-
--- Manual dragging for window via topBar
 do
     local dragging = false
-    local dragStart = nil
-    local startPos = nil
+    local dragStart, startPos
     local function onInputChanged(input)
         if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
             local delta = input.Position - dragStart
-            -- window.Position is UDim2: combine scale + offset
-            local newX = startPos.X.Offset + delta.X
-            local newY = startPos.Y.Offset + delta.Y
-            window.Position = UDim2.new(startPos.X.Scale, newX, startPos.Y.Scale, newY)
+            window.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
+                                        startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         end
     end
     topBar.InputBegan:Connect(function(input)
@@ -213,9 +233,7 @@ do
     end)
     topBar.InputChanged:Connect(onInputChanged)
 end
-
--- Initial show with tween
-task.delay(2, function()
+task.delay(1, function()
     window.Visible = true
     TweenService:Create(window, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
         Position = UDim2.fromScale(0.5, 0.5)
@@ -225,8 +243,6 @@ end)
 -- ================= Helper UI functions =================
 local inputRow = 0
 local ROW_HEIGHT = 30
-
--- Section header
 local function createSection(title)
     inputRow = inputRow + 1
     local lbl = Instance.new("TextLabel")
@@ -241,8 +257,6 @@ local function createSection(title)
     lbl.LayoutOrder = inputRow
     lbl.Parent = content
 end
-
--- Input row
 local function createInput(labelText, getDefault, callback)
     inputRow = inputRow + 1
     local container = Instance.new("Frame")
@@ -291,8 +305,6 @@ local function createInput(labelText, getDefault, callback)
     end)
     return input
 end
-
--- Switch row
 local function createSwitch(labelText, callback)
     inputRow = inputRow + 1
     local container = Instance.new("Frame")
@@ -340,8 +352,6 @@ local function createSwitch(labelText, callback)
     end)
     return toggle
 end
-
--- Button row
 local function createButton(labelText, callback)
     inputRow = inputRow + 1
     local container = Instance.new("Frame")
@@ -373,680 +383,616 @@ local function createButton(labelText, callback)
     end)
 end
 
--- ================= CORE LOGIC =================
-
---- Anti Features setup ---
-local function setupAntiFeatures()
-    Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+-- ================= Thiết lập Character/Humanoid =================
+local function onCharacterAdded(char)
+    Character = char
     Humanoid = Character:WaitForChild("Humanoid", 5)
     RootPart = Character:WaitForChild("HumanoidRootPart", 5)
-    if not Character or not Humanoid or not RootPart then return end
-    local lastSafeCFrame = RootPart.CFrame
-
-    Humanoid.StateChanged:Connect(function(oldState, newState)
-        if newState == Enum.HumanoidStateType.Landed or newState == Enum.HumanoidStateType.Running then
-            if RootPart and RootPart.Parent and Humanoid.FloorMaterial ~= Enum.Material.Air then
-                lastSafeCFrame = RootPart.CFrame
+    -- Lưu defaults lần đầu
+    if Humanoid then
+        savedWalkSpeed = Humanoid.WalkSpeed
+        savedJumpPower = Humanoid.JumpPower
+    end
+    -- Thiết lập AntiFeatures
+    if RootPart then lastSafeCFrame = RootPart.CFrame end
+    if Humanoid then
+        Humanoid.HealthChanged:Connect(function(h)
+            if semiGodModeEnabled and Humanoid and Humanoid.Parent and h<=0 then
+                Humanoid.Health = 1
+                Humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+                task.delay(2.5, function()
+                    if Humanoid and Humanoid.Parent and Humanoid:GetState()==Enum.HumanoidStateType.Physics then
+                        Humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+                        Humanoid.Health = Humanoid.MaxHealth
+                    end
+                end)
             end
-        end
-    end)
-
-    RunService.Heartbeat:Connect(function()
-        if not RootPart or not RootPart.Parent then return end
-
-        -- ANTI VOID
-        if RootPart.Position.Y < (workspace.FallenPartsDestroyHeight or -500) then
-            RootPart.CFrame = lastSafeCFrame + Vector3.new(0, 5, 0)
-        end
-
-        local currentState = Humanoid:GetState()
-        local isFallingOrJump = (currentState == Enum.HumanoidStateType.Freefall or currentState == Enum.HumanoidStateType.Jumping)
-
-        -- ANTI FLING
-        if RootPart.AssemblyLinearVelocity.Magnitude > 200 and not isFallingOrJump then
-            RootPart.CFrame = lastSafeCFrame + Vector3.new(0, 3, 0)
-        end
-    end)
-end
-
---- Semi-God Mode (Ragdoll thay vì chết) ---
-local semiGodModeEnabled = false
-local function onHealthChanged(health)
-    if not semiGodModeEnabled or not Humanoid or not Humanoid.Parent then return end
-    if health <= 0 then
-        Humanoid.Health = 1
-        Humanoid:ChangeState(Enum.HumanoidStateType.Physics)
-        task.delay(2.5, function()
-            if Humanoid and Humanoid.Parent and Humanoid:GetState() == Enum.HumanoidStateType.Physics then
-                Humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
-                Humanoid.Health = Humanoid.MaxHealth
+        end)
+        Humanoid.StateChanged:Connect(function(_, newState)
+            if (newState==Enum.HumanoidStateType.Landed or newState==Enum.HumanoidStateType.Running)
+            and RootPart and RootPart.Parent and Humanoid.FloorMaterial~=Enum.Material.Air then
+                lastSafeCFrame = RootPart.CFrame
             end
         end)
     end
-end
-
--- Notification helper
-local function notify(title, text, duration)
-    pcall(function()
-        StarterGui:SetCore("SendNotification", {
-            Title = title,
-            Text = text,
-            Duration = duration or 3,
-            Button1 = "OK"
-        })
-    end)
-end
-
--- Notification on load
-task.delay(1, function()
-    notify("Kevinz Hub Loaded ✅", "Version: " .. HUB_VERSION, 4)
-end)
-
--- Setup Anti Features
-setupAntiFeatures()
-
--- ================= “Fix Lag + Lower CPU Load” tối ưu sâu =================
-
--- optimizePerformance: thực hiện một lần
-local function optimizePerformance()
-    -- Override print/warn để clear log
-    pcall(function()
-        print = function(...) end
-        warn = function(...) end
-    end)
-
-    -- Lighting tối: midnight sky, tắt hiệu ứng
-    pcall(function()
-        -- Xóa mọi Sky có sẵn
-        for _, child in ipairs(Lighting:GetChildren()) do
-            if child:IsA("Sky") then
-                child:Destroy()
+    -- Gộp Heartbeat cho AntiFeatures + GunAura throttle
+    local auraTimer = 0
+    RunService.Heartbeat:Connect(function(dt)
+        -- Anti Void / Anti Fling
+        if RootPart and RootPart.Parent then
+            if RootPart.Position.Y < (workspace.FallenPartsDestroyHeight or -500) and lastSafeCFrame then
+                RootPart.CFrame = lastSafeCFrame + Vector3.new(0,5,0)
+            end
+            if Humanoid then
+                local st = Humanoid:GetState()
+                local isFallOrJump = (st==Enum.HumanoidStateType.Freefall or st==Enum.HumanoidStateType.Jumping)
+                if RootPart.AssemblyLinearVelocity.Magnitude>200 and not isFallOrJump and lastSafeCFrame then
+                    RootPart.CFrame = lastSafeCFrame + Vector3.new(0,3,0)
+                end
             end
         end
-        -- Thiết bầu trời midnight
+        -- Gun Aura throttled: mỗi 0.3s mới check
+        if gunAuraEnabled then
+            auraTimer = auraTimer + dt
+            if auraTimer >= 0.3 then
+                auraTimer = 0
+                -- Chỉ lặp qua gunDropList
+                local now = tick()
+                for dropObj,_ in pairs(gunDropList) do
+                    if dropObj and dropObj.Parent then
+                        local success, dist = pcall(function()
+                            return (dropObj.Position - RootPart.Position).Magnitude
+                        end)
+                        if success and dist and dist<=auraDistance then
+                            local lastT = lastAuraTimes[dropObj] or 0
+                            if now - lastT >= auraCooldown then
+                                lastAuraTimes[dropObj] = now
+                                local orig = RootPart.CFrame
+                                pcall(function()
+                                    RootPart.CFrame = dropObj.CFrame + Vector3.new(0,3,0)
+                                end)
+                                -- Nếu muốn restore: delay và restore orig
+                                task.delay(0.2, function()
+                                    -- pcall(function() RootPart.CFrame = orig end)
+                                end)
+                                break
+                            end
+                        end
+                    else
+                        gunDropList[dropObj] = nil
+                    end
+                end
+            end
+        end
+    end)
+    -- Nếu Midnight đang bật khi respawn
+    if midnightEnabled then
         Lighting.ClockTime = 0
         Lighting.Brightness = 35
-        Lighting.Ambient = Color3.new(0, 0, 0)
-        Lighting.OutdoorAmbient = Color3.new(0, 0, 0)
-        Lighting.FogColor = Color3.new(0, 0, 0)
+        Lighting.Ambient = Color3.new(0,0,0)
+        Lighting.OutdoorAmbient = Color3.new(0,0,0)
+        Lighting.FogColor = Color3.new(0,0,0)
         Lighting.FogStart = 0
         Lighting.FogEnd = 1e3
         Lighting.GlobalShadows = false
         Lighting.EnvironmentDiffuseScale = 0
         Lighting.EnvironmentSpecularScale = 0
-        -- Tắt mọi PostEffect trong Lighting
-        for _, eff in ipairs(Lighting:GetDescendants()) do
-            if eff:IsA("PostEffect") then
-                pcall(function() eff.Enabled = false end)
-            end
+        for _, child in ipairs(Lighting:GetChildren()) do
+            if child:IsA("Sky") then pcall(function() child:Destroy() end) end
         end
-    end)
-
-    -- Giảm chi tiết render trong Workspace
-    pcall(function()
-        for _, obj in ipairs(workspace:GetDescendants()) do
+    end
+    -- Nếu FPS Booster đang bật, scan hiện hữu theo nhóm cấp 1 để tránh lag
+    if fpsBoosterEnabled then
+        local function optimizePart(obj)
             if obj:IsA("BasePart") then
                 pcall(function()
+                    obj.Material = Enum.Material.SmoothPlastic
+                    obj.Color = Color3.fromRGB(128,128,128)
                     obj.CastShadow = false
                     obj.Reflectance = 0
-                    -- Nếu muốn, có thể chuyển Material về Plastic, nhưng nhiều game cấm:
-                    -- obj.Material = Enum.Material.Plastic
                 end)
             end
-            if obj:IsA("PointLight") or obj:IsA("SurfaceLight") or obj:IsA("SpotLight") then
-                pcall(function() obj.Enabled = false end)
+            if obj:IsA("MeshPart") then
+                pcall(function()
+                    obj.Material = Enum.Material.SmoothPlastic
+                    obj.Color = Color3.fromRGB(128,128,128)
+                    obj.CastShadow = false
+                    obj.Reflectance = 0
+                end)
+            end
+            if obj:IsA("Decal") or obj:IsA("Texture") then
+                pcall(function() obj.Transparency = 1 end)
             end
             if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Smoke") or obj:IsA("Fire") or obj:IsA("Sparkles") then
                 pcall(function() obj.Enabled = false end)
             end
-            if obj:IsA("Decal") or obj:IsA("Texture") then
-                pcall(function() obj.Transparency = 1 end)
+            if obj:IsA("PointLight") or obj:IsA("SurfaceLight") or obj:IsA("SpotLight") then
+                pcall(function() obj.Enabled = false end)
             end
             if obj:IsA("SpecialMesh") then
                 pcall(function() obj.Scale = Vector3.new(0.1,0.1,0.1) end)
             end
         end
-    end)
-
-    -- Giảm chất lượng Graphics Level
-    pcall(function()
-        local ugs = UserSettings:GetService("UserGameSettings")
-        if ugs.SetRenderingQualityLevel then
-            ugs:SetRenderingQualityLevel(1)
-        elseif ugs.SetGraphicsQualityLevel then
-            ugs:SetGraphicsQualityLevel(1)
-        end
-    end)
-
-    -- Terrain: tắt water effects
-    pcall(function()
-        local terrain = workspace:FindFirstChildOfClass("Terrain")
-        if terrain then
-            terrain.WaterWaveSize = 0
-            terrain.WaterWaveSpeed = 0
-            terrain.WaterReflectance = 0
-            terrain.WaterTransparency = 1
-            terrain.CastShadow = false
-        end
-    end)
-
-    -- Camera: tắt PostEffect con (nếu có)
-    pcall(function()
-        local cam = workspace.CurrentCamera
-        if cam then
-            for _, eff in ipairs(cam:GetDescendants()) do
-                if eff:IsA("PostEffect") then
-                    pcall(function() eff.Enabled = false end)
+        -- Scan các con cấp 1 của workspace để tránh lag scan quá lớn
+        for _, child in ipairs(workspace:GetChildren()) do
+            -- Nếu bạn biết folder cụ thể (ví dụ workspace.Map), chỉ scan trong đó để tối ưu
+            task.spawn(function()
+                for _, obj in ipairs(child:GetDescendants()) do
+                    optimizePart(obj)
                 end
-            end
-        end
-    end)
-
-    -- Thông báo hoàn thành
-    pcall(function()
-        StarterGui:SetCore("SendNotification", {
-            Title = "Optimization Applied",
-            Text = "Tối ưu sâu đã áp dụng: Midnight sky, tắt hiệu ứng, giảm render chi tiết.",
-            Duration = 5
-        })
-    end)
-end
-
--- optimizePerformanceWithListener: chạy một lần rồi kết nối để disable object mới
-local optimized = false
-local function optimizePerformanceWithListener()
-    if optimized then return end
-    optimized = true
-    optimizePerformance()
-    -- Kết nối event để disable object thêm mới
-    workspace.DescendantAdded:Connect(function(obj)
-        -- Disable tương tự khi optimizePerformance
-        if obj:IsA("Sky") and obj.Parent == Lighting then
-            pcall(function() obj:Destroy() end)
-        end
-        if obj:IsA("BasePart") then
-            pcall(function()
-                obj.CastShadow = false
-                obj.Reflectance = 0
-                -- obj.Material = Enum.Material.Plastic
             end)
         end
-        if obj:IsA("PointLight") or obj:IsA("SurfaceLight") or obj:IsA("SpotLight") then
-            pcall(function() obj.Enabled = false end)
-        end
-        if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Smoke") or obj:IsA("Fire") or obj:IsA("Sparkles") then
-            pcall(function() obj.Enabled = false end)
-        end
-        if obj:IsA("Decal") or obj:IsA("Texture") then
-            pcall(function() obj.Transparency = 1 end)
-        end
-        if obj:IsA("SpecialMesh") then
-            pcall(function() obj.Scale = Vector3.new(0.1,0.1,0.1) end)
-        end
-    end)
+    end
 end
 
--- ================= UI controls =================
-inputRow = 0
-
--- Group 1: Movement Settings
-createSection("Movement Settings")
-createInput("WalkSpeed", function() return 16 end, function(v)
-    savedWalkSpeed = v
-    if Humanoid then Humanoid.WalkSpeed = v end
-end)
-createInput("JumpPower", function() return 50 end, function(v)
-    savedJumpPower = v
-    if Humanoid then Humanoid.JumpPower = v end
-end)
-createInput("FOV", function() return 70 end, function(v)
-    if workspace.CurrentCamera then workspace.CurrentCamera.FieldOfView = v end
-end)
-
--- Group 2: Health & Semi-God
-createSection("Health Settings")
-do
-    local hpDisplayInput
-    createInput("Set HP (Attempt)", function() return 100 end, function(v)
-        if Humanoid then
-            Humanoid.Health = math.clamp(v, 0, Humanoid.MaxHealth)
-            notify("HP Adjustment", "Đã cố gắng điều chỉnh HP thành " .. v .. ". Server có thể override.", 3)
-        end
-    end)
-    RunService.Heartbeat:Connect(function()
-        if hpDisplayInput == nil then
-            local cont = content:FindFirstChild("InputRow_" .. inputRow)
-            if cont then
-                hpDisplayInput = cont:FindFirstChild("TextBox")
-            end
-        end
-        if hpDisplayInput and Humanoid and Humanoid.Parent then
-            hpDisplayInput.PlaceholderText = string.format("HP: %.0f/%.0f", Humanoid.Health, Humanoid.MaxHealth)
-        end
-    end)
+-- Kết nối CharacterAdded
+LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
+if LocalPlayer.Character then
+    onCharacterAdded(LocalPlayer.Character)
 end
-createSwitch("Semi-God Mode", function(on)
-    semiGodModeEnabled = on
-    if on then
-        notify("Semi-God Mode", "Bật: HP sẽ hồi lại khi chết.", 3)
-    else
-        notify("Semi-God Mode", "Tắt: hoạt động bình thường.", 3)
-    end
-end)
 
--- Group 3: Utilities
-createSection("Utilities")
-createSwitch("Hide Accessories", function(on)
-    if on and LocalPlayer.Character then
-        for _, item in ipairs(LocalPlayer.Character:GetChildren()) do
-            if item:IsA("Accessory") then
-                local handle = item:FindFirstChild("Handle")
-                if handle then handle.Transparency = 1 end
-            end
-        end
-    end
-end)
-createButton("Fix Lag + Lower CPU Load", optimizePerformanceWithListener)
-
--- ================= DOT ESP + WEAPON/DROP HIGHLIGHT (ĐÃ FIX) =================
-
-local espEnabled = false
+-- ================= Role Detection Helper =================
 local roleColors = {
-    Murderer = Color3.fromRGB(255, 50, 50),        -- Đỏ
-    SheriffOrHero = Color3.fromRGB(50, 150, 255),  -- Xanh dương (Sheriff + Hero)
-    Innocent = Color3.fromRGB(50, 255, 80),        -- Xanh lá
-    Unknown  = Color3.fromRGB(180, 180, 180)       -- Xám
+    Murderer = Color3.fromRGB(255, 50, 50),
+    Sheriff  = Color3.fromRGB(50, 150, 255),
+    Innocent = Color3.fromRGB(50, 255, 80),
+    Unknown  = Color3.fromRGB(180, 180, 180),
 }
-local lastRole = {}
-local lastCharacter = {}
-_G._KevinzHub_WeaponHighlights = {}
-local gunDropESP = {}
-_G._KevinzHub_KnifeHighlights = _G._KevinzHub_KnifeHighlights or {}
-
 local function getRole(player)
     local hasKnife, hasGun = false, false
     for _, tool in ipairs(player.Backpack:GetChildren()) do
-        local n = tool.Name:lower()
-        if n:find("knife") or n:find("blade") then hasKnife = true end
-        if n:find("gun") or n:find("revolver") then hasGun = true end
-    end
-    for _, tool in ipairs((player.Character and player.Character:GetChildren()) or {}) do
         if tool:IsA("Tool") then
-            local n = tool.Name:lower()
-            if n:find("knife") or n:find("blade") then hasKnife = true end
-            if n:find("gun") or n:find("revolver") then hasGun = true end
+            local n=tool.Name:lower()
+            if n:find("knife") or n:find("blade") then hasKnife=true end
+            if n:find("gun") or n:find("revolver") then hasGun=true end
+        end
+    end
+    if player.Character then
+        for _, child in ipairs(player.Character:GetChildren()) do
+            if child:IsA("Tool") then
+                local n=child.Name:lower()
+                if n:find("knife") or n:find("blade") then hasKnife=true end
+                if n:find("gun") or n:find("revolver") then hasGun=true end
+            end
         end
     end
     if hasKnife and not hasGun then return "Murderer"
-    elseif hasGun and not hasKnife then return "SheriffOrHero"
-    elseif hasGun and hasKnife then return "Unknown"
-    else return "Innocent"
-    end
+    elseif hasGun and not hasKnife then return "Sheriff"
+    elseif not hasGun and not hasKnife then return "Innocent"
+    else return "Unknown" end
 end
 
-local function updateDotESP(player)
-    if player == LocalPlayer then return end
-    local char = player.Character
+-- ================= ESP Manager (event-driven) =================
+local ESPManager = {}
+ESPManager.__index = ESPManager
+
+function ESPManager.new()
+    local self = setmetatable({}, ESPManager)
+    self.weaponHighlights = {}       -- [player] = { [tool] = highlight }
+    self.playerConnections = {}      -- [player] = { list of Conns }
+    self.dropHighlights = {}         -- [BasePart] = highlight
+    self.playerAddedConn = nil
+    self.descendantAddedConn = nil
+    self.descendantRemovingConn = nil
+    return self
+end
+
+function ESPManager:updateDotESP(player)
+    if not espEnabled or player==LocalPlayer then return end
+    local char=player.Character
     if not char or not char:FindFirstChild("Head") then return end
-    local color = roleColors[getRole(player)] or roleColors.Unknown
-
-    local head = char.Head
-    local gui = head:FindFirstChild("DotESP")
-    if not gui then
-        gui = Instance.new("BillboardGui")
-        gui.Name = "DotESP"
-        gui.Adornee = head
-        gui.Size = UDim2.new(0, 12, 0, 12)
-        gui.AlwaysOnTop = true
-        gui.LightInfluence = 0
-        gui.StudsOffset = Vector3.new(0, 1, 0)
-        gui.Parent = head
-
-        local frame = Instance.new("Frame")
-        frame.Name = "Dot"
-        frame.BackgroundColor3 = color
-        frame.BackgroundTransparency = 0
-        frame.BorderSizePixel = 0
-        frame.AnchorPoint = Vector2.new(0.5,0.5)
-        frame.Position = UDim2.new(0.5,0,0.5,0)
-        frame.Size = UDim2.new(1,0,1,0)
-        frame.Parent = gui
+    local role=getRole(player)
+    local color=roleColors[role] or roleColors.Unknown
+    local head=char.Head
+    local guiESP=head:FindFirstChild("DotESP")
+    if not guiESP then
+        guiESP=Instance.new("BillboardGui")
+        guiESP.Name="DotESP"
+        guiESP.Adornee=head
+        guiESP.Size=UDim2.new(0,12,0,12)
+        guiESP.AlwaysOnTop=true
+        guiESP.LightInfluence=0
+        guiESP.StudsOffset=Vector3.new(0,1,0)
+        guiESP.Parent=head
+        local frame=Instance.new("Frame",guiESP)
+        frame.Name="Dot"
+        frame.BackgroundColor3=color
+        frame.BackgroundTransparency=0
+        frame.BorderSizePixel=0
+        frame.AnchorPoint=Vector2.new(0.5,0.5)
+        frame.Position=UDim2.new(0.5,0,0.5,0)
+        frame.Size=UDim2.new(1,0,1,0)
     else
-        local frame = gui:FindFirstChild("Dot")
-        if frame then
-            frame.BackgroundColor3 = color
-        end
+        local frame=guiESP:FindFirstChild("Dot")
+        if frame then frame.BackgroundColor3=color end
     end
 end
 
-local function clearDotESP(char)
+function ESPManager:clearDotESP(player)
+    local char=player.Character
     if char and char:FindFirstChild("Head") then
-        local e = char.Head:FindFirstChild("DotESP")
+        local e=char.Head:FindFirstChild("DotESP")
         if e then e:Destroy() end
     end
 end
 
-local function clearWeaponHighlightsForPlayer(player)
-    local tbl = _G._KevinzHub_WeaponHighlights[player]
-    if tbl then
-        for tool, hl in pairs(tbl) do
-            if hl and hl.Parent then
-                hl:Destroy()
-            end
-        end
-    end
-    _G._KevinzHub_WeaponHighlights[player] = nil
-end
-
-local function addWeaponHighlight(player, toolInstance)
-    if not espEnabled then return end
-    if not toolInstance or not toolInstance:IsA("Tool") then return end
-    if not _G._KevinzHub_WeaponHighlights[player] then
-        _G._KevinzHub_WeaponHighlights[player] = {}
-    end
-    if _G._KevinzHub_WeaponHighlights[player][toolInstance] then return end
-
-    local nameLower = toolInstance.Name:lower()
-    local color = Color3.fromRGB(255, 255, 255)
-    if nameLower:find("knife") or nameLower:find("blade") then
-        color = Color3.fromRGB(160, 32, 240)
-    elseif nameLower:find("gun") or nameLower:find("revolver") then
-        color = Color3.fromRGB(100, 150, 255)
-    end
-
-    local handle = toolInstance:FindFirstChildWhichIsA("BasePart") or toolInstance:FindFirstChild("Handle")
+function ESPManager:addWeaponHighlight(player,toolInstance)
+    if not espEnabled or not toolInstance or not toolInstance:IsA("Tool") then return end
+    if not self.weaponHighlights[player] then self.weaponHighlights[player]={} end
+    if self.weaponHighlights[player][toolInstance] then return end
+    local nameLower=toolInstance.Name:lower()
+    local color=Color3.fromRGB(255,255,255)
+    if nameLower:find("knife") or nameLower:find("blade") then color=Color3.fromRGB(160,32,240)
+    elseif nameLower:find("gun") or nameLower:find("revolver") then color=Color3.fromRGB(100,150,255) end
+    local handle=toolInstance:FindFirstChildWhichIsA("BasePart") or toolInstance:FindFirstChild("Handle")
     if not handle then return end
-
-    local hl = Instance.new("Highlight")
-    hl.Name = "_ESP_WEAPON"
-    hl.FillTransparency = 1
-    hl.OutlineColor = color
-    hl.OutlineTransparency = 0.2
-    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    hl.Adornee = handle
-    hl.Parent = handle
-
-    _G._KevinzHub_WeaponHighlights[player][toolInstance] = hl
+    local hl=Instance.new("Highlight")
+    hl.Name="_ESP_WEAPON"
+    hl.FillTransparency=1
+    hl.OutlineColor=color
+    hl.OutlineTransparency=0.2
+    hl.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
+    hl.Adornee=handle
+    hl.Parent=handle
+    self.weaponHighlights[player][toolInstance]=hl
 end
 
-local function removeWeaponHighlight(player, toolInstance)
-    if not _G._KevinzHub_WeaponHighlights[player] then return end
-    local hl = _G._KevinzHub_WeaponHighlights[player][toolInstance]
-    if hl and hl.Parent then
-        hl:Destroy()
-    end
-    _G._KevinzHub_WeaponHighlights[player][toolInstance] = nil
-end
-
-local function highlightGunDrop(obj)
-    if not espEnabled then return end
-    if gunDropESP[obj] and gunDropESP[obj].Parent then return end
-    if not obj:IsA("BasePart") then return end
-    local hl = Instance.new("Highlight")
-    hl.Name = "_ESP_GUNDROP"
-    hl.Adornee = obj
-    hl.FillColor = Color3.fromRGB(255, 20, 147)
-    hl.OutlineColor = Color3.fromRGB(255, 20, 147)
-    hl.FillTransparency = 0.8
-    hl.OutlineTransparency = 0.2
-    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    hl.Parent = obj
-    gunDropESP[obj] = hl
-end
-
-local function removeGunDropESP(obj)
-    if gunDropESP[obj] then
-        if gunDropESP[obj].Parent then
-            gunDropESP[obj]:Destroy()
-        end
-        gunDropESP[obj] = nil
-    end
-end
-
-local function updatePlayer(player)
-    local char = player.Character
-    if char then
-        if lastCharacter[player] ~= char then
-            lastRole[player] = nil
-            clearWeaponHighlightsForPlayer(player)
-            clearDotESP(lastCharacter[player])
-            lastCharacter[player] = char
-        end
-    else
-        lastRole[player] = nil
-        clearWeaponHighlightsForPlayer(player)
-        clearDotESP(lastCharacter[player])
-        lastCharacter[player] = nil
-        return
-    end
-
-    if not espEnabled then
-        clearWeaponHighlightsForPlayer(player)
-        clearDotESP(char)
-        lastRole[player] = nil
-        return
-    end
-
-    -- Dot ESP
-    if player ~= LocalPlayer then
-        if char and char:FindFirstChild("Head") then
-            local role = getRole(player)
-            if lastRole[player] ~= role then
-                updateDotESP(player)
-                lastRole[player] = role
-            end
-        end
-    end
-
-    -- Weapon highlight
-    local tbl = _G._KevinzHub_WeaponHighlights[player]
+function ESPManager:clearWeaponHighlightsForPlayer(player)
+    local tbl=self.weaponHighlights[player]
     if tbl then
-        for toolInst, hl in pairs(tbl) do
-            if not (toolInst and toolInst.Parent == char) then
-                if hl and hl.Parent then hl:Destroy() end
-                tbl[toolInst] = nil
-            end
-        end
-    end
-    for _, child in ipairs(char:GetChildren()) do
-        if child:IsA("Tool") then
-            if not (_G._KevinzHub_WeaponHighlights[player] and _G._KevinzHub_WeaponHighlights[player][child]) then
-                addWeaponHighlight(player, child)
-            end
-        end
-    end
-end
-
-local espLoopRunning = false
-local espLoopInterval = 0.7
-local function startEspLoop()
-    if espLoopRunning then return end
-    espLoopRunning = true
-    task.spawn(function()
-        while espEnabled do
-            for _, player in ipairs(Players:GetPlayers()) do
-                updatePlayer(player)
-            end
-            for _, obj in ipairs(workspace:GetDescendants()) do
-                if obj:IsA("BasePart") and obj.Name == "GunDrop" then
-                    highlightGunDrop(obj)
-                end
-            end
-            task.wait(espLoopInterval)
-        end
-        for obj, _ in pairs(gunDropESP) do
-            removeGunDropESP(obj)
-        end
-        for obj, hl in pairs(_G._KevinzHub_KnifeHighlights) do
+        for toolInst,hl in pairs(tbl) do
             if hl and hl.Parent then hl:Destroy() end
-            _G._KevinzHub_KnifeHighlights[obj] = nil
         end
-        espLoopRunning = false
-    end)
+    end
+    self.weaponHighlights[player]=nil
 end
 
-local function setupPlayer(player)
-    if player == LocalPlayer then return end
-    player.CharacterAdded:Connect(function(char)
-        char:WaitForChild("Head", 3)
-        updateDotESP(player)
-        char.ChildAdded:Connect(function() updateDotESP(player) end)
-        char.ChildRemoved:Connect(function() updateDotESP(player) end)
-    end)
-    if player.Character and player.Character:FindFirstChild("Head") then
-        updateDotESP(player)
-    end
-    player.Backpack.ChildAdded:Connect(function() updateDotESP(player) end)
-    player.Backpack.ChildRemoved:Connect(function() updateDotESP(player) end)
-end
-
-for _, player in ipairs(Players:GetPlayers()) do
-    setupPlayer(player)
-end
-Players.PlayerAdded:Connect(setupPlayer)
-
-workspace.DescendantAdded:Connect(function(obj)
-    if obj:IsA("BasePart") and obj.Name == "GunDrop" then
-        if espEnabled then highlightGunDrop(obj) end
-    elseif obj:IsA("BasePart") and obj.Name == "KnifeDrop" then
-        if espEnabled then
-            local hl = Instance.new("Highlight")
-            hl.Name = "_ESP_KNIFEDROP"
-            hl.Adornee = obj
-            hl.FillColor = Color3.fromRGB(160, 32, 240)
-            hl.OutlineColor = Color3.fromRGB(200, 100, 200)
-            hl.FillTransparency = 0.8
-            hl.OutlineTransparency = 0.2
-            hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-            hl.Parent = obj
-            _G._KevinzHub_KnifeHighlights[obj] = hl
-        end
-    end
-end)
-workspace.DescendantRemoving:Connect(function(obj)
-    if obj.Name == "GunDrop" then
-        removeGunDropESP(obj)
-    elseif obj.Name == "KnifeDrop" then
-        if _G._KevinzHub_KnifeHighlights[obj] then
-            local hl = _G._KevinzHub_KnifeHighlights[obj]
-            if hl and hl.Parent then hl:Destroy() end
-            _G._KevinzHub_KnifeHighlights[obj] = nil
-        end
-    end
-end)
-Players.PlayerRemoving:Connect(function(player)
-    clearWeaponHighlightsForPlayer(player)
-    clearDotESP(player.Character)
-    lastRole[player] = nil
-    lastCharacter[player] = nil
-end)
-
-createSection("ESP Settings")
-createSwitch("ESP MM2 Dot + Vũ Khí & Drop", function(on)
-    espEnabled = on
-    if espEnabled then
-        startEspLoop()
-        StarterGui:SetCore("SendNotification", {
-            Title = "ESP Enabled",
-            Text = "Dot ESP, Weapon & Drop Highlight đã bật.",
-            Duration = 3
-        })
-    else
-        for _, player in ipairs(Players:GetPlayers()) do
-            clearWeaponHighlightsForPlayer(player)
-            clearDotESP(player.Character)
-            lastRole[player] = nil
-            lastCharacter[player] = nil
-        end
-        StarterGui:SetCore("SendNotification", {
-            Title = "ESP Disabled",
-            Text = "Đã tắt Dot ESP, Weapon & Drop Highlight.",
-            Duration = 3
-        })
-    end
-end)
-
--- ================= Setup notification when existing players die =================
-for _, player in ipairs(Players:GetPlayers()) do
-    if player.Character and player.Character:FindFirstChild("Humanoid") then
-        local hum = player.Character:FindFirstChild("Humanoid")
-        hum.Died:Connect(function()
-            local role = getRole(player)
-            if role == "Sheriff" or role == "Hero" then
-                notify(role .. " Died", player.Name .. " (" .. role .. ") đã chết.", 4)
+function ESPManager:setupPlayer(player)
+    local conns={}
+    self.playerConnections[player]=conns
+    local charAddedConn=player.CharacterAdded:Connect(function(char)
+        char:WaitForChild("Head",5)
+        if espEnabled then self:updateDotESP(player) end
+        local childAddedConn=char.ChildAdded:Connect(function(child)
+            if espEnabled and child:IsA("Tool") then
+                task.delay(0.1,function()
+                    self:addWeaponHighlight(player,child)
+                    self:updateDotESP(player)
+                end)
             end
         end)
+        local childRemovedConn=char.ChildRemoved:Connect(function(child)
+            if child:IsA("Tool") then
+                if self.weaponHighlights[player] and self.weaponHighlights[player][child] then
+                    local hl=self.weaponHighlights[player][child]
+                    if hl and hl.Parent then hl:Destroy() end
+                    self.weaponHighlights[player][child]=nil
+                end
+                if espEnabled then self:updateDotESP(player) end
+            end
+        end)
+        table.insert(conns,childAddedConn)
+        table.insert(conns,childRemovedConn)
+    end)
+    table.insert(conns,charAddedConn)
+    if player.Character and player.Character:FindFirstChild("Head") then
+        if espEnabled then self:updateDotESP(player) end
+    end
+    local backpackAddedConn=player.Backpack.ChildAdded:Connect(function(child)
+        if espEnabled and child:IsA("Tool") then
+            task.delay(0.1,function() self:updateDotESP(player) end)
+        end
+    end)
+    local backpackRemovedConn=player.Backpack.ChildRemoved:Connect(function(child)
+        if espEnabled and child:IsA("Tool") then
+            task.delay(0.1,function() self:updateDotESP(player) end)
+        end
+    end)
+    table.insert(conns,backpackAddedConn)
+    table.insert(conns,backpackRemovedConn)
+    local playerRemovingConn=player.AncestryChanged:Connect(function(_,parent)
+        if not parent then self:teardownPlayer(player) end
+    end)
+    table.insert(conns,playerRemovingConn)
+end
+
+function ESPManager:teardownPlayer(player)
+    local conns=self.playerConnections[player]
+    if conns then
+        for _,conn in ipairs(conns) do
+            if conn and conn.Disconnect then conn:Disconnect() end
+        end
+    end
+    self.playerConnections[player]=nil
+    self:clearDotESP(player)
+    self:clearWeaponHighlightsForPlayer(player)
+end
+
+function ESPManager:onDropAdded(obj)
+    if not espEnabled then return end
+    if obj:IsA("BasePart") and obj.Name=="GunDrop" then
+        if not self.dropHighlights[obj] then
+            local hl=Instance.new("Highlight")
+            hl.Name="_ESP_GUNDROP"
+            hl.Adornee=obj
+            hl.FillColor=Color3.fromRGB(255,20,147)
+            hl.OutlineColor=Color3.fromRGB(255,20,147)
+            hl.FillTransparency=0.8
+            hl.OutlineTransparency=0.2
+            hl.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
+            hl.Parent=obj
+            self.dropHighlights[obj]=hl
+        end
+        -- Thêm vào gunDropList để GunAura dùng
+        gunDropList[obj]=true
+    elseif obj:IsA("BasePart") and obj.Name=="KnifeDrop" then
+        if not self.dropHighlights[obj] then
+            local hl=Instance.new("Highlight")
+            hl.Name="_ESP_KNIFEDROP"
+            hl.Adornee=obj
+            hl.FillColor=Color3.fromRGB(160,32,240)
+            hl.OutlineColor=Color3.fromRGB(200,100,200)
+            hl.FillTransparency=0.8
+            hl.OutlineTransparency=0.2
+            hl.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
+            hl.Parent=obj
+            self.dropHighlights[obj]=hl
+        end
+        -- Nếu bạn có KnifeAura tương tự, có thể thêm knifeDropList
     end
 end
-Players.PlayerAdded:Connect(function(player)
+
+function ESPManager:onDropRemoved(obj)
+    local hl=self.dropHighlights[obj]
+    if hl then if hl.Parent then hl:Destroy() end end
+    self.dropHighlights[obj]=nil
+    -- Xóa khỏi gunDropList nếu có
+    if gunDropList[obj] then gunDropList[obj]=nil end
+end
+
+function ESPManager:Enable()
+    if espEnabled then return end
+    espEnabled=true
+    for _,player in ipairs(Players:GetPlayers()) do
+        if player~=LocalPlayer then self:setupPlayer(player) end
+    end
+    self.playerAddedConn=Players.PlayerAdded:Connect(function(player)
+        if player~=LocalPlayer then self:setupPlayer(player) end
+    end)
+    self.dropHighlights={}  -- reset
+    -- Scan existing drops: chỉ thêm vào gunDropList và highlight
+    for _,obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and (obj.Name=="GunDrop" or obj.Name=="KnifeDrop") then
+            self:onDropAdded(obj)
+        end
+    end
+    self.descendantAddedConn=workspace.DescendantAdded:Connect(function(obj)
+        self:onDropAdded(obj)
+    end)
+    self.descendantRemovingConn=workspace.DescendantRemoving:Connect(function(obj)
+        self:onDropRemoved(obj)
+    end)
+    notify("ESP Enabled", "Dot ESP, Weapon & Drop Highlight đã bật (event-driven).", 3)
+end
+
+function ESPManager:Disable()
+    if not espEnabled then return end
+    espEnabled=false
+    if self.playerAddedConn then self.playerAddedConn:Disconnect(); self.playerAddedConn=nil end
+    if self.descendantAddedConn then self.descendantAddedConn:Disconnect(); self.descendantAddedConn=nil end
+    if self.descendantRemovingConn then self.descendantRemovingConn:Disconnect(); self.descendantRemovingConn=nil end
+    for _,player in ipairs(Players:GetPlayers()) do
+        if player~=LocalPlayer then self:teardownPlayer(player) end
+    end
+    for obj,hl in pairs(self.dropHighlights) do
+        if hl and hl.Parent then hl:Destroy() end
+    end
+    self.dropHighlights={}
+    -- Clear gunDropList
+    gunDropList={}
+    notify("ESP Disabled", "Dot ESP, Weapon & Drop Highlight đã tắt.", 3)
+end
+
+local espManager=ESPManager.new()
+
+-- ================= Setup notification khi player chết =================
+local function setupDeathNotification(player)
     player.CharacterAdded:Connect(function(char)
-        local hum = char:WaitForChild("Humanoid", 5)
+        local hum=char:WaitForChild("Humanoid",5)
         if hum then
             hum.Died:Connect(function()
-                local role = getRole(player)
-                if role == "Sheriff" or role == "Hero" then
-                    notify(role .. " Died", player.Name .. " (" .. role .. ") đã chết.", 4)
+                local role=getRole(player)
+                if role=="Sheriff" or role=="Murderer" then
+                    notify(role.." Died", player.Name.." ("..role..") đã chết.", 4)
                 end
             end)
         end
     end)
+    if player.Character and player.Character:FindFirstChild("Humanoid") then
+        local hum=player.Character:FindFirstChild("Humanoid")
+        hum.Died:Connect(function()
+            local role=getRole(player)
+            if role=="Sheriff" or role=="Murderer" then
+                notify(role.." Died", player.Name.." ("..role..") đã chết.", 4)
+            end
+        end)
+    end
+end
+
+-- ================= Optimize Midnight & FPS Booster =================
+local function applyMidnightSky()
+    Lighting.ClockTime=0
+    Lighting.Brightness=35
+    Lighting.Ambient=Color3.new(0,0,0)
+    Lighting.OutdoorAmbient=Color3.new(0,0,0)
+    Lighting.FogColor=Color3.new(0,0,0)
+    Lighting.FogStart=0
+    Lighting.FogEnd=1e3
+    Lighting.GlobalShadows=false
+    Lighting.EnvironmentDiffuseScale=0
+    Lighting.EnvironmentSpecularScale=0
+    for _,child in ipairs(Lighting:GetChildren()) do
+        if child:IsA("Sky") then pcall(function() child:Destroy() end) end
+    end
+    notify("Midnight Sky", "Ánh sáng tối đã bật.", 3)
+    Lighting.DescendantAdded:Connect(function(obj)
+        if obj:IsA("Sky") then pcall(function() obj:Destroy() end) end
+    end)
+end
+local function restoreOriginalSky()
+    Lighting.ClockTime = originalLightingSettings.ClockTime or 12
+    Lighting.Brightness = originalLightingSettings.Brightness or 2
+    Lighting.Ambient = originalLightingSettings.Ambient or Color3.new(1,1,1)
+    Lighting.OutdoorAmbient = originalLightingSettings.OutdoorAmbient or Color3.new(1,1,1)
+    Lighting.FogColor = originalLightingSettings.FogColor or Color3.new(0.7,0.7,0.7)
+    Lighting.FogStart = originalLightingSettings.FogStart or 0
+    Lighting.FogEnd = originalLightingSettings.FogEnd or 1000
+    Lighting.GlobalShadows = originalLightingSettings.GlobalShadows
+    Lighting.EnvironmentDiffuseScale = originalLightingSettings.EnvironmentDiffuseScale
+    Lighting.EnvironmentSpecularScale = originalLightingSettings.EnvironmentSpecularScale
+    notify("Midnight Sky", "Restore ánh sáng ban đầu (có thể cần reload map).", 3)
+end
+
+local function applyFPSBooster()
+    local function optimizePart(obj)
+        if obj:IsA("BasePart") then
+            pcall(function()
+                obj.Material=Enum.Material.SmoothPlastic
+                obj.Color=Color3.fromRGB(128,128,128)
+                obj.CastShadow=false
+                obj.Reflectance=0
+            end)
+        end
+        if obj:IsA("MeshPart") then
+            pcall(function()
+                obj.Material=Enum.Material.SmoothPlastic
+                obj.Color=Color3.fromRGB(128,128,128)
+                obj.CastShadow=false
+                obj.Reflectance=0
+            end)
+        end
+        if obj:IsA("Decal") or obj:IsA("Texture") then
+            pcall(function() obj.Transparency=1 end)
+        end
+        if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Smoke") or obj:IsA("Fire") or obj:IsA("Sparkles") then
+            pcall(function() obj.Enabled=false end)
+        end
+        if obj:IsA("PointLight") or obj:IsA("SurfaceLight") or obj:IsA("SpotLight") then
+            pcall(function() obj.Enabled=false end)
+        end
+        if obj:IsA("SpecialMesh") then
+            pcall(function() obj.Scale=Vector3.new(0.1,0.1,0.1) end)
+        end
+    end
+    -- Scan hiện hữu theo nhóm cấp 1 workspace
+    for _,child in ipairs(workspace:GetChildren()) do
+        task.spawn(function()
+            for _,obj in ipairs(child:GetDescendants()) do
+                optimizePart(obj)
+            end
+        end)
+    end
+    -- Listener
+    workspace.DescendantAdded:Connect(function(obj)
+        optimizePart(obj)
+    end)
+    notify("FPS Booster", "FPS Booster đã bật: render đơn giản màu xám. Để restore, reload game hoặc thủ công.", 4)
+end
+
+-- ================= UI Controls =================
+inputRow=0
+-- Movement Settings
+createSection("Movement Settings")
+createInput("WalkSpeed", function() return savedWalkSpeed end, function(v)
+    savedWalkSpeed=v
+    if Humanoid then Humanoid.WalkSpeed=v end
+end)
+createInput("JumpPower", function() return savedJumpPower end, function(v)
+    savedJumpPower=v
+    if Humanoid then Humanoid.JumpPower=v end
+end)
+createInput("FOV", function()
+    if workspace.CurrentCamera then return workspace.CurrentCamera.FieldOfView end
+    return 70
+end, function(v)
+    if workspace.CurrentCamera then workspace.CurrentCamera.FieldOfView=v end
 end)
 
--- ================= UI: ESP section =================
-createSection("ESP Settings")
-createSwitch("ESP Theo Role + Highlight Vũ Khí & Drop", function(on)
-    espEnabled = on
-    if espEnabled then
-        startEspLoop()
-        notify("ESP Enabled", "Outline, Weapon Highlight và Drop Highlight đã bật.", 3)
-    else
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player.Character then
-                clearOutlineHighlight(player.Character)
-            end
-            clearWeaponHighlightsForPlayer(player)
-            lastRole[player] = nil
-            lastCharacter[player] = nil
-        end
-        -- Drop highlights removed in loop end
-        notify("ESP Disabled", "Outline, Weapon Highlight và Drop Highlight đã tắt.", 3)
+-- Health & Semi-God
+createSection("Health Settings")
+local hpDisplayInput
+createInput("Set HP (Attempt)", function() return Humanoid and Humanoid.Health or 100 end, function(v)
+    if Humanoid then
+        Humanoid.Health = math.clamp(v,0,Humanoid.MaxHealth)
+        notify("HP Adjustment", "Đã cố gắng điều chỉnh HP thành "..v..". Server có thể override.", 3)
     end
 end)
+RunService.Heartbeat:Connect(function()
+    if not hpDisplayInput then
+        local cont=content:FindFirstChild("InputRow_"..inputRow)
+        if cont then hpDisplayInput=cont:FindFirstChild("TextBox") end
+    end
+    if hpDisplayInput and Humanoid and Humanoid.Parent then
+        hpDisplayInput.PlaceholderText=string.format("HP: %.0f/%.0f",Humanoid.Health,Humanoid.MaxHealth)
+    end
+end)
+createSwitch("Semi-God Mode", function(on)
+    semiGodModeEnabled=on
+    if on then notify("Semi-God Mode","Bật: HP sẽ hồi lại khi chết.",3)
+    else notify("Semi-God Mode","Tắt: hoạt động bình thường.",3) end
+end)
 
--- ================= UI: Gun Aura section =================
+-- Utilities
+createSection("Utilities")
+createSwitch("Hide Accessories", function(on)
+    if on and LocalPlayer.Character then
+        for _,item in ipairs(LocalPlayer.Character:GetChildren()) do
+            if item:IsA("Accessory") then
+                local handle=item:FindFirstChild("Handle")
+                if handle then handle.Transparency=1 end
+            end
+        end
+    end
+end)
+createButton("Fix Lag + Lower CPU Load (Deep)", function()
+    notify("Use separate switches for Midnight Sky and FPS Booster.","Vui lòng dùng riêng switch.",4)
+end)
+
+-- ESP Settings
+createSection("ESP Settings")
+createSwitch("ESP Dot + Weapon & Drop Highlight", function(on)
+    if on then espManager:Enable() else espManager:Disable() end
+end)
+
+-- Gun Aura Settings
 createSection("Gun Aura Settings")
 createSwitch("Gun Aura (Auto Grab GunDrop)", function(on)
-    gunAuraEnabled = on
-    if on then
-        notify("Gun Aura", "Auto Grab GunDrop đã bật.", 3)
-    else
-        notify("Gun Aura", "Auto Grab GunDrop đã tắt.", 3)
-    end
+    gunAuraEnabled=on
+    if on then notify("Gun Aura","Auto Grab GunDrop đã bật.",3)
+    else notify("Gun Aura","Auto Grab GunDrop đã tắt.",3) end
 end)
 createInput("Aura Distance", function() return auraDistance end, function(v)
-    auraDistance = v
-    notify("Gun Aura", "Đã đặt Aura Distance = " .. tostring(v), 2)
+    auraDistance=v; notify("Gun Aura","Đã đặt Aura Distance = "..tostring(v),2)
 end)
 createInput("Aura Cooldown (s)", function() return auraCooldown end, function(v)
-    auraCooldown = v
-    notify("Gun Aura", "Đã đặt Aura Cooldown = " .. tostring(v) .. "s", 2)
+    auraCooldown=v; notify("Gun Aura","Đã đặt Aura Cooldown = "..tostring(v).."s",2)
 end)
 
--- ================= UI: Optimization section =================
--- (Đã gắn callback optimizePerformanceWithListener lên nút "Fix Lag + Lower CPU Load" phía trên)
-
--- ================= CharacterAdded initial: reapply settings =================
-LocalPlayer.CharacterAdded:Connect(function(char)
-    Character = char
-    Humanoid = char:WaitForChild("Humanoid")
-    RootPart = char:WaitForChild("HumanoidRootPart")
-    setupAntiFeatures()
-    Humanoid.HealthChanged:Connect(onHealthChanged)
-    task.wait(0.2)
-    if Humanoid then
-        Humanoid.WalkSpeed = savedWalkSpeed
-        Humanoid.JumpPower = savedJumpPower
-    end
+-- Optimize Settings
+createSection("Optimize Settings")
+createSwitch("Midnight Sky Only", function(on)
+    midnightEnabled=on
+    if on then applyMidnightSky() else restoreOriginalSky() end
+end)
+createSwitch("FPS Booster", function(on)
+    fpsBoosterEnabled=on
+    if on then applyFPSBooster()
+    else notify("FPS Booster","Không thể restore tự động. Reload game hoặc restore thủ công.",5) end
 end)
 
--- End of script v1.18
+-- ================= Setup PlayerAdded và Death Notifications =================
+for _,player in ipairs(Players:GetPlayers()) do setupDeathNotification(player) end
+Players.PlayerAdded:Connect(function(player) setupDeathNotification(player) end)
+
+-- ================= End of Script v1.23 =================
+
