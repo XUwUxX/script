@@ -1,6 +1,5 @@
--- Kevinz Hub Refactored Script v1.29 (đã chỉnh sửa detect role & update ESP)
+-- Kevinz Hub Refactored Script v1.30 (đã tích hợp Bullet Trail từ muzzle, mỏng & mờ hơn)
 -- Chạy client, LocalScript trong StarterPlayerScripts hoặc StarterGui
--- Yêu cầu exploit/hub môi trường (nếu muốn scan Backpack của người khác)
 
 -- ================= Services =================
 local Players = game:GetService("Players")
@@ -9,14 +8,15 @@ local StarterGui = game:GetService("StarterGui")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
 local Debris = game:GetService("Debris")
+local Workspace = workspace
 
 -- ================= Biến toàn cục =================
 local LocalPlayer = Players.LocalPlayer
 local Character, Humanoid, RootPart = nil, nil, nil
-local Camera = workspace.CurrentCamera
+local Camera = Workspace.CurrentCamera
 
 -- Phiên bản
-local HUB_VERSION = "v1 (Modified)"
+local HUB_VERSION = "v1.30 (BulletTrail Updated)"
 
 -- Movement defaults
 local savedWalkSpeed = 16
@@ -458,44 +458,137 @@ local function onCharacterAdded(char)
     table.clear(gunDropTouchedConns)
     table.clear(gunDrops)
 
-    -- Highlight đường đạn cho local player
+    -- Setup ChildAdded để detect Tools và bullet trail
     Character.ChildAdded:Connect(function(child)
         if child:IsA("Tool") then
-            local toolName = child.Name:lower()
-            if toolName:find("gun") or toolName:find("revolver") then
-                child.Equipped:Connect(function()
-                    child.Activated:Connect(function()
-                        if not Camera then Camera = workspace.CurrentCamera end
-                        local origin = Camera.CFrame.Position
-                        local direction = Camera.CFrame.LookVector * 500
-                        local rayParams = RaycastParams.new()
-                        rayParams.FilterDescendantsInstances = {Character}
-                        rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-                        local result = workspace:Raycast(origin, direction, rayParams)
-                        local hitPos
-                        if result and result.Position then
-                            hitPos = result.Position
-                        else
-                            hitPos = origin + direction
+            local tool = child
+            local nameLower = tool.Name:lower()
+            -- Nếu là súng (gun/revolver) thì attach bullet trail
+            if nameLower:find("gun") or nameLower:find("revolver") then
+                tool.Equipped:Connect(function()
+                    -- Khi đã Equipped, lắng nghe Activated ngay
+                    tool.Activated:Connect(function()
+                        -- Lấy camera hiện tại
+                        if not Camera or not Camera.CFrame then
+                            Camera = Workspace.CurrentCamera
                         end
-                        local diff = hitPos - origin
-                        local distance = diff.Magnitude
+                        -- Xác định origin từ muzzle
+                        local originPos
+                        local handle = tool:FindFirstChild("Handle")
+                        if handle then
+                            -- Thử tìm Attachment tên "Muzzle" hoặc "Barrel"
+                            local attach = handle:FindFirstChild("Muzzle") or handle:FindFirstChild("Barrel")
+                            if attach and attach:IsA("Attachment") then
+                                originPos = attach.WorldPosition
+                            else
+                                -- Fallback: offset nửa chiều dài theo LookVector của handle
+                                originPos = handle.CFrame.Position + (handle.CFrame.LookVector * (handle.Size.Z/2))
+                            end
+                        else
+                            -- Nếu không có handle, fallback về camera
+                            originPos = Camera.CFrame.Position
+                        end
+
+                        -- Tính direction: theo hướng camera LookVector
+                        local direction
+                        if Camera and Camera.CFrame then
+                            direction = Camera.CFrame.LookVector * 500
+                        elseif handle then
+                            direction = handle.CFrame.LookVector * 500
+                        else
+                            direction = Vector3.new(0, 0, -1) * 500
+                        end
+
+                        -- RaycastParams: loại trừ Character
+                        local rayParams = RaycastParams.new()
+                        rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+                        rayParams.FilterDescendantsInstances = {Character}
+
+                        -- Raycast ngay lập tức
+                        local result = Workspace:Raycast(originPos, direction, rayParams)
+                        local hitPos = result and result.Position or (originPos + direction)
+                        local distance = (hitPos - originPos).Magnitude
+
+                        -- Tạo Part hiển thị bullet trail
                         local part = Instance.new("Part")
-                        part.Name = "_BulletPath"
+                        part.Name = "_BulletTrail"
                         part.Anchored = true
                         part.CanCollide = false
+                        part.CastShadow = false
+                        part.Material = Enum.Material.Neon
+                        part.Color = Color3.new(1, 0, 0)  -- đỏ, có thể thay tuỳ ý
+                        part.Transparency = 0.7           -- mờ hơn
+                        local thickness = 0.05            -- mỏng hơn
+                        part.Size = Vector3.new(thickness, thickness, distance)
+                        -- CFrame đặt giữa origin và hitPos, hướng chính xác
+                        part.CFrame = CFrame.new(originPos, hitPos) * CFrame.new(0, 0, -distance/2)
+                        part.Parent = Workspace
+                        -- Xóa nhanh để tránh tồn đọng: lifetime 0.3s
+                        Debris:AddItem(part, 0.3)
+                    end)
+                end)
+            end
+
+            -- Cập nhật localRole khi thêm tool
+            updateLocalRole()
+        end
+    end)
+
+    -- Ngoài ra, khi respawn, nếu có tool đã equip sẵn, attach bullet trail cho nó
+    for _, tool in ipairs(Character:GetChildren()) do
+        if tool:IsA("Tool") then
+            local nameLower = tool.Name:lower()
+            if nameLower:find("gun") or nameLower:find("revolver") then
+                -- Tương tự attach Equipped -> Activated
+                tool.Equipped:Connect(function()
+                    tool.Activated:Connect(function()
+                        if not Camera or not Camera.CFrame then
+                            Camera = Workspace.CurrentCamera
+                        end
+                        local originPos
+                        local handle = tool:FindFirstChild("Handle")
+                        if handle then
+                            local attach = handle:FindFirstChild("Muzzle") or handle:FindFirstChild("Barrel")
+                            if attach and attach:IsA("Attachment") then
+                                originPos = attach.WorldPosition
+                            else
+                                originPos = handle.CFrame.Position + (handle.CFrame.LookVector * (handle.Size.Z/2))
+                            end
+                        else
+                            originPos = Camera.CFrame.Position
+                        end
+                        local direction
+                        if Camera and Camera.CFrame then
+                            direction = Camera.CFrame.LookVector * 500
+                        elseif handle then
+                            direction = handle.CFrame.LookVector * 500
+                        else
+                            direction = Vector3.new(0, 0, -1) * 500
+                        end
+                        local rayParams = RaycastParams.new()
+                        rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+                        rayParams.FilterDescendantsInstances = {Character}
+                        local result = Workspace:Raycast(originPos, direction, rayParams)
+                        local hitPos = result and result.Position or (originPos + direction)
+                        local distance = (hitPos - originPos).Magnitude
+                        local part = Instance.new("Part")
+                        part.Name = "_BulletTrail"
+                        part.Anchored = true
+                        part.CanCollide = false
+                        part.CastShadow = false
                         part.Material = Enum.Material.Neon
                         part.Color = Color3.new(1, 0, 0)
-                        part.Transparency = 0.5
-                        part.Size = Vector3.new(0.1, 0.1, distance)
-                        part.CFrame = CFrame.new(origin, hitPos) * CFrame.new(0, 0, -distance/2)
-                        part.Parent = workspace
-                        Debris:AddItem(part, 0.5)
+                        part.Transparency = 0.7
+                        local thickness = 0.05
+                        part.Size = Vector3.new(thickness, thickness, distance)
+                        part.CFrame = CFrame.new(originPos, hitPos) * CFrame.new(0, 0, -distance/2)
+                        part.Parent = Workspace
+                        Debris:AddItem(part, 0.3)
                     end)
                 end)
             end
         end
-    end)
+    end
 end
 LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
 if LocalPlayer.Character then
@@ -510,11 +603,9 @@ local roleColors = {
     Unknown  = Color3.fromRGB(180, 180, 180),
 }
 
--- Thay thế logic detect role cũ: dùng logic chuẩn từ ESP mới
 local function getRoleForPlayer(player)
     local hasKnife = false
     local hasGun = false
-    -- Check Backpack
     if player:FindFirstChild("Backpack") then
         for _, tool in ipairs(player.Backpack:GetChildren()) do
             if tool:IsA("Tool") then
@@ -524,7 +615,6 @@ local function getRoleForPlayer(player)
             end
         end
     end
-    -- Check Character
     if player.Character then
         for _, child in ipairs(player.Character:GetChildren()) do
             if child:IsA("Tool") then
@@ -534,7 +624,6 @@ local function getRoleForPlayer(player)
             end
         end
     end
-    -- Determine role
     if hasKnife and not hasGun then
         return "Murderer"
     elseif hasGun and not hasKnife then
@@ -598,7 +687,6 @@ function ESPManager:clearWeaponHighlightsForPlayer(player)
     self.weaponHighlights[player] = nil
 end
 
--- Thay thế updateDotESP bằng logic mới từ file ESP, nhẹ và chuẩn
 function ESPManager:updateDotESP(player)
     if not espEnabled or player == LocalPlayer then return end
     local char = player.Character
@@ -747,7 +835,7 @@ function ESPManager:onDropAdded(obj)
             local hl = Instance.new("Highlight")
             hl.Name = "_ESP_KNIFEDROP"
             hl.Adornee = obj
-            hl.FillColor = Color3.fromRGB(255, 0, 255)  -- cải thiện màu knife drop cho nổi bật
+            hl.FillColor = Color3.fromRGB(255, 0, 255)  -- cải thiện màu knife drop
             hl.OutlineColor = Color3.fromRGB(200, 100, 200)
             hl.FillTransparency = 0.8
             hl.OutlineTransparency = 0.2
@@ -781,15 +869,15 @@ function ESPManager:Enable()
         end
     end)
     self.dropHighlights = {}
-    for _, obj in ipairs(workspace:GetDescendants()) do
+    for _, obj in ipairs(Workspace:GetDescendants()) do
         if obj:IsA("BasePart") and (obj.Name == "GunDrop" or obj.Name == "KnifeDrop") then
             self:onDropAdded(obj)
         end
     end
-    self.descendantAddedConn = workspace.DescendantAdded:Connect(function(obj)
+    self.descendantAddedConn = Workspace.DescendantAdded:Connect(function(obj)
         self:onDropAdded(obj)
     end)
-    self.descendantRemovingConn = workspace.DescendantRemoving:Connect(function(obj)
+    self.descendantRemovingConn = Workspace.DescendantRemoving:Connect(function(obj)
         self:onDropRemoved(obj)
     end)
     notify("ESP Enabled", "Dot ESP, Weapon & Drop Highlight đã bật.", 3)
@@ -907,14 +995,14 @@ local function applyFPSBooster()
             pcall(function() obj.Scale = Vector3.new(0.1, 0.1, 0.1) end)
         end
     end
-    for _, child in ipairs(workspace:GetChildren()) do
+    for _, child in ipairs(Workspace:GetChildren()) do
         task.spawn(function()
             for _, obj in ipairs(child:GetDescendants()) do
                 optimizePart(obj)
             end
         end)
     end
-    workspace.DescendantAdded:Connect(function(obj)
+    Workspace.DescendantAdded:Connect(function(obj)
         optimizePart(obj)
     end)
     notify("FPS Booster", "FPS Booster đã bật: render đơn giản màu xám. Để restore, reload game hoặc restore thủ công.", 4)
@@ -1014,10 +1102,10 @@ createInput("JumpPower", function() return savedJumpPower end, function(v)
     if Humanoid then Humanoid.JumpPower = v end
 end)
 createInput("FOV", function()
-    if workspace.CurrentCamera then return workspace.CurrentCamera.FieldOfView end
+    if Workspace.CurrentCamera then return Workspace.CurrentCamera.FieldOfView end
     return 70
 end, function(v)
-    if workspace.CurrentCamera then workspace.CurrentCamera.FieldOfView = v end
+    if Workspace.CurrentCamera then Workspace.CurrentCamera.FieldOfView = v end
 end)
 
 -- Health & Semi-God
@@ -1056,7 +1144,7 @@ createSwitch("Hide Accessories", function(on)
         end
     end
 end)
--- Đã xóa nút Fix Lag + Lower CPU Load
+-- Đã xóa nút Fix Lag + Lower CPU Load (nếu cần, có thể thêm lại sau)
 
 -- ESP Settings
 createSection("ESP Settings")
@@ -1069,7 +1157,7 @@ createSection("Gun Aura Settings")
 createSwitch("Gun Aura (Touched + Radius)", function(on)
     gunAuraEnabled = on
     if on then
-        for _, obj in ipairs(workspace:GetDescendants()) do
+        for _, obj in ipairs(Workspace:GetDescendants()) do
             if obj:IsA("BasePart") and obj.Name == "GunDrop" then
                 setupGunAuraOnDrop(obj)
             end
@@ -1108,12 +1196,12 @@ for _, player in ipairs(Players:GetPlayers()) do setupDeathNotification(player) 
 Players.PlayerAdded:Connect(function(player) setupDeathNotification(player) end)
 
 -- ================= Listen workspace drop events cho GunAura =================
-workspace.DescendantAdded:Connect(function(obj)
+Workspace.DescendantAdded:Connect(function(obj)
     if obj:IsA("BasePart") and obj.Name == "GunDrop" then
         setupGunAuraOnDrop(obj)
     end
 end)
-workspace.DescendantRemoving:Connect(function(obj)
+Workspace.DescendantRemoving:Connect(function(obj)
     if obj:IsA("BasePart") and obj.Name == "GunDrop" then
         cleanupGunAuraForDrop(obj)
     end
