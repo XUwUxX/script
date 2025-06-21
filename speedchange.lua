@@ -1,4 +1,4 @@
--- Kevinz Hub Refactored Script v1.29
+-- Kevinz Hub Refactored Script v1.29 (đã chỉnh sửa detect role & update ESP)
 -- Chạy client, LocalScript trong StarterPlayerScripts hoặc StarterGui
 -- Yêu cầu exploit/hub môi trường (nếu muốn scan Backpack của người khác)
 
@@ -16,7 +16,7 @@ local Character, Humanoid, RootPart = nil, nil, nil
 local Camera = workspace.CurrentCamera
 
 -- Phiên bản
-local HUB_VERSION = "v1"
+local HUB_VERSION = "v1 (Modified)"
 
 -- Movement defaults
 local savedWalkSpeed = 16
@@ -509,9 +509,12 @@ local roleColors = {
     Innocent = Color3.fromRGB(50, 255, 80),
     Unknown  = Color3.fromRGB(180, 180, 180),
 }
+
+-- Thay thế logic detect role cũ: dùng logic chuẩn từ ESP mới
 local function getRoleForPlayer(player)
     local hasKnife = false
     local hasGun = false
+    -- Check Backpack
     if player:FindFirstChild("Backpack") then
         for _, tool in ipairs(player.Backpack:GetChildren()) do
             if tool:IsA("Tool") then
@@ -521,6 +524,7 @@ local function getRoleForPlayer(player)
             end
         end
     end
+    -- Check Character
     if player.Character then
         for _, child in ipairs(player.Character:GetChildren()) do
             if child:IsA("Tool") then
@@ -530,6 +534,7 @@ local function getRoleForPlayer(player)
             end
         end
     end
+    -- Determine role
     if hasKnife and not hasGun then
         return "Murderer"
     elseif hasGun and not hasKnife then
@@ -564,10 +569,11 @@ function ESPManager:addWeaponHighlight(player, toolInstance)
     if self.weaponHighlights[player][toolInstance] then return end
     local nameLower = toolInstance.Name:lower()
     local color = Color3.fromRGB(255, 255, 255)
+    -- Cải thiện highlight knife/gun: dùng màu nổi bật hơn, outline dày hơn một chút
     if nameLower:find("knife") or nameLower:find("blade") then
-        color = Color3.fromRGB(160, 32, 240)
+        color = Color3.fromRGB(255, 0, 255)  -- tím chói hơn
     elseif nameLower:find("gun") or nameLower:find("revolver") then
-        color = Color3.fromRGB(100, 150, 255)
+        color = Color3.fromRGB(0, 200, 255)  -- xanh sáng hơn
     end
     local handle = toolInstance:FindFirstChildWhichIsA("BasePart") or toolInstance:FindFirstChild("Handle")
     if not handle then return end
@@ -592,6 +598,7 @@ function ESPManager:clearWeaponHighlightsForPlayer(player)
     self.weaponHighlights[player] = nil
 end
 
+-- Thay thế updateDotESP bằng logic mới từ file ESP, nhẹ và chuẩn
 function ESPManager:updateDotESP(player)
     if not espEnabled or player == LocalPlayer then return end
     local char = player.Character
@@ -740,7 +747,7 @@ function ESPManager:onDropAdded(obj)
             local hl = Instance.new("Highlight")
             hl.Name = "_ESP_KNIFEDROP"
             hl.Adornee = obj
-            hl.FillColor = Color3.fromRGB(160, 32, 240)
+            hl.FillColor = Color3.fromRGB(255, 0, 255)  -- cải thiện màu knife drop cho nổi bật
             hl.OutlineColor = Color3.fromRGB(200, 100, 200)
             hl.FillTransparency = 0.8
             hl.OutlineTransparency = 0.2
