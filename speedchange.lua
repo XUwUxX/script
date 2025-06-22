@@ -1,5 +1,5 @@
--- Kevinz Hub Refactored Script v1.35 (Toggle "Midnight Sky" áp dụng cả Midnight Sky và Lower CPU Load)
--- LocalScript chạy client (ví dụ trong StarterPlayerScripts hoặc StarterGui)
+-- Kevinz Hub Full Script v1.36 (Sidebar Tab UI with Emoji Icons, Integrated Logic)
+-- LocalScript chạy client, ví dụ đặt trong StarterPlayerScripts hoặc StarterGui
 
 -- ================= Services =================
 local Players = game:GetService("Players")
@@ -16,13 +16,11 @@ local Character, Humanoid, RootPart = nil, nil, nil
 local Camera = Workspace.CurrentCamera
 
 -- Phiên bản
-local HUB_VERSION = "v1.35"
+local HUB_VERSION = "v1.36"
 
--- Movement defaults: lấy giá trị mặc định một lần khi script load xong (nếu Character đã tồn tại)
+-- Movement defaults
 local savedWalkSpeed = 16
 local savedJumpPower = 50
-
--- Nếu Character đã tồn tại khi script load, lấy giá trị Humanoid hiện tại
 if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
     local hum0 = LocalPlayer.Character:FindFirstChild("Humanoid")
     if hum0 then
@@ -31,20 +29,18 @@ if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") th
     end
 end
 
--- Semi-God Mode
+-- Semi-God
 local semiGodModeEnabled = false
 
 -- Gun Aura state (chỉ pick-up logic)
 local gunAuraEnabled = false
-local gunAuraRadius = 10      -- Mặc định radius 10 studs
+local gunAuraRadius = 10
 local gunDrops = {}           -- [dropInstance] = true
 local gunDropTouchedConns = {}-- [dropInstance] = connection
 local gunAuraLoopThread = nil
 
--- Highlight GunDrop state (dành cho ESP)
+-- ESP Highlight GunDrop state
 local gunDropHighlights = {}  -- [dropInstance] = {highlight = Highlight, billboard = BillboardGui}
-
--- Connection lưu khi bật ESP
 local espGlobalConns = {
     playerAdded = nil,
     renderStepped = nil,
@@ -56,14 +52,14 @@ local espGlobalConns = {
 local lowerCpuApplied = false
 local lowerCpuConn = nil  -- để disconnect DescendantAdded khi tắt
 
--- Caching localRole: scan Backpack + Character
+-- Caching localRole
 local localRole = "Unknown"
 
 -- Optimize Performance state
 local midnightEnabled = false
 local fpsBoosterEnabled = false
 
--- Lưu original Lighting settings để restoreLightingOnly / restoreOriginalSky
+-- Lưu original Lighting settings để restore
 local originalLightingSettings = {
     ClockTime = Lighting.ClockTime,
     Brightness = Lighting.Brightness,
@@ -76,7 +72,6 @@ local originalLightingSettings = {
     EnvironmentDiffuseScale = Lighting.EnvironmentDiffuseScale,
     EnvironmentSpecularScale = Lighting.EnvironmentSpecularScale,
 }
--- Lưu state Enabled của PostEffect trong Lighting
 local originalLightingEffects = {}
 for _, eff in ipairs(Lighting:GetDescendants()) do
     if eff:IsA("PostEffect") or eff:IsA("Atmosphere") then
@@ -96,301 +91,11 @@ local function notify(title, text, duration)
     end)
 end
 
--- Khi load xong
 task.delay(1, function()
     notify("Kevinz Hub Loaded ✅", "Version: " .. HUB_VERSION, 4)
 end)
 
--- ================= UI Setup =================
-local gui = Instance.new("ScreenGui")
-gui.Name = "KevinzHub"
-gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-gui.ResetOnSpawn = false
-gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-
-local window = Instance.new("Frame")
-window.Name = "MainWindow"
-window.AnchorPoint = Vector2.new(0.5, 0.5)
-window.Position = UDim2.fromScale(0.5, 0.5)
-window.Size = UDim2.new(0.35, 0, 0.6, 0)
-window.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-window.BorderSizePixel = 0
-window.ZIndex = 2
-window.ClipsDescendants = true
-window.Parent = gui
-do
-    local gradient = Instance.new("UIGradient", window)
-    gradient.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 30, 30)),
-        ColorSequenceKeypoint.new(0.7, Color3.fromRGB(25, 15, 15)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 0, 0))
-    }
-    gradient.Rotation = 90
-    Instance.new("UICorner", window).CornerRadius = UDim.new(0, 8)
-    local stroke = Instance.new("UIStroke", window)
-    stroke.Color = Color3.fromRGB(80, 80, 80)
-    stroke.Thickness = 1
-end
-
-local topBar = Instance.new("Frame", window)
-topBar.Name = "TopBar"
-topBar.Size = UDim2.new(1, 0, 0, 30)
-topBar.Position = UDim2.new(0, 0, 0, 0)
-topBar.BackgroundTransparency = 1
-do
-    local layout = Instance.new("UIListLayout", topBar)
-    layout.FillDirection = Enum.FillDirection.Horizontal
-    layout.VerticalAlignment = Enum.VerticalAlignment.Center
-    layout.Padding = UDim.new(0, 5)
-    local pad = Instance.new("UIPadding", topBar)
-    pad.PaddingLeft = UDim.new(0, 6)
-    pad.PaddingTop = UDim.new(0, 5)
-    pad.PaddingBottom = UDim.new(0, 5)
-end
-do
-    local success, thumb = pcall(function()
-        return Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
-    end)
-    local avatar = Instance.new("ImageLabel", topBar)
-    avatar.Name = "Avatar"
-    avatar.Size = UDim2.new(0, 24, 0, 24)
-    avatar.BackgroundTransparency = 1
-    avatar.Image = success and thumb or ""
-    avatar.ImageTransparency = success and 0 or 1
-    Instance.new("UICorner", avatar).CornerRadius = UDim.new(1, 0)
-    avatar.LayoutOrder = 1
-end
-do
-    local nameLabel = Instance.new("TextLabel", topBar)
-    nameLabel.Name = "NameLabel"
-    nameLabel.Size = UDim2.new(0.7, 0, 0.7, 0)
-    nameLabel.BackgroundTransparency = 1
-    nameLabel.Text = "Kevinz Hub | " .. LocalPlayer.DisplayName
-    nameLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
-    nameLabel.Font = Enum.Font.GothamBold
-    nameLabel.TextSize = 12
-    nameLabel.TextXAlignment = Enum.TextXAlignment.Center
-    nameLabel.TextWrapped = true
-    nameLabel.TextScaled = true
-    nameLabel.LayoutOrder = 2
-end
-local minimizeButton = Instance.new("TextButton", topBar)
-minimizeButton.Name = "MinimizeButton"
-minimizeButton.Size = UDim2.new(0, 20, 0, 20)
-minimizeButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-minimizeButton.Text = "-"
-minimizeButton.Font = Enum.Font.GothamBold
-minimizeButton.TextSize = 16
-minimizeButton.TextColor3 = Color3.fromRGB(240, 240, 240)
-minimizeButton.AutoButtonColor = false
-Instance.new("UICorner", minimizeButton).CornerRadius = UDim.new(1, 0)
-minimizeButton.LayoutOrder = 3
-local closeScriptButton = Instance.new("TextButton", topBar)
-closeScriptButton.Name = "CloseScriptButton"
-closeScriptButton.Size = UDim2.new(0, 20, 0, 20)
-closeScriptButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-closeScriptButton.Text = "X"
-closeScriptButton.Font = Enum.Font.GothamBold
-closeScriptButton.TextSize = 12
-closeScriptButton.TextColor3 = Color3.fromRGB(240, 240, 240)
-closeScriptButton.AutoButtonColor = false
-Instance.new("UICorner", closeScriptButton).CornerRadius = UDim.new(1, 0)
-closeScriptButton.LayoutOrder = 4
-
-local content = Instance.new("ScrollingFrame", window)
-content.Name = "ContentFrame"
-content.Size = UDim2.new(1, -10, 1, -40)
-content.Position = UDim2.new(0, 5, 0, 30)
-content.BackgroundTransparency = 1
-content.ScrollBarThickness = 6
-content.CanvasSize = UDim2.new(0, 0, 0, 0)
-content.AutomaticCanvasSize = Enum.AutomaticSize.Y
-content.Active = true
-content.ZIndex = 2
-do
-    local uiList = Instance.new("UIListLayout", content)
-    uiList.SortOrder = Enum.SortOrder.LayoutOrder
-    uiList.Padding = UDim.new(0, 12)
-    uiList.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    local pad = Instance.new("UIPadding", content)
-    pad.PaddingLeft = UDim.new(0, 8)
-    pad.PaddingRight = UDim.new(0, 8)
-    pad.PaddingTop = UDim.new(0, 8)
-    pad.PaddingBottom = UDim.new(0, 8)
-end
-
-local miniToggle = Instance.new("TextButton", gui)
-miniToggle.Name = "MiniToggle"
-miniToggle.Size = UDim2.new(0, 28, 0, 28)
-miniToggle.Position = UDim2.new(0, 50, 1, -40)
-miniToggle.AnchorPoint = Vector2.new(0.5, 0.5)
-miniToggle.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-miniToggle.Text = "+"
-miniToggle.Font = Enum.Font.GothamBold
-miniToggle.TextSize = 16
-miniToggle.TextColor3 = Color3.fromRGB(240, 240, 240)
-miniToggle.AutoButtonColor = false
-Instance.new("UICorner", miniToggle).CornerRadius = UDim.new(1, 0)
-miniToggle.Visible = false
-
-minimizeButton.MouseButton1Click:Connect(function()
-    window.Visible = false
-    miniToggle.Visible = true
-end)
-miniToggle.MouseButton1Click:Connect(function()
-    window.Visible = true
-    miniToggle.Visible = false
-end)
-closeScriptButton.MouseButton1Click:Connect(function()
-    gui:Destroy()
-end)
-do
-    local dragging = false
-    local dragStart, startPos
-    local function onInputChanged(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            local delta = input.Position - dragStart
-            window.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
-                                        startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
-    end
-    topBar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-            dragStart = input.Position
-            startPos = window.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                end
-            end)
-        end
-    end)
-    topBar.InputChanged:Connect(onInputChanged)
-end
-task.delay(1, function()
-    window.Visible = true
-    TweenService:Create(window, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-        Position = UDim2.fromScale(0.5, 0.5)
-    }):Play()
-end)
-
--- ================= Helper UI functions =================
-local inputRow = 0
-local ROW_HEIGHT = 30
-local function createSection(title)
-    inputRow = inputRow + 1
-    local lbl = Instance.new("TextLabel")
-    lbl.Name = "Section_" .. inputRow
-    lbl.Size = UDim2.new(1, 0, 0, 24)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = title
-    lbl.TextColor3 = Color3.fromRGB(200, 200, 200)
-    lbl.Font = Enum.Font.GothamBold
-    lbl.TextSize = 16
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.LayoutOrder = inputRow
-    lbl.Parent = content
-end
-local function createInput(labelText, getDefault, callback)
-    inputRow = inputRow + 1
-    local container = Instance.new("Frame")
-    container.Name = "InputRow_" .. inputRow
-    container.Size = UDim2.new(1, 0, 0, ROW_HEIGHT)
-    container.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-    container.BorderSizePixel = 0
-    Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
-    container.LayoutOrder = inputRow
-    container.Parent = content
-
-    local label = Instance.new("TextLabel", container)
-    label.Name = "Label"
-    label.Size = UDim2.new(0.4, 0, 1, 0)
-    label.Position = UDim2.new(0, 8, 0, 0)
-    label.BackgroundTransparency = 1
-    label.Text = labelText
-    label.TextColor3 = Color3.fromRGB(230, 230, 230)
-    label.Font = Enum.Font.Gotham
-    label.TextSize = 14
-    label.TextXAlignment = Enum.TextXAlignment.Left
-
-    local input = Instance.new("TextBox", container)
-    input.Name = "TextBox"
-    input.Size = UDim2.new(0.6, -16, 1, -4)
-    input.Position = UDim2.new(0.4, 8, 0, 2)
-    input.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    input.TextColor3 = Color3.fromRGB(240, 240, 240)
-    input.Text = ""
-    input.PlaceholderText = tostring(getDefault())
-    input.ClearTextOnFocus = false
-    input.Font = Enum.Font.Gotham
-    input.TextSize = 14
-    Instance.new("UICorner", input).CornerRadius = UDim.new(0, 6)
-
-    input.FocusLost:Connect(function(enterPressed)
-        if enterPressed then
-            local text = input.Text
-            local val = tonumber(text)
-            if val then
-                pcall(function() callback(val) end)
-                input.PlaceholderText = tostring(val)
-            else
-                input.PlaceholderText = tostring(getDefault())
-            end
-            input.Text = ""
-        end
-    end)
-    return input
-end
-local function createSwitch(labelText, callback)
-    inputRow = inputRow + 1
-    local container = Instance.new("Frame")
-    container.Name = "SwitchRow_" .. inputRow
-    container.Size = UDim2.new(1, 0, 0, ROW_HEIGHT)
-    container.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-    container.BorderSizePixel = 0
-    Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
-    container.LayoutOrder = inputRow
-    container.Parent = content
-
-    local label = Instance.new("TextLabel", container)
-    label.Name = "Label"
-    label.Size = UDim2.new(0.6, 0, 1, 0)
-    label.Position = UDim2.new(0, 8, 0, 0)
-    label.BackgroundTransparency = 1
-    label.Text = labelText
-    label.TextColor3 = Color3.fromRGB(230, 230, 230)
-    label.Font = Enum.Font.Gotham
-    label.TextSize = 14
-    label.TextXAlignment = Enum.TextXAlignment.Left
-
-    local toggle = Instance.new("TextButton", container)
-    toggle.Name = "Toggle"
-    toggle.Size = UDim2.new(0.4, -16, 1, -4)
-    toggle.Position = UDim2.new(0.6, 8, 0, 2)
-    toggle.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-    toggle.Text = "OFF"
-    toggle.Font = Enum.Font.GothamBold
-    toggle.TextSize = 14
-    toggle.TextColor3 = Color3.fromRGB(240, 240, 240)
-    toggle.AutoButtonColor = false
-    Instance.new("UICorner", toggle).CornerRadius = UDim.new(0, 6)
-
-    local state = false
-    toggle.MouseButton1Click:Connect(function()
-        state = not state
-        toggle.Text = state and "ON" or "OFF"
-        if state then
-            TweenService:Create(toggle, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0, 150, 0)}):Play()
-        else
-            TweenService:Create(toggle, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(70, 70, 70)}):Play()
-        end
-        pcall(function() callback(state) end)
-    end)
-    return toggle
-end
-
--- ================= Role Detection Helper cho LocalPlayer =================
+-- ================= Role Detection Helper =================
 local function updateLocalRole()
     local hasKnife = false
     local hasGun = false
@@ -458,20 +163,14 @@ local function setupLocalRoleListeners()
 end
 setupLocalRoleListeners()
 
--- ================= Thiết lập Character/Humanoid chung =================
+-- ================= Character/Humanoid Setup =================
 local function onCharacterAdded(char)
     Character = char
     Humanoid = Character:WaitForChild("Humanoid", 5)
     RootPart = Character:WaitForChild("HumanoidRootPart", 5)
     if Humanoid then
-        -- Áp dụng savedWalkSpeed & savedJumpPower từ trước lên Humanoid mới
-        pcall(function()
-            Humanoid.WalkSpeed = savedWalkSpeed
-        end)
-        pcall(function()
-            Humanoid.JumpPower = savedJumpPower
-        end)
-        -- Lắng nghe HealthChanged cho Semi-God Mode
+        pcall(function() Humanoid.WalkSpeed = savedWalkSpeed end)
+        pcall(function() Humanoid.JumpPower = savedJumpPower end)
         Humanoid.HealthChanged:Connect(function(h)
             if semiGodModeEnabled and Humanoid and Humanoid.Parent and h <= 0 then
                 Humanoid.Health = 1
@@ -493,9 +192,7 @@ local function onCharacterAdded(char)
     table.clear(gunDropTouchedConns)
     table.clear(gunDrops)
 
-    -- Không tự xóa highlight GunDrop ở đây; highlight được quản lý qua ESP toggle
-
-    -- Highlight đường đạn cho local player
+    -- Highlight đường đạn local player
     Character.ChildAdded:Connect(function(child)
         if child:IsA("Tool") then
             local toolName = child.Name:lower()
@@ -575,7 +272,7 @@ local function clearWeaponHighlightsForPlayer(player)
     weaponHighlights[player] = nil
 end
 
--- ================= ESP from esp.lua (Dot ESP) =================
+-- ================= ESP Logic (Dot ESP + Weapon + GunDrop Highlight) =================
 local roleColors = {
     Murderer = Color3.fromRGB(255, 50, 50),
     Sheriff = Color3.fromRGB(0, 89, 255),
@@ -806,13 +503,10 @@ end
 
 local espEnabled = false
 
--- ================= Highlight GunDrop Helper =================
--- Tạo highlight + BillboardGui trên mỗi BasePart có Name == "GunDrop"
+-- Highlight GunDrop Helper
 local function addGunDropHighlight(drop)
     if not drop or not drop:IsA("BasePart") then return end
-    -- Nếu đã highlight trước đó, skip
     if gunDropHighlights[drop] then return end
-    -- Highlight: outline màu xanh lá
     local hl = Instance.new("Highlight")
     hl.Name = "_ESP_GUNDROP_HL"
     hl.Adornee = drop
@@ -822,15 +516,13 @@ local function addGunDropHighlight(drop)
     hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     hl.Parent = drop
 
-    -- BillboardGui với TextLabel: "Gun drop here" màu đỏ, size lớn
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "_ESP_GUNDROP_BILLBOARD"
     billboard.Adornee = drop
     billboard.AlwaysOnTop = true
     billboard.LightInfluence = 0
-    -- Điều chỉnh offset để hiển thị trên đỉnh của drop. Có thể điều chỉnh Y tăng thêm nếu drop thấp
     billboard.StudsOffset = Vector3.new(0, 2, 0)
-    billboard.Size = UDim2.new(0, 200, 0, 50)  -- rộng 200px, cao 50px
+    billboard.Size = UDim2.new(0, 200, 0, 50)
     billboard.Parent = drop
 
     local textLabel = Instance.new("TextLabel")
@@ -851,33 +543,25 @@ end
 local function removeGunDropHighlight(drop)
     local data = gunDropHighlights[drop]
     if data then
-        if data.highlight then
-            data.highlight:Destroy()
-        end
-        if data.billboard then
-            data.billboard:Destroy()
-        end
+        if data.highlight then data.highlight:Destroy() end
+        if data.billboard then data.billboard:Destroy() end
         gunDropHighlights[drop] = nil
     end
 end
 
--- ================= ESP enable/disable with GunDrop highlight =================
 local function enableESP()
     if espEnabled then return end
     espEnabled = true
-    -- Thiết lập cho các player hiện tại
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
             setupESPForPlayer(player)
         end
     end
-    -- Khi có player mới
     espGlobalConns.playerAdded = Players.PlayerAdded:Connect(function(player)
         if player ~= LocalPlayer then
             setupESPForPlayer(player)
         end
     end)
-    -- RenderStepped loop: cập nhật round/state và update dotESP mỗi frame
     espGlobalConns.renderStepped = RunService.RenderStepped:Connect(function()
         detectRoundReset()
         monitorSheriffAssignment()
@@ -887,13 +571,12 @@ local function enableESP()
             end
         end
     end)
-    -- GunDrop highlight: scan hiện có
+    -- GunDrop highlight
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if obj:IsA("BasePart") and obj.Name == "GunDrop" then
             addGunDropHighlight(obj)
         end
     end
-    -- Kết nối sự kiện thêm/xóa GunDrop để highlight dynamic
     espGlobalConns.gunDropAdded = Workspace.DescendantAdded:Connect(function(obj)
         if obj:IsA("BasePart") and obj.Name == "GunDrop" then
             addGunDropHighlight(obj)
@@ -904,34 +587,28 @@ local function enableESP()
             removeGunDropHighlight(obj)
         end
     end)
-
     notify("ESP Enabled", "Dot ESP & GunDrop highlight đã bật.", 3)
 end
 
 local function disableESP()
     if not espEnabled then return end
     espEnabled = false
-    -- Hủy listeners global ESP players
-    if espGlobalConns.playerAdded then espGlobalConns.playerAdded:Disconnect() espGlobalConns.playerAdded = nil end
-    if espGlobalConns.renderStepped then espGlobalConns.renderStepped:Disconnect() espGlobalConns.renderStepped = nil end
-    -- Hủy listeners GunDrop highlight
-    if espGlobalConns.gunDropAdded then espGlobalConns.gunDropAdded:Disconnect() espGlobalConns.gunDropAdded = nil end
-    if espGlobalConns.gunDropRemoving then espGlobalConns.gunDropRemoving:Disconnect() espGlobalConns.gunDropRemoving = nil end
-    -- Teardown từng player
+    if espGlobalConns.playerAdded then espGlobalConns.playerAdded:Disconnect(); espGlobalConns.playerAdded = nil end
+    if espGlobalConns.renderStepped then espGlobalConns.renderStepped:Disconnect(); espGlobalConns.renderStepped = nil end
+    if espGlobalConns.gunDropAdded then espGlobalConns.gunDropAdded:Disconnect(); espGlobalConns.gunDropAdded = nil end
+    if espGlobalConns.gunDropRemoving then espGlobalConns.gunDropRemoving:Disconnect(); espGlobalConns.gunDropRemoving = nil end
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
             teardownESPForPlayer(player)
         end
     end
-    -- Xóa hết highlight GunDrop đang tồn tại
     for drop, _ in pairs(gunDropHighlights) do
         removeGunDropHighlight(drop)
     end
-
     notify("ESP Disabled", "Dot ESP & GunDrop highlight đã tắt.", 3)
 end
 
--- ================= Setup notification khi player chết =================
+-- ================= Death Notification =================
 local function setupDeathNotification(player)
     player.CharacterAdded:Connect(function(char)
         local hum = char:WaitForChild("Humanoid", 5)
@@ -955,9 +632,12 @@ local function setupDeathNotification(player)
     end
 end
 
--- ================= Optimize Midnight Sky & Lower CPU Load =================
+for _, player in ipairs(Players:GetPlayers()) do
+    setupDeathNotification(player)
+end
+Players.PlayerAdded:Connect(setupDeathNotification)
 
--- Hàm apply Midnight Sky (tắt shadows, set ClockTime, v.v.)
+-- ================= Optimize Midnight Sky & Lower CPU Load =================
 local function applyMidnightSky()
     Lighting.ClockTime = 0
     Lighting.Brightness = 35
@@ -969,13 +649,11 @@ local function applyMidnightSky()
     Lighting.GlobalShadows = false
     Lighting.EnvironmentDiffuseScale = 0
     Lighting.EnvironmentSpecularScale = 0
-    -- Xóa Sky instances
     for _, child in ipairs(Lighting:GetChildren()) do
         if child:IsA("Sky") then
             pcall(function() child:Destroy() end)
         end
     end
-    -- Giữ destroy Sky khi spawn lại
     Lighting.DescendantAdded:Connect(function(obj)
         if obj:IsA("Sky") then
             pcall(function() obj:Destroy() end)
@@ -997,9 +675,7 @@ local function applyMidnightSky()
     notify("Midnight Sky", "Áp dụng Midnight Sky.", 3)
 end
 
--- Hàm restore Lighting cơ bản (chỉ lighting, PostEffect), phần parts đã đổi Material cần reload để restore
 local function restoreOriginalSky()
-    -- Restore Lighting settings
     pcall(function() Lighting.ClockTime = originalLightingSettings.ClockTime end)
     pcall(function() Lighting.Brightness = originalLightingSettings.Brightness end)
     pcall(function() Lighting.Ambient = originalLightingSettings.Ambient end)
@@ -1010,16 +686,14 @@ local function restoreOriginalSky()
     pcall(function() Lighting.GlobalShadows = originalLightingSettings.GlobalShadows end)
     pcall(function() Lighting.EnvironmentDiffuseScale = originalLightingSettings.EnvironmentDiffuseScale end)
     pcall(function() Lighting.EnvironmentSpecularScale = originalLightingSettings.EnvironmentSpecularScale end)
-    -- Restore PostEffects
     for eff, wasEnabled in pairs(originalLightingEffects) do
         if eff and eff.Parent then
             pcall(function() eff.Enabled = wasEnabled end)
         end
     end
-    notify("Midnight Sky", "Restore Lighting cơ bản. Reload/rejoin để phục hồi phần đổi Material trên parts.", 4)
+    notify("Midnight Sky", "Restore Lighting cơ bản. Reload/rejoin để phục hồi parts.", 4)
 end
 
--- Hàm disable thêm các hiệu ứng hậu kỳ nếu chưa disable
 local function disableLightingEffects()
     Lighting.GlobalShadows = false
     for _, eff in ipairs(Lighting:GetDescendants()) do
@@ -1036,46 +710,33 @@ local function disableLightingEffects()
     end
 end
 
--- Hàm apply Lower CPU Load: chunked traversal
 local function applyLowerCPULoad()
     if lowerCpuApplied then return end
     lowerCpuApplied = true
 
-    -- 1. Disable thêm lighting effects
     disableLightingEffects()
 
-    -- 2. Xử lý workspace descendants theo batch để tránh block
     local all = Workspace:GetDescendants()
     local batchSize = 50
     local total = #all
 
     local function processObj(obj)
-        -- BasePart hoặc MeshPart
         if obj:IsA("BasePart") then
-            -- Giữ nguyên Color:
             local suc, col = pcall(function() return obj.Color end)
-            -- Chuyển Material:
             pcall(function() obj.Material = Enum.Material.SmoothPlastic end)
             if suc and col then
                 pcall(function() obj.Color = col end)
             end
-            -- Tắt specular/reflect:
             pcall(function() obj.Reflectance = 0 end)
-            -- Tắt shadow cast:
             pcall(function() obj.CastShadow = false end)
         end
-        -- Nếu có SurfaceAppearance (PBR), destroy để giảm cost
         if obj:IsA("SurfaceAppearance") then
             pcall(function() obj:Destroy() end)
         end
-        -- Lights giảm cường độ:
         if obj:IsA("PointLight") or obj:IsA("SurfaceLight") or obj:IsA("SpotLight") then
-            pcall(function()
-                obj.Enabled = false
-                -- Nếu muốn giảm thay vì tắt hoàn toàn, dùng: obj.Brightness = obj.Brightness * 0.2
-            end)
+            pcall(function() obj.Enabled = false end)
         end
-        -- Có thể thêm disable ParticleEmitter nếu cần: 
+        -- Nếu cần disable ParticleEmitter, Trail, v.v., có thể mở comment:
         -- if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Smoke") or obj:IsA("Fire") or obj:IsA("Sparkles") then
         --     pcall(function() obj.Enabled = false end)
         -- end
@@ -1090,48 +751,39 @@ local function applyLowerCPULoad()
                 processObj(obj)
             end
             i = j + 1
-            task.wait()  -- yield một frame để tránh lag
+            task.wait()
         end
     end)
 
-    -- 3. Kết nối DescendantAdded để xử lý object mới spawn
     lowerCpuConn = Workspace.DescendantAdded:Connect(function(obj)
         task.defer(function()
-            -- delay để object có thuộc tính đầy đủ
             if obj then
-                -- process chính bản thân
                 if obj:IsA("BasePart") or obj:IsA("PointLight") or obj:IsA("SurfaceLight") or obj:IsA("SpotLight") or obj:IsA("SurfaceAppearance") then
                     processObj(obj)
                 end
-                -- Nếu obj là Model, các child sẽ được DescendantAdded gọi tiếp nên không cần lặp thêm
             end
         end)
     end)
 
-    -- 4. Có thể giảm Ambient/OutdoorAmbient một chút
     pcall(function() Lighting.Ambient = Lighting.Ambient * 0.5 end)
     pcall(function() Lighting.OutdoorAmbient = Lighting.OutdoorAmbient * 0.5 end)
 
-    notify("Lower CPU", "Áp dụng tối ưu: SmoothPlastic giữ màu, tắt shadow/effects, giảm đèn.", 4)
+    notify("Lower CPU", "Áp dụng tối ưu: SmoothPlastic, tắt shadows/effects, giảm đèn.", 4)
 end
 
--- Hàm restore Lighting cơ bản, parts đã đổi Material không thể restore tự động
 local function restoreLightingOnly()
-    -- Restore Lighting settings cơ bản
     pcall(function() Lighting.Ambient = originalLightingSettings.Ambient end)
     pcall(function() Lighting.OutdoorAmbient = originalLightingSettings.OutdoorAmbient end)
-    -- Restore PostEffects
     for eff, wasEnabled in pairs(originalLightingEffects) do
         if eff and eff.Parent then
             pcall(function() eff.Enabled = wasEnabled end)
         end
     end
-    -- Restore GlobalShadows
     pcall(function() Lighting.GlobalShadows = originalLightingSettings.GlobalShadows end)
-    notify("Restore Lighting", "Restore Lighting cơ bản. Reload/rejoin để phục hồi phần đổi Material trên parts.", 4)
+    notify("Restore Lighting", "Restore Lighting cơ bản. Reload/rejoin để phục hồi parts.", 4)
 end
 
--- ================= Gun Aura functions (chỉ pick-up, không highlight) =================
+-- ================= Gun Aura Logic =================
 function cleanupGunAuraForDrop(drop)
     local conn = gunDropTouchedConns[drop]
     if conn then
@@ -1210,142 +862,6 @@ local function startGunAuraRadiusLoop()
     end)
 end
 
--- ================= UI Controls =================
-inputRow = 0
--- Movement Settings
-createSection("Movement Settings")
-createInput("WalkSpeed", function() return savedWalkSpeed end, function(v)
-    savedWalkSpeed = v
-    if Humanoid then
-        pcall(function() Humanoid.WalkSpeed = v end)
-    end
-end)
-createInput("JumpPower", function() return savedJumpPower end, function(v)
-    savedJumpPower = v
-    if Humanoid then
-        pcall(function() Humanoid.JumpPower = v end)
-    end
-end)
-createInput("FOV", function()
-    if Workspace.CurrentCamera then return Workspace.CurrentCamera.FieldOfView end
-    return 70
-end, function(v)
-    if Workspace.CurrentCamera then Workspace.CurrentCamera.FieldOfView = v end
-end)
-
--- Health & Semi-God
-createSection("Health Settings")
-local hpDisplayInput
-createInput("Set HP (Attempt)", function() return Humanoid and Humanoid.Health or 100 end, function(v)
-    if Humanoid then
-        Humanoid.Health = math.clamp(v, 0, Humanoid.MaxHealth)
-        notify("HP Adjustment", "Đã cố gắng điều chỉnh HP thành " .. v .. ". Server có thể override.", 3)
-    end
-end)
-RunService.Heartbeat:Connect(function(dt)
-    if not hpDisplayInput then
-        local cont = content:FindFirstChild("InputRow_" .. inputRow)
-        if cont then hpDisplayInput = cont:FindFirstChild("TextBox") end
-    end
-    if hpDisplayInput and Humanoid and Humanoid.Parent then
-        hpDisplayInput.PlaceholderText = string.format("HP: %.0f/%.0f", Humanoid.Health, Humanoid.MaxHealth)
-    end
-end)
-createSwitch("Semi-God Mode", function(on)
-    semiGodModeEnabled = on
-    if on then notify("Semi-God Mode", "Bật: HP sẽ hồi lại khi chết.", 3)
-    else notify("Semi-God Mode", "Tắt: hoạt động bình thường.", 3) end
-end)
-
--- Utilities
-createSection("Utilities")
-createSwitch("Hide Accessories", function(on)
-    if on and LocalPlayer.Character then
-        for _, item in ipairs(LocalPlayer.Character:GetChildren()) do
-            if item:IsA("Accessory") then
-                local handle = item:FindFirstChild("Handle")
-                if handle then handle.Transparency = 1 end
-            end
-        end
-    end
-end)
-
--- ESP Settings
-createSection("ESP Settings")
-createSwitch("ESP Dot + Weapon Highlight + GunDrop Highlight", function(on)
-    if on then
-        enableESP()
-    else
-        disableESP()
-    end
-end)
-
--- Gun Aura Settings
-createSection("Gun Aura Settings")
-createSwitch("Gun Aura (Touched + Radius)", function(on)
-    gunAuraEnabled = on
-    if on then
-        for _, obj in ipairs(Workspace:GetDescendants()) do
-            if obj:IsA("BasePart") and obj.Name == "GunDrop" then
-                setupGunAuraOnDrop(obj)
-            end
-        end
-        startGunAuraRadiusLoop()
-        notify("Gun Aura", "Gun Aura đã bật: Touched & Radius.", 3)
-    else
-        gunAuraEnabled = false
-        for drop, _ in pairs(gunDrops) do
-            cleanupGunAuraForDrop(drop)
-        end
-        notify("Gun Aura", "Gun Aura đã tắt.", 3)
-    end
-end)
-createInput("Gun Aura Radius", function() return gunAuraRadius end, function(v)
-    if v and v >= 0 then
-        gunAuraRadius = v
-        notify("Gun Aura Radius", "Radius đặt thành " .. tostring(v) .. " studs.", 2)
-    end
-end)
-
--- Optimize Settings
-createSection("Optimize Settings")
--- Toggle vẫn tên "Midnight Sky" nhưng áp dụng cả Midnight Sky và Lower CPU Load
-createSwitch("Midnight Sky", function(on)
-    midnightEnabled = on
-    if on then
-        applyMidnightSky()
-        applyLowerCPULoad()
-    else
-        restoreOriginalSky()
-        restoreLightingOnly()
-        -- Disconnect event DescendantAdded cho lower CPU
-        if lowerCpuConn then
-            lowerCpuConn:Disconnect()
-            lowerCpuConn = nil
-        end
-        lowerCpuApplied = false
-    end
-end)
-createSwitch("FPS Booster", function(on)
-    fpsBoosterEnabled = on
-    if on then
-        -- Nếu muốn vẫn giữ FPS Booster logic cũ:
-        -- applyFPSBooster()  -- phần này không restore tự động được
-        notify("FPS Booster", "FPS Booster đã bật: render đơn giản màu xám. Để restore, reload game hoặc restore thủ công.", 4)
-    else
-        notify("FPS Booster", "Tắt FPS Booster: reload/rejoin để restore.", 4)
-    end
-end)
-
--- ================= Setup PlayerAdded và Death Notifications =================
-for _, player in ipairs(Players:GetPlayers()) do 
-    setupDeathNotification(player)
-end
-Players.PlayerAdded:Connect(function(player) 
-    setupDeathNotification(player)
-end)
-
--- ================= Listen workspace drop events cho GunAura (không highlight) =================
 Workspace.DescendantAdded:Connect(function(obj)
     if obj:IsA("BasePart") and obj.Name == "GunDrop" then
         setupGunAuraOnDrop(obj)
@@ -1356,3 +872,518 @@ Workspace.DescendantRemoving:Connect(function(obj)
         cleanupGunAuraForDrop(obj)
     end
 end)
+
+-- ================= UI: Sidebar Tab with Emoji =================
+
+-- 1. Tạo ScreenGui & MainWindow
+local gui = Instance.new("ScreenGui")
+gui.Name = "KevinzHub"
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.ResetOnSpawn = false
+gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local window = Instance.new("Frame")
+window.Name = "MainWindow"
+window.AnchorPoint = Vector2.new(0.5, 0.5)
+window.Position = UDim2.fromScale(0.5, 0.5)
+window.Size = UDim2.new(0.4, 0, 0.7, 0)  -- điều chỉnh theo ý bạn
+window.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+window.BorderSizePixel = 0
+window.ZIndex = 2
+window.ClipsDescendants = true
+window.Parent = gui
+do
+    local corner = Instance.new("UICorner", window)
+    corner.CornerRadius = UDim.new(0, 8)
+    local stroke = Instance.new("UIStroke", window)
+    stroke.Color = Color3.fromRGB(70, 70, 70)
+    stroke.Thickness = 1
+end
+
+-- 2. TopBar (draggable, close/minimize)
+local topBar = Instance.new("Frame", window)
+topBar.Name = "TopBar"
+topBar.Size = UDim2.new(1, 0, 0, 30)
+topBar.Position = UDim2.new(0, 0, 0, 0)
+topBar.BackgroundTransparency = 1
+do
+    local layout = Instance.new("UIListLayout", topBar)
+    layout.FillDirection = Enum.FillDirection.Horizontal
+    layout.VerticalAlignment = Enum.VerticalAlignment.Center
+    layout.Padding = UDim.new(0, 5)
+    local pad = Instance.new("UIPadding", topBar)
+    pad.PaddingLeft = UDim.new(0, 8)
+    pad.PaddingTop = UDim.new(0, 5)
+    pad.PaddingBottom = UDim.new(0, 5)
+end
+do
+    -- Avatar
+    local success, thumb = pcall(function()
+        return Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
+    end)
+    local avatar = Instance.new("ImageLabel", topBar)
+    avatar.Name = "Avatar"
+    avatar.Size = UDim2.new(0, 24, 0, 24)
+    avatar.BackgroundTransparency = 1
+    avatar.Image = success and thumb or ""
+    avatar.ImageTransparency = success and 0 or 1
+    Instance.new("UICorner", avatar).CornerRadius = UDim.new(1, 0)
+    avatar.LayoutOrder = 1
+
+    -- Name label
+    local nameLabel = Instance.new("TextLabel", topBar)
+    nameLabel.Name = "NameLabel"
+    nameLabel.Size = UDim2.new(0.6, 0, 0.7, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = "Kevinz Hub | " .. LocalPlayer.DisplayName
+    nameLabel.TextColor3 = Color3.fromRGB(230, 230, 230)
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.TextSize = 14
+    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    nameLabel.LayoutOrder = 2
+
+    -- Minimize button
+    local minimizeButton = Instance.new("TextButton", topBar)
+    minimizeButton.Name = "MinimizeButton"
+    minimizeButton.Size = UDim2.new(0, 20, 0, 20)
+    minimizeButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    minimizeButton.Text = "-"
+    minimizeButton.Font = Enum.Font.GothamBold
+    minimizeButton.TextSize = 16
+    minimizeButton.TextColor3 = Color3.fromRGB(230, 230, 230)
+    minimizeButton.AutoButtonColor = false
+    Instance.new("UICorner", minimizeButton).CornerRadius = UDim.new(1, 0)
+    minimizeButton.LayoutOrder = 3
+    minimizeButton.MouseButton1Click:Connect(function()
+        window.Visible = false
+        -- Bạn có thể tạo một nút bên ngoài để mở lại window nếu muốn
+    end)
+
+    -- Close button
+    local closeScriptButton = Instance.new("TextButton", topBar)
+    closeScriptButton.Name = "CloseScriptButton"
+    closeScriptButton.Size = UDim2.new(0, 20, 0, 20)
+    closeScriptButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    closeScriptButton.Text = "X"
+    closeScriptButton.Font = Enum.Font.GothamBold
+    closeScriptButton.TextSize = 14
+    closeScriptButton.TextColor3 = Color3.fromRGB(230, 230, 230)
+    closeScriptButton.AutoButtonColor = false
+    Instance.new("UICorner", closeScriptButton).CornerRadius = UDim.new(1, 0)
+    closeScriptButton.LayoutOrder = 4
+    closeScriptButton.MouseButton1Click:Connect(function()
+        gui:Destroy()
+    end)
+end
+
+-- Drag window
+do
+    local dragging = false
+    local dragStart, startPos
+    topBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = window.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    topBar.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = input.Position - dragStart
+            window.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
+                                        startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
+
+-- 3. Tạo Sidebar và ContentContainer
+local sidebar = Instance.new("Frame", window)
+sidebar.Name = "Sidebar"
+sidebar.Size = UDim2.new(0, 120, 1, -30)  -- rộng 120px, cao full minus topBar
+sidebar.Position = UDim2.new(0, 0, 0, 30)
+sidebar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+sidebar.BorderSizePixel = 0
+Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 8)
+
+local contentContainer = Instance.new("Frame", window)
+contentContainer.Name = "ContentContainer"
+contentContainer.Size = UDim2.new(1, -120, 1, -30)
+contentContainer.Position = UDim2.new(0, 120, 0, 30)
+contentContainer.BackgroundTransparency = 1
+
+-- Sidebar layout
+local sidebarLayout = Instance.new("UIListLayout", sidebar)
+sidebarLayout.FillDirection = Enum.FillDirection.Vertical
+sidebarLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+sidebarLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+sidebarLayout.SortOrder = Enum.SortOrder.LayoutOrder
+sidebarLayout.Padding = UDim.new(0, 4)
+local sidebarPadding = Instance.new("UIPadding", sidebar)
+sidebarPadding.PaddingTop = UDim.new(0, 8)
+sidebarPadding.PaddingBottom = UDim.new(0, 8)
+sidebarPadding.PaddingLeft = UDim.new(0, 4)
+sidebarPadding.PaddingRight = UDim.new(0, 4)
+
+-- 4. Định nghĩa tabs với Emoji
+local tabs = {
+    { Name = "Movement", Emoji = "🏃" },
+    { Name = "ESP",      Emoji = "🔍" },
+    { Name = "Optimize", Emoji = "⚡" },
+    { Name = "GunAura",  Emoji = "🔫" },
+    { Name = "Settings", Emoji = "⚙️" },
+}
+
+-- 5. Tạo bảng lưu
+local tabButtons = {}
+local tabContentFrames = {}
+
+local function setButtonActive(button, active)
+    if active then
+        button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    else
+        button.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    end
+end
+
+-- 6. Tạo nút sidebar và content frames (ScrollingFrame) cho mỗi tab
+for index, tabInfo in ipairs(tabs) do
+    -- Nút sidebar
+    local btn = Instance.new("TextButton")
+    btn.Name = "TabBtn_" .. tabInfo.Name
+    btn.Size = UDim2.new(1, 0, 0, 40)
+    btn.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    btn.BorderSizePixel = 0
+    btn.LayoutOrder = index
+    btn.AutoButtonColor = false
+    btn.Text = ""
+    btn.Parent = sidebar
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+
+    -- Emoji icon
+    local emojiLabel = Instance.new("TextLabel", btn)
+    emojiLabel.Name = "IconEmoji"
+    emojiLabel.Size = UDim2.new(0, 24, 1, 0)
+    emojiLabel.Position = UDim2.new(0, 8, 0, 0)
+    emojiLabel.BackgroundTransparency = 1
+    emojiLabel.Text = tabInfo.Emoji or ""
+    emojiLabel.Font = Enum.Font.Gotham
+    emojiLabel.TextSize = 18
+    emojiLabel.TextColor3 = Color3.fromRGB(230,230,230)
+    emojiLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+    -- Label text
+    local lbl = Instance.new("TextLabel", btn)
+    lbl.Name = "Label"
+    lbl.Size = UDim2.new(1, -40, 1, 0)
+    lbl.Position = UDim2.new(0, 40, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = tabInfo.Name
+    lbl.TextColor3 = Color3.fromRGB(230, 230, 230)
+    lbl.Font = Enum.Font.Gotham
+    lbl.TextSize = 14
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    -- Content ScrollingFrame
+    local frame = Instance.new("ScrollingFrame")
+    frame.Name = "Content_" .. tabInfo.Name
+    frame.Size = UDim2.new(1, 0, 1, 0)
+    frame.Position = UDim2.new(0, 0, 0, 0)
+    frame.BackgroundTransparency = 1
+    frame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    frame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    frame.ScrollBarThickness = 6
+    frame.Visible = false
+    frame.Parent = contentContainer
+
+    -- UIListLayout trong content frame
+    local layout = Instance.new("UIListLayout", frame)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Padding = UDim.new(0, 8)
+    local pad = Instance.new("UIPadding", frame)
+    pad.PaddingTop = UDim.new(0, 8)
+    pad.PaddingBottom = UDim.new(0, 8)
+    pad.PaddingLeft = UDim.new(0, 8)
+    pad.PaddingRight = UDim.new(0, 8)
+
+    -- Hover effect
+    btn.MouseEnter:Connect(function()
+        if not frame.Visible then
+            TweenService:Create(btn, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(35,35,35)}):Play()
+        end
+    end)
+    btn.MouseLeave:Connect(function()
+        if not frame.Visible then
+            TweenService:Create(btn, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(25,25,25)}):Play()
+        end
+    end)
+
+    -- Click handler
+    btn.MouseButton1Click:Connect(function()
+        for name, f in pairs(tabContentFrames) do
+            f.Visible = false
+            setButtonActive(tabButtons[name], false)
+        end
+        frame.Visible = true
+        setButtonActive(btn, true)
+    end)
+
+    tabButtons[tabInfo.Name] = btn
+    tabContentFrames[tabInfo.Name] = frame
+end
+
+-- 7. Mặc định chọn tab đầu
+if #tabs > 0 then
+    local firstName = tabs[1].Name
+    tabButtons[firstName].BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    tabContentFrames[firstName].Visible = true
+end
+
+-- 8. Helper createInput/createSwitch với parent param
+local function createInput(parent, labelText, getDefault, callback)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(1, 0, 0, 30)
+    container.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    container.BorderSizePixel = 0
+    Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
+    container.LayoutOrder = (#parent:GetChildren()) + 1
+    container.Parent = parent
+
+    local label = Instance.new("TextLabel", container)
+    label.Name = "Label"
+    label.Size = UDim2.new(0.4, 0, 1, 0)
+    label.Position = UDim2.new(0, 8, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = labelText
+    label.TextColor3 = Color3.fromRGB(230, 230, 230)
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 14
+    label.TextXAlignment = Enum.TextXAlignment.Left
+
+    local input = Instance.new("TextBox", container)
+    input.Name = "TextBox"
+    input.Size = UDim2.new(0.6, -16, 1, -4)
+    input.Position = UDim2.new(0.4, 8, 0, 2)
+    input.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    input.TextColor3 = Color3.fromRGB(240, 240, 240)
+    input.Text = ""
+    input.PlaceholderText = tostring(getDefault())
+    input.ClearTextOnFocus = false
+    input.Font = Enum.Font.Gotham
+    input.TextSize = 14
+    Instance.new("UICorner", input).CornerRadius = UDim.new(0, 6)
+
+    input.FocusLost:Connect(function(enterPressed)
+        if enterPressed then
+            local text = input.Text
+            local val = tonumber(text)
+            if val then
+                pcall(function() callback(val) end)
+                input.PlaceholderText = tostring(val)
+            else
+                input.PlaceholderText = tostring(getDefault())
+            end
+            input.Text = ""
+        end
+    end)
+    return input
+end
+
+local function createSwitch(parent, labelText, callback)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(1, 0, 0, 30)
+    container.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    container.BorderSizePixel = 0
+    Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
+    container.LayoutOrder = (#parent:GetChildren()) + 1
+    container.Parent = parent
+
+    local label = Instance.new("TextLabel", container)
+    label.Name = "Label"
+    label.Size = UDim2.new(0.6, 0, 1, 0)
+    label.Position = UDim2.new(0, 8, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = labelText
+    label.TextColor3 = Color3.fromRGB(230, 230, 230)
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 14
+    label.TextXAlignment = Enum.TextXAlignment.Left
+
+    local toggle = Instance.new("TextButton", container)
+    toggle.Name = "Toggle"
+    toggle.Size = UDim2.new(0.4, -16, 1, -4)
+    toggle.Position = UDim2.new(0.6, 8, 0, 2)
+    toggle.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+    toggle.Text = "OFF"
+    toggle.Font = Enum.Font.GothamBold
+    toggle.TextSize = 14
+    toggle.TextColor3 = Color3.fromRGB(240, 240, 240)
+    toggle.AutoButtonColor = false
+    Instance.new("UICorner", toggle).CornerRadius = UDim.new(0, 6)
+
+    local state = false
+    toggle.MouseButton1Click:Connect(function()
+        state = not state
+        toggle.Text = state and "ON" or "OFF"
+        if state then
+            TweenService:Create(toggle, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0, 150, 0)}):Play()
+        else
+            TweenService:Create(toggle, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(70, 70, 70)}):Play()
+        end
+        pcall(function() callback(state) end)
+    end)
+    return toggle
+end
+
+-- 9. Khởi tạo nội dung cho từng tab
+
+-- Movement Tab
+do
+    local parent = tabContentFrames["Movement"]
+    if parent then
+        createInput(parent, "WalkSpeed", function() return savedWalkSpeed end, function(v)
+            savedWalkSpeed = v
+            if Humanoid then pcall(function() Humanoid.WalkSpeed = v end) end
+            notify("WalkSpeed", "Đã đặt WalkSpeed = " .. v, 2)
+        end)
+        createInput(parent, "JumpPower", function() return savedJumpPower end, function(v)
+            savedJumpPower = v
+            if Humanoid then pcall(function() Humanoid.JumpPower = v end) end
+            notify("JumpPower", "Đã đặt JumpPower = " .. v, 2)
+        end)
+        createInput(parent, "FOV", function() return Workspace.CurrentCamera and Workspace.CurrentCamera.FieldOfView or 70 end, function(v)
+            if Workspace.CurrentCamera then Workspace.CurrentCamera.FieldOfView = v end
+            notify("FOV", "Đã đặt FOV = " .. v, 2)
+        end)
+        createSwitch(parent, "Semi-God Mode", function(on)
+            semiGodModeEnabled = on
+            notify("Semi-God", on and "Bật Semi-God" or "Tắt Semi-God", 2)
+        end)
+    end
+end
+
+-- ESP Tab
+do
+    local parent = tabContentFrames["ESP"]
+    if parent then
+        createSwitch(parent, "ESP Dot + Weapon + GunDrop", function(on)
+            if on then enableESP() else disableESP() end
+        end)
+    end
+end
+
+-- Optimize Tab
+do
+    local parent = tabContentFrames["Optimize"]
+    if parent then
+        createSwitch(parent, "Midnight Sky", function(on)
+            midnightEnabled = on
+            if on then
+                applyMidnightSky()
+                applyLowerCPULoad()
+            else
+                restoreOriginalSky()
+                restoreLightingOnly()
+                if lowerCpuConn then lowerCpuConn:Disconnect(); lowerCpuConn = nil end
+                lowerCpuApplied = false
+            end
+        end)
+        createSwitch(parent, "FPS Booster", function(on)
+            fpsBoosterEnabled = on
+            if on then
+                notify("FPS Booster", "Bật FPS Booster. Reload để restore.", 3)
+            else
+                notify("FPS Booster", "Tắt FPS Booster. Reload để restore.", 3)
+            end
+        end)
+    end
+end
+
+-- GunAura Tab
+do
+    local parent = tabContentFrames["GunAura"]
+    if parent then
+        createSwitch(parent, "Gun Aura (Touched+Radius)", function(on)
+            gunAuraEnabled = on
+            if on then
+                for _, obj in ipairs(Workspace:GetDescendants()) do
+                    if obj:IsA("BasePart") and obj.Name == "GunDrop" then
+                        setupGunAuraOnDrop(obj)
+                    end
+                end
+                startGunAuraRadiusLoop()
+                notify("GunAura", "Bật Gun Aura", 2)
+            else
+                for drop,_ in pairs(gunDrops) do cleanupGunAuraForDrop(drop) end
+                notify("GunAura", "Tắt Gun Aura", 2)
+            end
+        end)
+        createInput(parent, "Gun Aura Radius", function() return gunAuraRadius end, function(v)
+            gunAuraRadius = v
+            notify("GunAura Radius", "Đặt Radius = " .. v, 2)
+        end)
+    end
+end
+
+-- Settings Tab
+do
+    local parent = tabContentFrames["Settings"]
+    if parent then
+        createSwitch(parent, "Dark Theme", function(on)
+            if on then
+                window.BackgroundColor3 = Color3.fromRGB(20,20,20)
+                sidebar.BackgroundColor3 = Color3.fromRGB(25,25,25)
+                for _, btn in pairs(tabButtons) do
+                    btn.BackgroundColor3 = Color3.fromRGB(25,25,25)
+                    local icon = btn:FindFirstChild("IconEmoji")
+                    if icon then icon.TextColor3 = Color3.fromRGB(230,230,230) end
+                    local lbl = btn:FindFirstChild("Label")
+                    if lbl then lbl.TextColor3 = Color3.fromRGB(230,230,230) end
+                end
+                for _, frame in pairs(tabContentFrames) do
+                    for _, child in ipairs(frame:GetDescendants()) do
+                        if child:IsA("TextLabel") then
+                            child.TextColor3 = Color3.fromRGB(230,230,230)
+                        elseif child:IsA("TextBox") then
+                            child.TextColor3 = Color3.fromRGB(230,230,230)
+                            child.BackgroundColor3 = Color3.fromRGB(50,50,50)
+                        elseif child:IsA("TextButton") then
+                            child.TextColor3 = Color3.fromRGB(230,230,230)
+                            child.BackgroundColor3 = Color3.fromRGB(35,35,35)
+                        end
+                    end
+                end
+            else
+                window.BackgroundColor3 = Color3.fromRGB(240,240,240)
+                sidebar.BackgroundColor3 = Color3.fromRGB(250,250,250)
+                for _, btn in pairs(tabButtons) do
+                    btn.BackgroundColor3 = Color3.fromRGB(245,245,245)
+                    local icon = btn:FindFirstChild("IconEmoji")
+                    if icon then icon.TextColor3 = Color3.fromRGB(20,20,20) end
+                    local lbl = btn:FindFirstChild("Label")
+                    if lbl then lbl.TextColor3 = Color3.fromRGB(20,20,20) end
+                end
+                for _, frame in pairs(tabContentFrames) do
+                    for _, child in ipairs(frame:GetDescendants()) do
+                        if child:IsA("TextLabel") then
+                            child.TextColor3 = Color3.fromRGB(20,20,20)
+                        elseif child:IsA("TextBox") then
+                            child.TextColor3 = Color3.fromRGB(20,20,20)
+                            child.BackgroundColor3 = Color3.fromRGB(240,240,240)
+                        elseif child:IsA("TextButton") then
+                            child.TextColor3 = Color3.fromRGB(20,20,20)
+                            child.BackgroundColor3 = Color3.fromRGB(245,245,245)
+                        end
+                    end
+                end
+            end
+        end)
+        -- Có thể thêm keybind manager, config lưu local, v.v.
+    end
+end
+
+-- ================= End of Script =================
