@@ -1,4 +1,4 @@
--- Kevinz Hub Refactored Script v1.31 (Fix movement persistence)
+-- Kevinz Hub Refactored Script v1.32 (Thêm highlight GunDrop: màu xanh lá + chữ "Gun drop here" màu đỏ)
 -- Chạy client, LocalScript trong StarterPlayerScripts hoặc StarterGui
 
 -- ================= Services =================
@@ -8,14 +8,15 @@ local StarterGui = game:GetService("StarterGui")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
 local Debris = game:GetService("Debris")
+local Workspace = workspace
 
 -- ================= Biến toàn cục =================
 local LocalPlayer = Players.LocalPlayer
 local Character, Humanoid, RootPart = nil, nil, nil
-local Camera = workspace.CurrentCamera
+local Camera = Workspace.CurrentCamera
 
 -- Phiên bản
-local HUB_VERSION = "v1.31 (Movement Persistence)"
+local HUB_VERSION = "v1.32 (Add GunDrop Highlight)"
 
 -- Movement defaults: lấy giá trị mặc định một lần khi script load xong (nếu Character đã tồn tại)
 local savedWalkSpeed = 16
@@ -39,6 +40,9 @@ local gunAuraRadius = 10      -- Mặc định radius 10 studs; có thể thay �
 local gunDrops = {}           -- [dropInstance] = true
 local gunDropTouchedConns = {}-- [dropInstance] = connection
 local gunAuraLoopThread = nil
+
+-- Highlight GunDrop state
+local gunDropHighlights = {}  -- [dropInstance] = {highlight = Highlight, billboard = BillboardGui}
 
 -- Caching localRole: scan cả Backpack + Character
 local localRole = "Unknown"
@@ -368,7 +372,6 @@ local function createSwitch(labelText, callback)
 end
 
 -- ================= Role Detection Helper cho LocalPlayer =================
--- Logic getRole local giống cũ
 local function updateLocalRole()
     local hasKnife = false
     local hasGun = false
@@ -443,7 +446,6 @@ local function onCharacterAdded(char)
     RootPart = Character:WaitForChild("HumanoidRootPart", 5)
     if Humanoid then
         -- Áp dụng savedWalkSpeed & savedJumpPower từ trước lên Humanoid mới
-        -- Nếu savedWalkSpeed đã do user thay đổi, sẽ giữ. Nếu default, cũng áp dụng default ban đầu.
         pcall(function()
             Humanoid.WalkSpeed = savedWalkSpeed
         end)
@@ -472,6 +474,17 @@ local function onCharacterAdded(char)
     table.clear(gunDropTouchedConns)
     table.clear(gunDrops)
 
+    -- Reset Highlight GunDrop khi respawn local? Thường không cần, nhưng đảm bảo dọn những drop cũ:
+    for drop, data in pairs(gunDropHighlights) do
+        if data.highlight then
+            data.highlight:Destroy()
+        end
+        if data.billboard then
+            data.billboard:Destroy()
+        end
+    end
+    table.clear(gunDropHighlights)
+
     -- Highlight đường đạn cho local player
     Character.ChildAdded:Connect(function(child)
         if child:IsA("Tool") then
@@ -479,13 +492,13 @@ local function onCharacterAdded(char)
             if toolName:find("gun") or toolName:find("revolver") then
                 child.Equipped:Connect(function()
                     child.Activated:Connect(function()
-                        if not Camera then Camera = workspace.CurrentCamera end
+                        if not Camera then Camera = Workspace.CurrentCamera end
                         local origin = Camera.CFrame.Position
                         local direction = Camera.CFrame.LookVector * 500
                         local rayParams = RaycastParams.new()
                         rayParams.FilterDescendantsInstances = {Character}
                         rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-                        local result = workspace:Raycast(origin, direction, rayParams)
+                        local result = Workspace:Raycast(origin, direction, rayParams)
                         local hitPos
                         if result and result.Position then
                             hitPos = result.Position
@@ -503,7 +516,7 @@ local function onCharacterAdded(char)
                         part.Transparency = 0.5
                         part.Size = Vector3.new(0.1, 0.1, distance)
                         part.CFrame = CFrame.new(origin, hitPos) * CFrame.new(0, 0, -distance/2)
-                        part.Parent = workspace
+                        part.Parent = Workspace
                         Debris:AddItem(part, 0.5)
                     end)
                 end)
@@ -513,7 +526,6 @@ local function onCharacterAdded(char)
 end
 LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
 if LocalPlayer.Character then
-    -- Nếu Character đã tồn tại khi script load, gọi onCharacterAdded ngay
     onCharacterAdded(LocalPlayer.Character)
 end
 
@@ -913,14 +925,14 @@ local function applyFPSBooster()
             pcall(function() obj.Scale = Vector3.new(0.1, 0.1, 0.1) end)
         end
     end
-    for _, child in ipairs(workspace:GetChildren()) do
+    for _, child in ipairs(Workspace:GetChildren()) do
         task.spawn(function()
             for _, obj in ipairs(child:GetDescendants()) do
                 optimizePart(obj)
             end
         end)
     end
-    workspace.DescendantAdded:Connect(function(obj)
+    Workspace.DescendantAdded:Connect(function(obj)
         optimizePart(obj)
     end)
     notify("FPS Booster", "FPS Booster đã bật: render đơn giản màu xám. Để restore, reload game hoặc restore thủ công.", 4)
@@ -973,6 +985,8 @@ function setupGunAuraOnDrop(drop)
         end)
         gunDropTouchedConns[drop] = conn
     end
+    -- Đồng thời thiết lập highlight GunDrop khi GunAura enable/nếu muốn luôn highlight thì tách ra riêng
+    -- Ở đây ta chỉ thiết lập highlight dựa trên hàm highlight quản lý riêng bên dưới
 end
 
 local function startGunAuraRadiusLoop()
@@ -1007,6 +1021,61 @@ local function startGunAuraRadiusLoop()
     end)
 end
 
+-- ================= Highlight GunDrop Helper =================
+-- Tạo highlight + BillboardGui trên mỗi BasePart có Name == "GunDrop"
+local function addGunDropHighlight(drop)
+    if not drop or not drop:IsA("BasePart") then return end
+    -- Nếu đã highlight trước đó, skip
+    if gunDropHighlights[drop] then return end
+    -- Highlight: outline màu xanh lá
+    local hl = Instance.new("Highlight")
+    hl.Name = "_ESP_GUNDROP_HL"
+    hl.Adornee = drop
+    hl.FillTransparency = 1
+    hl.OutlineColor = Color3.fromRGB(0, 255, 0)
+    hl.OutlineTransparency = 0.2
+    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    hl.Parent = drop
+
+    -- BillboardGui với TextLabel: "Gun drop here" màu đỏ, size lớn
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "_ESP_GUNDROP_BILLBOARD"
+    billboard.Adornee = drop
+    billboard.AlwaysOnTop = true
+    billboard.LightInfluence = 0
+    -- Điều chỉnh offset để hiển thị trên đỉnh của drop. Có thể điều chỉnh Y tăng thêm nếu drop thấp
+    billboard.StudsOffset = Vector3.new(0, 2, 0)
+    billboard.Size = UDim2.new(0, 200, 0, 50)  -- rộng 200px, cao 50px
+    billboard.Parent = drop
+
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Name = "GunDropLabel"
+    textLabel.Size = UDim2.new(1, 0, 1, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Text = "Gun drop here"
+    textLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+    textLabel.Font = Enum.Font.GothamBold
+    textLabel.TextSize = 24
+    textLabel.TextScaled = false
+    textLabel.TextStrokeTransparency = 0.5
+    textLabel.Parent = billboard
+
+    gunDropHighlights[drop] = {highlight = hl, billboard = billboard}
+end
+
+local function removeGunDropHighlight(drop)
+    local data = gunDropHighlights[drop]
+    if data then
+        if data.highlight then
+            data.highlight:Destroy()
+        end
+        if data.billboard then
+            data.billboard:Destroy()
+        end
+        gunDropHighlights[drop] = nil
+    end
+end
+
 -- ================= UI Controls =================
 inputRow = 0
 -- Movement Settings
@@ -1024,10 +1093,10 @@ createInput("JumpPower", function() return savedJumpPower end, function(v)
     end
 end)
 createInput("FOV", function()
-    if workspace.CurrentCamera then return workspace.CurrentCamera.FieldOfView end
+    if Workspace.CurrentCamera then return Workspace.CurrentCamera.FieldOfView end
     return 70
 end, function(v)
-    if workspace.CurrentCamera then workspace.CurrentCamera.FieldOfView = v end
+    if Workspace.CurrentCamera then Workspace.CurrentCamera.FieldOfView = v end
 end)
 
 -- Health & Semi-God
@@ -1082,9 +1151,11 @@ createSection("Gun Aura Settings")
 createSwitch("Gun Aura (Touched + Radius)", function(on)
     gunAuraEnabled = on
     if on then
-        for _, obj in ipairs(workspace:GetDescendants()) do
+        for _, obj in ipairs(Workspace:GetDescendants()) do
             if obj:IsA("BasePart") and obj.Name == "GunDrop" then
                 setupGunAuraOnDrop(obj)
+                -- Khi bật GunAura, cũng highlight GunDrop nếu muốn:
+                addGunDropHighlight(obj)
             end
         end
         startGunAuraRadiusLoop()
@@ -1094,6 +1165,8 @@ createSwitch("Gun Aura (Touched + Radius)", function(on)
         for drop, _ in pairs(gunDrops) do
             cleanupGunAuraForDrop(drop)
         end
+        -- Khi tắt GunAura, có thể vẫn giữ highlight GunDrop hay xóa? Ở đây ta giữ highlight, nếu muốn xóa, uncomment:
+        -- for drop,_ in pairs(gunDropHighlights) do removeGunDropHighlight(drop) end
         notify("Gun Aura", "Gun Aura đã tắt.", 3)
     end
 end)
@@ -1124,14 +1197,18 @@ Players.PlayerAdded:Connect(function(player)
     setupDeathNotification(player)
 end)
 
--- ================= Listen workspace drop events cho GunAura =================
-workspace.DescendantAdded:Connect(function(obj)
+-- ================= Listen workspace drop events cho GunAura & GunDrop highlight =================
+Workspace.DescendantAdded:Connect(function(obj)
     if obj:IsA("BasePart") and obj.Name == "GunDrop" then
         setupGunAuraOnDrop(obj)
+        -- Khi có GunDrop mới, luôn thêm highlight
+        addGunDropHighlight(obj)
     end
 end)
-workspace.DescendantRemoving:Connect(function(obj)
+Workspace.DescendantRemoving:Connect(function(obj)
     if obj:IsA("BasePart") and obj.Name == "GunDrop" then
         cleanupGunAuraForDrop(obj)
+        -- Xóa highlight khi GunDrop biến mất
+        removeGunDropHighlight(obj)
     end
 end)
