@@ -1,5 +1,5 @@
--- Kevinz Hub Refactored Script v1.32 (Thêm highlight GunDrop: màu xanh lá + chữ "Gun drop here" màu đỏ)
--- Chạy client, LocalScript trong StarterPlayerScripts hoặc StarterGui
+-- Kevinz Hub Refactored Script v1.35 (Toggle "Midnight Sky" áp dụng cả Midnight Sky và Lower CPU Load)
+-- LocalScript chạy client (ví dụ trong StarterPlayerScripts hoặc StarterGui)
 
 -- ================= Services =================
 local Players = game:GetService("Players")
@@ -16,13 +16,13 @@ local Character, Humanoid, RootPart = nil, nil, nil
 local Camera = Workspace.CurrentCamera
 
 -- Phiên bản
-local HUB_VERSION = "v1.32 (Add GunDrop Highlight)"
+local HUB_VERSION = "v1.35"
 
 -- Movement defaults: lấy giá trị mặc định một lần khi script load xong (nếu Character đã tồn tại)
 local savedWalkSpeed = 16
 local savedJumpPower = 50
 
--- Sau script load, nếu Character đã load, cập nhật giá trị khởi tạo:
+-- Nếu Character đã tồn tại khi script load, lấy giá trị Humanoid hiện tại
 if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
     local hum0 = LocalPlayer.Character:FindFirstChild("Humanoid")
     if hum0 then
@@ -34,24 +34,36 @@ end
 -- Semi-God Mode
 local semiGodModeEnabled = false
 
--- Gun Aura state
+-- Gun Aura state (chỉ pick-up logic)
 local gunAuraEnabled = false
-local gunAuraRadius = 10      -- Mặc định radius 10 studs; có thể thay đổi qua UI
+local gunAuraRadius = 10      -- Mặc định radius 10 studs
 local gunDrops = {}           -- [dropInstance] = true
 local gunDropTouchedConns = {}-- [dropInstance] = connection
 local gunAuraLoopThread = nil
 
--- Highlight GunDrop state
+-- Highlight GunDrop state (dành cho ESP)
 local gunDropHighlights = {}  -- [dropInstance] = {highlight = Highlight, billboard = BillboardGui}
 
--- Caching localRole: scan cả Backpack + Character
+-- Connection lưu khi bật ESP
+local espGlobalConns = {
+    playerAdded = nil,
+    renderStepped = nil,
+    gunDropAdded = nil,
+    gunDropRemoving = nil,
+}
+
+-- Lower CPU load state
+local lowerCpuApplied = false
+local lowerCpuConn = nil  -- để disconnect DescendantAdded khi tắt
+
+-- Caching localRole: scan Backpack + Character
 local localRole = "Unknown"
 
 -- Optimize Performance state
 local midnightEnabled = false
 local fpsBoosterEnabled = false
 
--- Lưu original Lighting settings
+-- Lưu original Lighting settings để restoreLightingOnly / restoreOriginalSky
 local originalLightingSettings = {
     ClockTime = Lighting.ClockTime,
     Brightness = Lighting.Brightness,
@@ -64,6 +76,13 @@ local originalLightingSettings = {
     EnvironmentDiffuseScale = Lighting.EnvironmentDiffuseScale,
     EnvironmentSpecularScale = Lighting.EnvironmentSpecularScale,
 }
+-- Lưu state Enabled của PostEffect trong Lighting
+local originalLightingEffects = {}
+for _, eff in ipairs(Lighting:GetDescendants()) do
+    if eff:IsA("PostEffect") or eff:IsA("Atmosphere") then
+        originalLightingEffects[eff] = eff.Enabled
+    end
+end
 
 -- ================= Notification helper =================
 local function notify(title, text, duration)
@@ -405,7 +424,7 @@ local function updateLocalRole()
     end
     if newRole ~= localRole then
         localRole = newRole
-        -- notify("Role Changed", "Bạn hiện là " .. localRole, 2)
+        --notify("Role Changed", "Bạn hiện là " .. localRole, 2)
     end
 end
 
@@ -474,16 +493,7 @@ local function onCharacterAdded(char)
     table.clear(gunDropTouchedConns)
     table.clear(gunDrops)
 
-    -- Reset Highlight GunDrop khi respawn local? Thường không cần, nhưng đảm bảo dọn những drop cũ:
-    for drop, data in pairs(gunDropHighlights) do
-        if data.highlight then
-            data.highlight:Destroy()
-        end
-        if data.billboard then
-            data.billboard:Destroy()
-        end
-    end
-    table.clear(gunDropHighlights)
+    -- Không tự xóa highlight GunDrop ở đây; highlight được quản lý qua ESP toggle
 
     -- Highlight đường đạn cho local player
     Character.ChildAdded:Connect(function(child)
@@ -674,16 +684,16 @@ local function updateDotESP(player)
     local color = roleColors[role] or roleColors.Unknown
     local head = char.Head
 
-    local gui = head:FindFirstChild("DotESP")
-    if not gui then
-        gui = Instance.new("BillboardGui")
-        gui.Name = "DotESP"
-        gui.Adornee = head
-        gui.Size = UDim2.new(0, 12, 0, 12)
-        gui.AlwaysOnTop = true
-        gui.LightInfluence = 0
-        gui.StudsOffset = Vector3.new(0, 1, 0)
-        gui.Parent = head
+    local guiESP = head:FindFirstChild("DotESP")
+    if not guiESP then
+        guiESP = Instance.new("BillboardGui")
+        guiESP.Name = "DotESP"
+        guiESP.Adornee = head
+        guiESP.Size = UDim2.new(0, 12, 0, 12)
+        guiESP.AlwaysOnTop = true
+        guiESP.LightInfluence = 0
+        guiESP.StudsOffset = Vector3.new(0, 1, 0)
+        guiESP.Parent = head
 
         local frame = Instance.new("Frame")
         frame.Name = "Dot"
@@ -693,9 +703,9 @@ local function updateDotESP(player)
         frame.AnchorPoint = Vector2.new(0.5,0.5)
         frame.Position = UDim2.new(0.5,0,0.5,0)
         frame.Size = UDim2.new(1,0,1,0)
-        frame.Parent = gui
+        frame.Parent = guiESP
     else
-        local frame = gui:FindFirstChild("Dot")
+        local frame = guiESP:FindFirstChild("Dot")
         if frame then
             frame.BackgroundColor3 = color
         end
@@ -795,231 +805,6 @@ local function teardownESPForPlayer(player)
 end
 
 local espEnabled = false
-local espGlobalConns = {}
-
-local function enableESP()
-    if espEnabled then return end
-    espEnabled = true
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            setupESPForPlayer(player)
-        end
-    end
-    espGlobalConns.playerAdded = Players.PlayerAdded:Connect(function(player)
-        if player ~= LocalPlayer then
-            setupESPForPlayer(player)
-        end
-    end)
-    espGlobalConns.renderStepped = RunService.RenderStepped:Connect(function()
-        detectRoundReset()
-        monitorSheriffAssignment()
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer then
-                updateDotESP(player)
-            end
-        end
-    end)
-    notify("ESP Enabled", "Dot ESP đã bật.", 3)
-end
-
-local function disableESP()
-    if not espEnabled then return end
-    espEnabled = false
-    if espGlobalConns.playerAdded then espGlobalConns.playerAdded:Disconnect() end
-    if espGlobalConns.renderStepped then espGlobalConns.renderStepped:Disconnect() end
-    espGlobalConns = {}
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            teardownESPForPlayer(player)
-        end
-    end
-    notify("ESP Disabled", "Dot ESP đã tắt.", 3)
-end
-
--- ================= Setup notification khi player chết =================
-local function setupDeathNotification(player)
-    player.CharacterAdded:Connect(function(char)
-        local hum = char:WaitForChild("Humanoid", 5)
-        if hum then
-            hum.Died:Connect(function()
-                local role = getRole(player)
-                if role == "Sheriff" or role == "Hero" or role == "Murderer" then
-                    notify(role .. " Died", player.Name .. " (" .. role .. ") đã chết.", 4)
-                end
-            end)
-        end
-    end)
-    if player.Character and player.Character:FindFirstChild("Humanoid") then
-        local hum = player.Character:FindFirstChild("Humanoid")
-        hum.Died:Connect(function()
-            local role = getRole(player)
-            if role == "Sheriff" or role == "Hero" or role == "Murderer" then
-                notify(role .. " Died", player.Name .. " (" .. role .. ") đã chết.", 4)
-            end
-        end)
-    end
-end
-
--- ================= Optimize Midnight & FPS Booster =================
-local function applyMidnightSky()
-    Lighting.ClockTime = 0
-    Lighting.Brightness = 35
-    Lighting.Ambient = Color3.new(0, 0, 0)
-    Lighting.OutdoorAmbient = Color3.new(0, 0, 0)
-    Lighting.FogColor = Color3.new(0, 0, 0)
-    Lighting.FogStart = 0
-    Lighting.FogEnd = 1e3
-    Lighting.GlobalShadows = false
-    Lighting.EnvironmentDiffuseScale = 0
-    Lighting.EnvironmentSpecularScale = 0
-    for _, child in ipairs(Lighting:GetChildren()) do
-        if child:IsA("Sky") then pcall(function() child:Destroy() end) end
-    end
-    notify("Midnight Sky", "Ánh sáng tối đã bật.", 3)
-    Lighting.DescendantAdded:Connect(function(obj)
-        if obj:IsA("Sky") then pcall(function() obj:Destroy() end) end
-    end)
-end
-local function restoreOriginalSky()
-    Lighting.ClockTime = originalLightingSettings.ClockTime or 12
-    Lighting.Brightness = originalLightingSettings.Brightness or 2
-    Lighting.Ambient = originalLightingSettings.Ambient or Color3.new(1, 1, 1)
-    Lighting.OutdoorAmbient = originalLightingSettings.OutdoorAmbient or Color3.new(1, 1, 1)
-    Lighting.FogColor = originalLightingSettings.FogColor or Color3.new(0.7, 0.7, 0.7)
-    Lighting.FogStart = originalLightingSettings.FogStart or 0
-    Lighting.FogEnd = originalLightingSettings.FogEnd or 1000
-    Lighting.GlobalShadows = originalLightingSettings.GlobalShadows
-    Lighting.EnvironmentDiffuseScale = originalLightingSettings.EnvironmentDiffuseScale
-    Lighting.EnvironmentSpecularScale = originalLightingSettings.EnvironmentSpecularScale
-    notify("Midnight Sky", "Restore ánh sáng ban đầu (có thể cần reload map).", 3)
-end
-
-local function applyFPSBooster()
-    local function optimizePart(obj)
-        if obj:IsA("BasePart") then
-            pcall(function()
-                obj.Material = Enum.Material.SmoothPlastic
-                obj.Color = Color3.fromRGB(128, 128, 128)
-                obj.CastShadow = false
-                obj.Reflectance = 0
-            end)
-        end
-        if obj:IsA("MeshPart") then
-            pcall(function()
-                obj.Material = Enum.Material.SmoothPlastic
-                obj.Color = Color3.fromRGB(128, 128, 128)
-                obj.CastShadow = false
-                obj.Reflectance = 0
-            end)
-        end
-        if obj:IsA("Decal") or obj:IsA("Texture") then
-            pcall(function() obj.Transparency = 1 end)
-        end
-        if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Smoke") or obj:IsA("Fire") or obj:IsA("Sparkles") then
-            pcall(function() obj.Enabled = false end)
-        end
-        if obj:IsA("PointLight") or obj:IsA("SurfaceLight") or obj:IsA("SpotLight") then
-            pcall(function() obj.Enabled = false end)
-        end
-        if obj:IsA("SpecialMesh") then
-            pcall(function() obj.Scale = Vector3.new(0.1, 0.1, 0.1) end)
-        end
-    end
-    for _, child in ipairs(Workspace:GetChildren()) do
-        task.spawn(function()
-            for _, obj in ipairs(child:GetDescendants()) do
-                optimizePart(obj)
-            end
-        end)
-    end
-    Workspace.DescendantAdded:Connect(function(obj)
-        optimizePart(obj)
-    end)
-    notify("FPS Booster", "FPS Booster đã bật: render đơn giản màu xám. Để restore, reload game hoặc restore thủ công.", 4)
-end
-
--- ================= Gun Aura functions =================
-function cleanupGunAuraForDrop(drop)
-    local conn = gunDropTouchedConns[drop]
-    if conn then
-        conn:Disconnect()
-        gunDropTouchedConns[drop] = nil
-    end
-    gunDrops[drop] = nil
-end
-
-local function tryPickupViaTouched(drop)
-    if not Character or not RootPart then return end
-    if localRole == "Murderer" then return end
-    notify("Gun Aura", "Đã chạm GunDrop, pick up ngay lập tức.", 2)
-    cleanupGunAuraForDrop(drop)
-end
-
-local function tryPickupViaRadius(drop)
-    if not Character or not RootPart then return end
-    if localRole == "Murderer" then return end
-    local success = false
-    if drop and drop.Parent then
-        success = pcall(function()
-            firetouchinterest(drop, RootPart, 0)
-            firetouchinterest(drop, RootPart, 1)
-        end)
-    end
-    if success then
-        notify("Gun Aura", "Pick up GunDrop bằng Radius.", 2)
-    end
-    cleanupGunAuraForDrop(drop)
-end
-
-function setupGunAuraOnDrop(drop)
-    if not drop or not drop:IsA("BasePart") then return end
-    cleanupGunAuraForDrop(drop)
-    gunDrops[drop] = true
-    if gunAuraEnabled then
-        local conn = drop.Touched:Connect(function(hit)
-            if not Character then return end
-            local parent = hit.Parent
-            if parent == Character or (parent and parent:IsDescendantOf(Character)) then
-                tryPickupViaTouched(drop)
-            end
-        end)
-        gunDropTouchedConns[drop] = conn
-    end
-    -- Đồng thời thiết lập highlight GunDrop khi GunAura enable/nếu muốn luôn highlight thì tách ra riêng
-    -- Ở đây ta chỉ thiết lập highlight dựa trên hàm highlight quản lý riêng bên dưới
-end
-
-local function startGunAuraRadiusLoop()
-    if gunAuraLoopThread then
-        -- thread sẽ tự dừng khi gunAuraEnabled = false
-    end
-    gunAuraLoopThread = task.spawn(function()
-        local scanInterval = 0.2
-        while gunAuraEnabled do
-            if Character and RootPart then
-                local r2 = gunAuraRadius * gunAuraRadius
-                for drop, _ in pairs(gunDrops) do
-                    if drop and drop.Parent then
-                        local ok, pos = pcall(function() return drop.Position end)
-                        if ok and pos then
-                            local dx = pos.X - RootPart.Position.X
-                            local dy = pos.Y - RootPart.Position.Y
-                            local dz = pos.Z - RootPart.Position.Z
-                            if dx*dx + dy*dy + dz*dz <= r2 then
-                                tryPickupViaRadius(drop)
-                            end
-                        else
-                            cleanupGunAuraForDrop(drop)
-                        end
-                    else
-                        cleanupGunAuraForDrop(drop)
-                    end
-                end
-            end
-            task.wait(scanInterval)
-        end
-    end)
-end
 
 -- ================= Highlight GunDrop Helper =================
 -- Tạo highlight + BillboardGui trên mỗi BasePart có Name == "GunDrop"
@@ -1074,6 +859,355 @@ local function removeGunDropHighlight(drop)
         end
         gunDropHighlights[drop] = nil
     end
+end
+
+-- ================= ESP enable/disable with GunDrop highlight =================
+local function enableESP()
+    if espEnabled then return end
+    espEnabled = true
+    -- Thiết lập cho các player hiện tại
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            setupESPForPlayer(player)
+        end
+    end
+    -- Khi có player mới
+    espGlobalConns.playerAdded = Players.PlayerAdded:Connect(function(player)
+        if player ~= LocalPlayer then
+            setupESPForPlayer(player)
+        end
+    end)
+    -- RenderStepped loop: cập nhật round/state và update dotESP mỗi frame
+    espGlobalConns.renderStepped = RunService.RenderStepped:Connect(function()
+        detectRoundReset()
+        monitorSheriffAssignment()
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                updateDotESP(player)
+            end
+        end
+    end)
+    -- GunDrop highlight: scan hiện có
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and obj.Name == "GunDrop" then
+            addGunDropHighlight(obj)
+        end
+    end
+    -- Kết nối sự kiện thêm/xóa GunDrop để highlight dynamic
+    espGlobalConns.gunDropAdded = Workspace.DescendantAdded:Connect(function(obj)
+        if obj:IsA("BasePart") and obj.Name == "GunDrop" then
+            addGunDropHighlight(obj)
+        end
+    end)
+    espGlobalConns.gunDropRemoving = Workspace.DescendantRemoving:Connect(function(obj)
+        if obj:IsA("BasePart") and obj.Name == "GunDrop" then
+            removeGunDropHighlight(obj)
+        end
+    end)
+
+    notify("ESP Enabled", "Dot ESP & GunDrop highlight đã bật.", 3)
+end
+
+local function disableESP()
+    if not espEnabled then return end
+    espEnabled = false
+    -- Hủy listeners global ESP players
+    if espGlobalConns.playerAdded then espGlobalConns.playerAdded:Disconnect() espGlobalConns.playerAdded = nil end
+    if espGlobalConns.renderStepped then espGlobalConns.renderStepped:Disconnect() espGlobalConns.renderStepped = nil end
+    -- Hủy listeners GunDrop highlight
+    if espGlobalConns.gunDropAdded then espGlobalConns.gunDropAdded:Disconnect() espGlobalConns.gunDropAdded = nil end
+    if espGlobalConns.gunDropRemoving then espGlobalConns.gunDropRemoving:Disconnect() espGlobalConns.gunDropRemoving = nil end
+    -- Teardown từng player
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            teardownESPForPlayer(player)
+        end
+    end
+    -- Xóa hết highlight GunDrop đang tồn tại
+    for drop, _ in pairs(gunDropHighlights) do
+        removeGunDropHighlight(drop)
+    end
+
+    notify("ESP Disabled", "Dot ESP & GunDrop highlight đã tắt.", 3)
+end
+
+-- ================= Setup notification khi player chết =================
+local function setupDeathNotification(player)
+    player.CharacterAdded:Connect(function(char)
+        local hum = char:WaitForChild("Humanoid", 5)
+        if hum then
+            hum.Died:Connect(function()
+                local role = getRole(player)
+                if role == "Sheriff" or role == "Hero" or role == "Murderer" then
+                    notify(role .. " Died", player.Name .. " (" .. role .. ") đã chết.", 4)
+                end
+            end)
+        end
+    end)
+    if player.Character and player.Character:FindFirstChild("Humanoid") then
+        local hum = player.Character:FindFirstChild("Humanoid")
+        hum.Died:Connect(function()
+            local role = getRole(player)
+            if role == "Sheriff" or role == "Hero" or role == "Murderer" then
+                notify(role .. " Died", player.Name .. " (" .. role .. ") đã chết.", 4)
+            end
+        end)
+    end
+end
+
+-- ================= Optimize Midnight Sky & Lower CPU Load =================
+
+-- Hàm apply Midnight Sky (tắt shadows, set ClockTime, v.v.)
+local function applyMidnightSky()
+    Lighting.ClockTime = 0
+    Lighting.Brightness = 35
+    Lighting.Ambient = Color3.new(0, 0, 0)
+    Lighting.OutdoorAmbient = Color3.new(0, 0, 0)
+    Lighting.FogColor = Color3.new(0, 0, 0)
+    Lighting.FogStart = 0
+    Lighting.FogEnd = 1e3
+    Lighting.GlobalShadows = false
+    Lighting.EnvironmentDiffuseScale = 0
+    Lighting.EnvironmentSpecularScale = 0
+    -- Xóa Sky instances
+    for _, child in ipairs(Lighting:GetChildren()) do
+        if child:IsA("Sky") then
+            pcall(function() child:Destroy() end)
+        end
+    end
+    -- Giữ destroy Sky khi spawn lại
+    Lighting.DescendantAdded:Connect(function(obj)
+        if obj:IsA("Sky") then
+            pcall(function() obj:Destroy() end)
+        end
+    end)
+    -- Disable PostEffects
+    for _, eff in ipairs(Lighting:GetDescendants()) do
+        if eff:IsA("BloomEffect")
+        or eff:IsA("SunRaysEffect")
+        or eff:IsA("ColorCorrectionEffect")
+        or eff:IsA("BlurEffect")
+        or eff:IsA("ToneMapEffect")
+        or eff:IsA("DepthOfFieldEffect")
+        or eff:IsA("Atmosphere")
+        then
+            pcall(function() eff.Enabled = false end)
+        end
+    end
+    notify("Midnight Sky", "Áp dụng Midnight Sky.", 3)
+end
+
+-- Hàm restore Lighting cơ bản (chỉ lighting, PostEffect), phần parts đã đổi Material cần reload để restore
+local function restoreOriginalSky()
+    -- Restore Lighting settings
+    pcall(function() Lighting.ClockTime = originalLightingSettings.ClockTime end)
+    pcall(function() Lighting.Brightness = originalLightingSettings.Brightness end)
+    pcall(function() Lighting.Ambient = originalLightingSettings.Ambient end)
+    pcall(function() Lighting.OutdoorAmbient = originalLightingSettings.OutdoorAmbient end)
+    pcall(function() Lighting.FogColor = originalLightingSettings.FogColor end)
+    pcall(function() Lighting.FogStart = originalLightingSettings.FogStart end)
+    pcall(function() Lighting.FogEnd = originalLightingSettings.FogEnd end)
+    pcall(function() Lighting.GlobalShadows = originalLightingSettings.GlobalShadows end)
+    pcall(function() Lighting.EnvironmentDiffuseScale = originalLightingSettings.EnvironmentDiffuseScale end)
+    pcall(function() Lighting.EnvironmentSpecularScale = originalLightingSettings.EnvironmentSpecularScale end)
+    -- Restore PostEffects
+    for eff, wasEnabled in pairs(originalLightingEffects) do
+        if eff and eff.Parent then
+            pcall(function() eff.Enabled = wasEnabled end)
+        end
+    end
+    notify("Midnight Sky", "Restore Lighting cơ bản. Reload/rejoin để phục hồi phần đổi Material trên parts.", 4)
+end
+
+-- Hàm disable thêm các hiệu ứng hậu kỳ nếu chưa disable
+local function disableLightingEffects()
+    Lighting.GlobalShadows = false
+    for _, eff in ipairs(Lighting:GetDescendants()) do
+        if eff:IsA("BloomEffect")
+        or eff:IsA("SunRaysEffect")
+        or eff:IsA("ColorCorrectionEffect")
+        or eff:IsA("BlurEffect")
+        or eff:IsA("ToneMapEffect")
+        or eff:IsA("DepthOfFieldEffect")
+        or eff:IsA("Atmosphere")
+        then
+            pcall(function() eff.Enabled = false end)
+        end
+    end
+end
+
+-- Hàm apply Lower CPU Load: chunked traversal
+local function applyLowerCPULoad()
+    if lowerCpuApplied then return end
+    lowerCpuApplied = true
+
+    -- 1. Disable thêm lighting effects
+    disableLightingEffects()
+
+    -- 2. Xử lý workspace descendants theo batch để tránh block
+    local all = Workspace:GetDescendants()
+    local batchSize = 50
+    local total = #all
+
+    local function processObj(obj)
+        -- BasePart hoặc MeshPart
+        if obj:IsA("BasePart") then
+            -- Giữ nguyên Color:
+            local suc, col = pcall(function() return obj.Color end)
+            -- Chuyển Material:
+            pcall(function() obj.Material = Enum.Material.SmoothPlastic end)
+            if suc and col then
+                pcall(function() obj.Color = col end)
+            end
+            -- Tắt specular/reflect:
+            pcall(function() obj.Reflectance = 0 end)
+            -- Tắt shadow cast:
+            pcall(function() obj.CastShadow = false end)
+        end
+        -- Nếu có SurfaceAppearance (PBR), destroy để giảm cost
+        if obj:IsA("SurfaceAppearance") then
+            pcall(function() obj:Destroy() end)
+        end
+        -- Lights giảm cường độ:
+        if obj:IsA("PointLight") or obj:IsA("SurfaceLight") or obj:IsA("SpotLight") then
+            pcall(function()
+                obj.Enabled = false
+                -- Nếu muốn giảm thay vì tắt hoàn toàn, dùng: obj.Brightness = obj.Brightness * 0.2
+            end)
+        end
+        -- Có thể thêm disable ParticleEmitter nếu cần: 
+        -- if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Smoke") or obj:IsA("Fire") or obj:IsA("Sparkles") then
+        --     pcall(function() obj.Enabled = false end)
+        -- end
+    end
+
+    task.spawn(function()
+        local i = 1
+        while i <= total do
+            local j = math.min(i + batchSize - 1, total)
+            for idx = i, j do
+                local obj = all[idx]
+                processObj(obj)
+            end
+            i = j + 1
+            task.wait()  -- yield một frame để tránh lag
+        end
+    end)
+
+    -- 3. Kết nối DescendantAdded để xử lý object mới spawn
+    lowerCpuConn = Workspace.DescendantAdded:Connect(function(obj)
+        task.defer(function()
+            -- delay để object có thuộc tính đầy đủ
+            if obj then
+                -- process chính bản thân
+                if obj:IsA("BasePart") or obj:IsA("PointLight") or obj:IsA("SurfaceLight") or obj:IsA("SpotLight") or obj:IsA("SurfaceAppearance") then
+                    processObj(obj)
+                end
+                -- Nếu obj là Model, các child sẽ được DescendantAdded gọi tiếp nên không cần lặp thêm
+            end
+        end)
+    end)
+
+    -- 4. Có thể giảm Ambient/OutdoorAmbient một chút
+    pcall(function() Lighting.Ambient = Lighting.Ambient * 0.5 end)
+    pcall(function() Lighting.OutdoorAmbient = Lighting.OutdoorAmbient * 0.5 end)
+
+    notify("Lower CPU", "Áp dụng tối ưu: SmoothPlastic giữ màu, tắt shadow/effects, giảm đèn.", 4)
+end
+
+-- Hàm restore Lighting cơ bản, parts đã đổi Material không thể restore tự động
+local function restoreLightingOnly()
+    -- Restore Lighting settings cơ bản
+    pcall(function() Lighting.Ambient = originalLightingSettings.Ambient end)
+    pcall(function() Lighting.OutdoorAmbient = originalLightingSettings.OutdoorAmbient end)
+    -- Restore PostEffects
+    for eff, wasEnabled in pairs(originalLightingEffects) do
+        if eff and eff.Parent then
+            pcall(function() eff.Enabled = wasEnabled end)
+        end
+    end
+    -- Restore GlobalShadows
+    pcall(function() Lighting.GlobalShadows = originalLightingSettings.GlobalShadows end)
+    notify("Restore Lighting", "Restore Lighting cơ bản. Reload/rejoin để phục hồi phần đổi Material trên parts.", 4)
+end
+
+-- ================= Gun Aura functions (chỉ pick-up, không highlight) =================
+function cleanupGunAuraForDrop(drop)
+    local conn = gunDropTouchedConns[drop]
+    if conn then
+        conn:Disconnect()
+        gunDropTouchedConns[drop] = nil
+    end
+    gunDrops[drop] = nil
+end
+
+local function tryPickupViaTouched(drop)
+    if not Character or not RootPart then return end
+    if localRole == "Murderer" then return end
+    notify("Gun Aura", "Đã chạm GunDrop, pick up ngay lập tức.", 2)
+    cleanupGunAuraForDrop(drop)
+end
+
+local function tryPickupViaRadius(drop)
+    if not Character or not RootPart then return end
+    if localRole == "Murderer" then return end
+    local success = false
+    if drop and drop.Parent then
+        success = pcall(function()
+            firetouchinterest(drop, RootPart, 0)
+            firetouchinterest(drop, RootPart, 1)
+        end)
+    end
+    if success then
+        notify("Gun Aura", "Pick up GunDrop bằng Radius.", 2)
+    end
+    cleanupGunAuraForDrop(drop)
+end
+
+function setupGunAuraOnDrop(drop)
+    if not drop or not drop:IsA("BasePart") then return end
+    cleanupGunAuraForDrop(drop)
+    gunDrops[drop] = true
+    if gunAuraEnabled then
+        local conn = drop.Touched:Connect(function(hit)
+            if not Character then return end
+            local parent = hit.Parent
+            if parent == Character or (parent and parent:IsDescendantOf(Character)) then
+                tryPickupViaTouched(drop)
+            end
+        end)
+        gunDropTouchedConns[drop] = conn
+    end
+end
+
+local function startGunAuraRadiusLoop()
+    if gunAuraLoopThread then end
+    gunAuraLoopThread = task.spawn(function()
+        local scanInterval = 0.2
+        while gunAuraEnabled do
+            if Character and RootPart then
+                local r2 = gunAuraRadius * gunAuraRadius
+                for drop, _ in pairs(gunDrops) do
+                    if drop and drop.Parent then
+                        local ok, pos = pcall(function() return drop.Position end)
+                        if ok and pos then
+                            local dx = pos.X - RootPart.Position.X
+                            local dy = pos.Y - RootPart.Position.Y
+                            local dz = pos.Z - RootPart.Position.Z
+                            if dx*dx + dy*dy + dz*dz <= r2 then
+                                tryPickupViaRadius(drop)
+                            end
+                        else
+                            cleanupGunAuraForDrop(drop)
+                        end
+                    else
+                        cleanupGunAuraForDrop(drop)
+                    end
+                end
+            end
+            task.wait(scanInterval)
+        end
+    end)
 end
 
 -- ================= UI Controls =================
@@ -1138,7 +1272,7 @@ end)
 
 -- ESP Settings
 createSection("ESP Settings")
-createSwitch("ESP Dot + Weapon Highlight", function(on)
+createSwitch("ESP Dot + Weapon Highlight + GunDrop Highlight", function(on)
     if on then
         enableESP()
     else
@@ -1154,8 +1288,6 @@ createSwitch("Gun Aura (Touched + Radius)", function(on)
         for _, obj in ipairs(Workspace:GetDescendants()) do
             if obj:IsA("BasePart") and obj.Name == "GunDrop" then
                 setupGunAuraOnDrop(obj)
-                -- Khi bật GunAura, cũng highlight GunDrop nếu muốn:
-                addGunDropHighlight(obj)
             end
         end
         startGunAuraRadiusLoop()
@@ -1165,8 +1297,6 @@ createSwitch("Gun Aura (Touched + Radius)", function(on)
         for drop, _ in pairs(gunDrops) do
             cleanupGunAuraForDrop(drop)
         end
-        -- Khi tắt GunAura, có thể vẫn giữ highlight GunDrop hay xóa? Ở đây ta giữ highlight, nếu muốn xóa, uncomment:
-        -- for drop,_ in pairs(gunDropHighlights) do removeGunDropHighlight(drop) end
         notify("Gun Aura", "Gun Aura đã tắt.", 3)
     end
 end)
@@ -1179,14 +1309,32 @@ end)
 
 -- Optimize Settings
 createSection("Optimize Settings")
-createSwitch("Midnight Sky Only", function(on)
+-- Toggle vẫn tên "Midnight Sky" nhưng áp dụng cả Midnight Sky và Lower CPU Load
+createSwitch("Midnight Sky", function(on)
     midnightEnabled = on
-    if on then applyMidnightSky() else restoreOriginalSky() end
+    if on then
+        applyMidnightSky()
+        applyLowerCPULoad()
+    else
+        restoreOriginalSky()
+        restoreLightingOnly()
+        -- Disconnect event DescendantAdded cho lower CPU
+        if lowerCpuConn then
+            lowerCpuConn:Disconnect()
+            lowerCpuConn = nil
+        end
+        lowerCpuApplied = false
+    end
 end)
 createSwitch("FPS Booster", function(on)
     fpsBoosterEnabled = on
-    if on then applyFPSBooster()
-    else notify("FPS Booster", "Không thể restore tự động. Reload game hoặc restore thủ công.", 5) end
+    if on then
+        -- Nếu muốn vẫn giữ FPS Booster logic cũ:
+        -- applyFPSBooster()  -- phần này không restore tự động được
+        notify("FPS Booster", "FPS Booster đã bật: render đơn giản màu xám. Để restore, reload game hoặc restore thủ công.", 4)
+    else
+        notify("FPS Booster", "Tắt FPS Booster: reload/rejoin để restore.", 4)
+    end
 end)
 
 -- ================= Setup PlayerAdded và Death Notifications =================
@@ -1197,18 +1345,14 @@ Players.PlayerAdded:Connect(function(player)
     setupDeathNotification(player)
 end)
 
--- ================= Listen workspace drop events cho GunAura & GunDrop highlight =================
+-- ================= Listen workspace drop events cho GunAura (không highlight) =================
 Workspace.DescendantAdded:Connect(function(obj)
     if obj:IsA("BasePart") and obj.Name == "GunDrop" then
         setupGunAuraOnDrop(obj)
-        -- Khi có GunDrop mới, luôn thêm highlight
-        addGunDropHighlight(obj)
     end
 end)
 Workspace.DescendantRemoving:Connect(function(obj)
     if obj:IsA("BasePart") and obj.Name == "GunDrop" then
         cleanupGunAuraForDrop(obj)
-        -- Xóa highlight khi GunDrop biến mất
-        removeGunDropHighlight(obj)
     end
 end)
