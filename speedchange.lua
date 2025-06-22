@@ -1,4 +1,4 @@
--- Kevinz Hub Full Script v1.37 (Sidebar Tab UI with Emoji Icons, Dynamic Lighting Transitions, Event Cleanup)
+-- Kevinz Hub Full Script v1.38 (Sidebar Tab UI with Emoji Icons, Dynamic Lighting Transitions, Event Cleanup, MiniToggle fix)
 -- Place this LocalScript in StarterPlayerScripts or StarterGui
 
 -- Services
@@ -14,7 +14,7 @@ local Workspace = workspace
 local LocalPlayer = Players.LocalPlayer
 local Character, Humanoid, RootPart = nil, nil, nil
 local Camera = Workspace.CurrentCamera
-local HUB_VERSION = "v1.37"
+local HUB_VERSION = "v1.38"
 
 -- Movement defaults
 local savedWalkSpeed = 16
@@ -832,13 +832,14 @@ Workspace.DescendantRemoving:Connect(function(obj)
     end
 end)
 
--- UI: Sidebar Tab with Emoji
+-- UI: Sidebar Tab with Emoji, MiniToggle support
 local gui = Instance.new("ScreenGui")
 gui.Name = "KevinzHub"
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.ResetOnSpawn = false
 gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
+-- Main window
 local window = Instance.new("Frame")
 window.Name = "MainWindow"
 window.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -856,6 +857,23 @@ do
     stroke.Thickness = 1
 end
 
+-- MiniToggle button (shows '+' when window minimized)
+local miniToggle = Instance.new("TextButton")
+miniToggle.Name = "MiniToggle"
+miniToggle.Size = UDim2.new(0, 28, 0, 28)
+miniToggle.AnchorPoint = Vector2.new(0, 1)
+miniToggle.Position = UDim2.new(0, 0, 1, 0)  -- bottom-left corner of screen
+miniToggle.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+miniToggle.Text = "+"
+miniToggle.Font = Enum.Font.GothamBold
+miniToggle.TextSize = 16
+miniToggle.TextColor3 = Color3.fromRGB(240, 240, 240)
+miniToggle.AutoButtonColor = false
+Instance.new("UICorner", miniToggle).CornerRadius = UDim.new(1, 0)
+miniToggle.Visible = false
+miniToggle.Parent = gui
+
+-- TopBar (draggable, close/minimize)
 local topBar = Instance.new("Frame", window)
 topBar.Name = "TopBar"
 topBar.Size = UDim2.new(1, 0, 0, 30)
@@ -908,6 +926,7 @@ do
     minimizeButton.LayoutOrder = 3
     minimizeButton.MouseButton1Click:Connect(function()
         window.Visible = false
+        miniToggle.Visible = true
     end)
 
     local closeScriptButton = Instance.new("TextButton", topBar)
@@ -926,11 +945,12 @@ do
     end)
 end
 
+-- Drag window
 do
     local dragging = false
     local dragStart, startPos
     topBar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if window.Visible and input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = true
             dragStart = input.Position
             startPos = window.Position
@@ -942,7 +962,7 @@ do
         end
     end)
     topBar.InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        if dragging and window.Visible and input.UserInputType == Enum.UserInputType.MouseMovement then
             local delta = input.Position - dragStart
             window.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
                                         startPos.Y.Scale, startPos.Y.Offset + delta.Y)
@@ -950,6 +970,13 @@ do
     end)
 end
 
+-- MiniToggle click to restore window
+miniToggle.MouseButton1Click:Connect(function()
+    window.Visible = true
+    miniToggle.Visible = false
+end)
+
+-- Sidebar & ContentContainer
 local sidebar = Instance.new("Frame", window)
 sidebar.Name = "Sidebar"
 sidebar.Size = UDim2.new(0, 120, 1, -30)
@@ -974,7 +1001,7 @@ local sidebarPadding = Instance.new("UIPadding", sidebar)
 sidebarPadding.PaddingTop = UDim.new(0, 8)
 sidebarPadding.PaddingBottom = UDim.new(0, 8)
 sidebarPadding.PaddingLeft = UDim.new(0, 4)
-sidebarPadding.PaddingRight = Instance.new("UIPadding", sidebar)
+sidebarPadding.PaddingRight = UDim.new(0, 4)
 
 local tabs = {
     { Name = "Movement", Emoji = "🏃" },
@@ -1046,8 +1073,8 @@ for index, tabInfo in ipairs(tabs) do
     local pad = Instance.new("UIPadding", frame)
     pad.PaddingTop = UDim.new(0, 8)
     pad.PaddingBottom = UDim.new(0, 8)
-    pad.PaddingLeft = Instance.new("UIPadding", frame)
-    pad.PaddingRight = UDim.new("UIPadding", frame)
+    pad.PaddingLeft = UDim.new(0, 8)
+    pad.PaddingRight = UDim.new(0, 8)
 
     btn.MouseEnter:Connect(function()
         if not frame.Visible then
