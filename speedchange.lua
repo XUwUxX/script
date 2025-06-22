@@ -1,4 +1,4 @@
--- Kevinz Hub Full Script v1.39 (Sidebar Tab UI with Emoji Icons, Dynamic Lighting Transitions, Event Cleanup, Scrollable Sidebar & Content, Improved Theme Sync)
+-- Kevinz Hub Full Script v1.38 (Sidebar Tab UI with Emoji Icons, Dynamic Lighting Transitions, Event Cleanup, MiniToggle fix)
 -- Place this LocalScript in StarterPlayerScripts or StarterGui
 
 -- Services
@@ -14,7 +14,7 @@ local Workspace = workspace
 local LocalPlayer = Players.LocalPlayer
 local Character, Humanoid, RootPart = nil, nil, nil
 local Camera = Workspace.CurrentCamera
-local HUB_VERSION = "v1.39"
+local HUB_VERSION = "v1.38"
 
 -- Movement defaults
 local savedWalkSpeed = 16
@@ -174,7 +174,6 @@ local function onCharacterAdded(char)
             end
         end)
     end
-    -- Cleanup gun aura listeners on respawn
     for drop, conn in pairs(gunDropTouchedConns) do
         if conn then conn:Disconnect() end
     end
@@ -833,7 +832,7 @@ Workspace.DescendantRemoving:Connect(function(obj)
     end
 end)
 
--- UI: Sidebar Tab with Emoji, Scrollable Sidebar & Content, MiniToggle support, Improved Theme Sync
+-- UI: Sidebar Tab with Emoji, MiniToggle support
 local gui = Instance.new("ScreenGui")
 gui.Name = "KevinzHub"
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
@@ -978,16 +977,12 @@ miniToggle.MouseButton1Click:Connect(function()
 end)
 
 -- Sidebar & ContentContainer
--- Sidebar is now a ScrollingFrame for scrollable tabs
-local sidebar = Instance.new("ScrollingFrame", window)
+local sidebar = Instance.new("Frame", window)
 sidebar.Name = "Sidebar"
 sidebar.Size = UDim2.new(0, 120, 1, -30)
 sidebar.Position = UDim2.new(0, 0, 0, 30)
 sidebar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 sidebar.BorderSizePixel = 0
-sidebar.CanvasSize = UDim2.new(0, 0, 0, 0)
-sidebar.AutomaticCanvasSize = Enum.AutomaticSize.Y
-sidebar.ScrollBarThickness = 6
 Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 8)
 
 local contentContainer = Instance.new("Frame", window)
@@ -1008,7 +1003,6 @@ sidebarPadding.PaddingBottom = UDim.new(0, 8)
 sidebarPadding.PaddingLeft = UDim.new(0, 4)
 sidebarPadding.PaddingRight = UDim.new(0, 4)
 
--- Tabs definition
 local tabs = {
     { Name = "Movement", Emoji = "🏃" },
     { Name = "ESP",      Emoji = "🔍" },
@@ -1020,37 +1014,15 @@ local tabs = {
 local tabButtons = {}
 local tabContentFrames = {}
 
--- Theme state
-local isDarkTheme = true
-
--- Helper to update active button appearance according to theme
-local function updateButtonAppearance(btn, active)
-    if isDarkTheme then
-        if active then
-            btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-        else
-            btn.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-        end
-        local icon = btn:FindFirstChild("IconEmoji")
-        if icon then icon.TextColor3 = Color3.fromRGB(230, 230, 230) end
-        local lbl = btn:FindFirstChild("Label")
-        if lbl then lbl.TextColor3 = Color3.fromRGB(230, 230, 230) end
+local function setButtonActive(button, active)
+    if active then
+        button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     else
-        if active then
-            btn.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
-        else
-            btn.BackgroundColor3 = Color3.fromRGB(245, 245, 245)
-        end
-        local icon = btn:FindFirstChild("IconEmoji")
-        if icon then icon.TextColor3 = Color3.fromRGB(20, 20, 20) end
-        local lbl = btn:FindFirstChild("Label")
-        if lbl then lbl.TextColor3 = Color3.fromRGB(20, 20, 20) end
+        button.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
     end
 end
 
--- Create tabs and content frames
 for index, tabInfo in ipairs(tabs) do
-    -- Sidebar button
     local btn = Instance.new("TextButton")
     btn.Name = "TabBtn_" .. tabInfo.Name
     btn.Size = UDim2.new(1, 0, 0, 40)
@@ -1084,7 +1056,6 @@ for index, tabInfo in ipairs(tabs) do
     lbl.TextSize = 14
     lbl.TextXAlignment = Enum.TextXAlignment.Left
 
-    -- Content ScrollingFrame
     local frame = Instance.new("ScrollingFrame")
     frame.Name = "Content_" .. tabInfo.Name
     frame.Size = UDim2.new(1, 0, 1, 0)
@@ -1102,40 +1073,36 @@ for index, tabInfo in ipairs(tabs) do
     local pad = Instance.new("UIPadding", frame)
     pad.PaddingTop = UDim.new(0, 8)
     pad.PaddingBottom = UDim.new(0, 8)
-    pad.PaddingLeft = Instance.new("UIPadding", frame)
-    pad.PaddingRight = Instance.new("UIPadding", frame)
+    pad.PaddingLeft = UDim.new(0, 8)
+    pad.PaddingRight = UDim.new(0, 8)
 
-    -- Hover effect
     btn.MouseEnter:Connect(function()
         if not frame.Visible then
-            local hoverColor = isDarkTheme and Color3.fromRGB(35,35,35) or Color3.fromRGB(230,230,230)
-            TweenService:Create(btn, TweenInfo.new(0.1), {BackgroundColor3 = hoverColor}):Play()
+            TweenService:Create(btn, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(35,35,35)}):Play()
         end
     end)
     btn.MouseLeave:Connect(function()
         if not frame.Visible then
-            updateButtonAppearance(btn, false)
+            TweenService:Create(btn, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(25,25,25)}):Play()
         end
     end)
 
-    -- Click handler
     btn.MouseButton1Click:Connect(function()
         for name, f in pairs(tabContentFrames) do
             f.Visible = false
-            updateButtonAppearance(tabButtons[name], false)
+            setButtonActive(tabButtons[name], false)
         end
         frame.Visible = true
-        updateButtonAppearance(btn, true)
+        setButtonActive(btn, true)
     end)
 
     tabButtons[tabInfo.Name] = btn
     tabContentFrames[tabInfo.Name] = frame
 end
 
--- Default select first tab
 if #tabs > 0 then
     local firstName = tabs[1].Name
-    updateButtonAppearance(tabButtons[firstName], true)
+    tabButtons[firstName].BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     tabContentFrames[firstName].Visible = true
 end
 
@@ -1143,7 +1110,7 @@ end
 local function createInput(parent, labelText, getDefault, callback)
     local container = Instance.new("Frame")
     container.Size = UDim2.new(1, 0, 0, 30)
-    container.BackgroundColor3 = isDarkTheme and Color3.fromRGB(35, 35, 35) or Color3.fromRGB(240,240,240)
+    container.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
     container.BorderSizePixel = 0
     Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
     container.LayoutOrder = (#parent:GetChildren()) + 1
@@ -1155,7 +1122,7 @@ local function createInput(parent, labelText, getDefault, callback)
     label.Position = UDim2.new(0, 8, 0, 0)
     label.BackgroundTransparency = 1
     label.Text = labelText
-    label.TextColor3 = isDarkTheme and Color3.fromRGB(230, 230, 230) or Color3.fromRGB(20,20,20)
+    label.TextColor3 = Color3.fromRGB(230, 230, 230)
     label.Font = Enum.Font.Gotham
     label.TextSize = 14
     label.TextXAlignment = Enum.TextXAlignment.Left
@@ -1164,8 +1131,8 @@ local function createInput(parent, labelText, getDefault, callback)
     input.Name = "TextBox"
     input.Size = UDim2.new(0.6, -16, 1, -4)
     input.Position = UDim2.new(0.4, 8, 0, 2)
-    input.BackgroundColor3 = isDarkTheme and Color3.fromRGB(50, 50, 50) or Color3.fromRGB(240,240,240)
-    input.TextColor3 = isDarkTheme and Color3.fromRGB(240, 240, 240) or Color3.fromRGB(20,20,20)
+    input.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    input.TextColor3 = Color3.fromRGB(240, 240, 240)
     input.Text = ""
     input.PlaceholderText = tostring(getDefault())
     input.ClearTextOnFocus = false
@@ -1192,7 +1159,7 @@ end
 local function createSwitch(parent, labelText, callback)
     local container = Instance.new("Frame")
     container.Size = UDim2.new(1, 0, 0, 30)
-    container.BackgroundColor3 = isDarkTheme and Color3.fromRGB(35, 35, 35) or Color3.fromRGB(240,240,240)
+    container.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
     container.BorderSizePixel = 0
     Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
     container.LayoutOrder = (#parent:GetChildren()) + 1
@@ -1204,7 +1171,7 @@ local function createSwitch(parent, labelText, callback)
     label.Position = UDim2.new(0, 8, 0, 0)
     label.BackgroundTransparency = 1
     label.Text = labelText
-    label.TextColor3 = isDarkTheme and Color3.fromRGB(230, 230, 230) or Color3.fromRGB(20,20,20)
+    label.TextColor3 = Color3.fromRGB(230, 230, 230)
     label.Font = Enum.Font.Gotham
     label.TextSize = 14
     label.TextXAlignment = Enum.TextXAlignment.Left
@@ -1328,39 +1295,49 @@ do
     local parent = tabContentFrames["Settings"]
     if parent then
         createSwitch(parent, "Dark Theme", function(on)
-            isDarkTheme = on
-            -- Update main window & sidebar backgrounds
-            if isDarkTheme then
+            if on then
                 window.BackgroundColor3 = Color3.fromRGB(20,20,20)
                 sidebar.BackgroundColor3 = Color3.fromRGB(25,25,25)
+                for _, btn in pairs(tabButtons) do
+                    btn.BackgroundColor3 = Color3.fromRGB(25,25,25)
+                    local icon = btn:FindFirstChild("IconEmoji")
+                    if icon then icon.TextColor3 = Color3.fromRGB(230,230,230) end
+                    local lbl = btn:FindFirstChild("Label")
+                    if lbl then lbl.TextColor3 = Color3.fromRGB(230,230,230) end
+                end
+                for _, frame in pairs(tabContentFrames) do
+                    for _, child in ipairs(frame:GetDescendants()) do
+                        if child:IsA("TextLabel") then
+                            child.TextColor3 = Color3.fromRGB(230,230,230)
+                        elseif child:IsA("TextBox") then
+                            child.TextColor3 = Color3.fromRGB(230,230,230)
+                            child.BackgroundColor3 = Color3.fromRGB(50,50,50)
+                        elseif child:IsA("TextButton") then
+                            child.TextColor3 = Color3.fromRGB(230,230,230)
+                            child.BackgroundColor3 = Color3.fromRGB(35,35,35)
+                        end
+                    end
+                end
             else
                 window.BackgroundColor3 = Color3.fromRGB(240,240,240)
                 sidebar.BackgroundColor3 = Color3.fromRGB(250,250,250)
-            end
-            -- Update tab buttons appearance
-            for name, btn in pairs(tabButtons) do
-                local active = tabContentFrames[name].Visible
-                updateButtonAppearance(btn, active)
-            end
-            -- Update content frames children colors
-            for _, frame in pairs(tabContentFrames) do
-                for _, child in ipairs(frame:GetDescendants()) do
-                    if child:IsA("TextLabel") then
-                        child.TextColor3 = isDarkTheme and Color3.fromRGB(230,230,230) or Color3.fromRGB(20,20,20)
-                        if child.BackgroundTransparency == 0 then
-                            child.BackgroundColor3 = isDarkTheme and Color3.fromRGB(35,35,35) or Color3.fromRGB(240,240,240)
-                        end
-                    elseif child:IsA("TextBox") then
-                        child.TextColor3 = isDarkTheme and Color3.fromRGB(230,230,230) or Color3.fromRGB(20,20,20)
-                        child.BackgroundColor3 = isDarkTheme and Color3.fromRGB(50,50,50) or Color3.fromRGB(240,240,240)
-                    elseif child:IsA("TextButton") and child.Name ~= "MinimizeButton" and child.Name ~= "CloseScriptButton" then
-                        -- For toggle buttons and other buttons in content
-                        child.TextColor3 = isDarkTheme and Color3.fromRGB(230,230,230) or Color3.fromRGB(20,20,20)
-                        child.BackgroundColor3 = isDarkTheme and Color3.fromRGB(35,35,35) or Color3.fromRGB(245,245,245)
-                    elseif child:IsA("Frame") then
-                        -- background frames
-                        if child.BackgroundTransparency == 0 then
-                            child.BackgroundColor3 = isDarkTheme and Color3.fromRGB(35,35,35) or Color3.fromRGB(240,240,240)
+                for _, btn in pairs(tabButtons) do
+                    btn.BackgroundColor3 = Color3.fromRGB(245,245,245)
+                    local icon = btn:FindFirstChild("IconEmoji")
+                    if icon then icon.TextColor3 = Color3.fromRGB(20,20,20) end
+                    local lbl = btn:FindFirstChild("Label")
+                    if lbl then lbl.TextColor3 = Color3.fromRGB(20,20,20) end
+                end
+                for _, frame in pairs(tabContentFrames) do
+                    for _, child in ipairs(frame:GetDescendants()) do
+                        if child:IsA("TextLabel") then
+                            child.TextColor3 = Color3.fromRGB(20,20,20)
+                        elseif child:IsA("TextBox") then
+                            child.TextColor3 = Color3.fromRGB(20,20,20)
+                            child.BackgroundColor3 = Color3.fromRGB(240,240,240)
+                        elseif child:IsA("TextButton") then
+                            child.TextColor3 = Color3.fromRGB(20,20,20)
+                            child.BackgroundColor3 = Color3.fromRGB(245,245,245)
                         end
                     end
                 end
