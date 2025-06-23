@@ -1,5 +1,5 @@
--- Kevinz Hub Full Script v1.38-fix (toàn bộ, bao gồm logic gốc và UI cải tiến)
--- Place this LocalScript in StarterPlayerScripts hoặc StarterGui
+-- Kevinz Hub Full Script v1.39 (Sidebar Tab UI with Emoji Icons, Dynamic Lighting Transitions, Event Cleanup, MiniToggle fix, Sidebar Scrollable)
+-- Place this LocalScript in StarterPlayerScripts or StarterGui
 
 -- Services
 local Players = game:GetService("Players")
@@ -9,13 +9,12 @@ local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
 local Debris = game:GetService("Debris")
 local Workspace = workspace
-local UserInputService = game:GetService("UserInputService")
 
 -- Globals
 local LocalPlayer = Players.LocalPlayer
 local Character, Humanoid, RootPart = nil, nil, nil
 local Camera = Workspace.CurrentCamera
-local HUB_VERSION = "v1.38-fix"
+local HUB_VERSION = "v1.39"
 
 -- Movement defaults
 local savedWalkSpeed = 16
@@ -256,61 +255,73 @@ local function clearWeaponHighlightsForPlayer(player)
     weaponHighlights[player] = nil
 end
 
--- ESP Dot logic
-local espDots = {}
-local function createDotHighlight(player)
-    if espDots[player] then return end
-    if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
-    local part = Instance.new("Part")
-    part.Name = "_ESP_DOT"
-    part.Size = Vector3.new(0.2, 0.2, 0.2)
-    part.Anchored = true
-    part.CanCollide = false
-    part.Material = Enum.Material.Neon
-    part.Color = Color3.new(1, 0, 0)
-    part.Transparency = 0.5
-    part.Parent = Workspace
-    espDots[player] = part
-end
+-- ESP (Dot + Weapon + GunDrop)
+local roleColors = {
+    Murderer = Color3.fromRGB(255, 50, 50),
+    Sheriff = Color3.fromRGB(0, 89, 255),
+    Hero = Color3.fromRGB(255, 255, 0),
+    Innocent = Color3.fromRGB(50, 255, 80),
+    Unknown = Color3.fromRGB(180, 180, 180),
+}
+local roundSheriffUserId = nil
+local roundActive = false
 
-local function updateDotESP()
-    for player, part in pairs(espDots) do
-        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            part.CFrame = player.Character.HumanoidRootPart.CFrame
-        else
-            part:Destroy()
-            espDots[player] = nil
+local function detectRoundReset()
+    local everyoneInnocent = true
+    for _, p in ipairs(Players:GetPlayers()) do
+        local hasKnife, hasGun = false, false
+        local bp = p:FindFirstChild("Backpack")
+        if bp then
+            for _, tool in ipairs(bp:GetChildren()) do
+                if tool:IsA("Tool") then
+                    local n = tool.Name:lower()
+                    if n:find("knife") or n:find("blade") then hasKnife = true end
+                    if n:find("gun") or n:find("revolver") then hasGun = true end
+                end
+            end
         end
-    end
-end
-
-local function clearDotESP()
-    for player, part in pairs(espDots) do
-        if part and part.Parent then part:Destroy() end
-    end
-    table.clear(espDots)
-end
-
--- Role detection helper to differentiate Sheriff vs Hero if needed:
-local function getRoleOfPlayer(player)
-    -- Example logic: cần tùy game, đây chỉ placeholder.
-    -- Nếu có thể detect thông qua tên tool hoặc attribute, bạn cần thay logic phù hợp game.
-    -- Giả sử: nếu player có Tool named "Gun" thì Sheriff/ Hero; nếu có Knife thì Murderer.
-    local hasKnife = false
-    local hasGun = false
-    local char = player.Character
-    if char then
-        for _, child in ipairs(char:GetChildren()) do
-            if child:IsA("Tool") then
-                local n = child.Name:lower()
+        for _, tool in ipairs((p.Character and p.Character:GetChildren()) or {}) do
+            if tool:IsA("Tool") then
+                local n = tool.Name:lower()
                 if n:find("knife") or n:find("blade") then hasKnife = true end
                 if n:find("gun") or n:find("revolver") then hasGun = true end
             end
         end
+        if hasKnife or hasGun then
+            everyoneInnocent = false
+            break
+        end
     end
-    local backpack = player:FindFirstChild("Backpack")
-    if backpack then
-        for _, tool in ipairs(backpack:GetChildren()) do
+    if everyoneInnocent then
+        roundSheriffUserId = nil
+        roundActive = false
+    end
+end
+
+local function monitorSheriffAssignment()
+    for _, p in ipairs(Players:GetPlayers()) do
+        local bp = p:FindFirstChild("Backpack")
+        if bp then
+            for _, tool in ipairs(bp:GetChildren()) do
+                if tool:IsA("Tool") then
+                    local n = tool.Name:lower()
+                    if n:find("gun") or n:find("revolver") then
+                        if not roundSheriffUserId and not roundActive then
+                            roundSheriffUserId = p.UserId
+                            roundActive = true
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+local function getRole(player)
+    local hasKnife, hasGun = false, false
+    local bp = player:FindFirstChild("Backpack")
+    if bp then
+        for _, tool in ipairs(bp:GetChildren()) do
             if tool:IsA("Tool") then
                 local n = tool.Name:lower()
                 if n:find("knife") or n:find("blade") then hasKnife = true end
@@ -318,276 +329,500 @@ local function getRoleOfPlayer(player)
             end
         end
     end
+    for _, tool in ipairs((player.Character and player.Character:GetChildren()) or {}) do
+        if tool:IsA("Tool") then
+            local n = tool.Name:lower()
+            if n:find("knife") or n:find("blade") then hasKnife = true end
+            if n:find("gun") or n:find("revolver") then hasGun = true end
+        end
+    end
     if hasKnife and not hasGun then
         return "Murderer"
     elseif hasGun and not hasKnife then
-        return "SheriffOrHero"
-    elseif not hasGun and not hasKnife then
+        if roundSheriffUserId and player.UserId == roundSheriffUserId and roundActive then
+            return "Sheriff"
+        elseif roundSheriffUserId and player.UserId ~= roundSheriffUserId and roundActive then
+            return "Hero"
+        else
+            return "Unknown"
+        end
+    elseif not hasKnife and not hasGun then
         return "Innocent"
     else
         return "Unknown"
     end
 end
 
--- Setup ESP per player
+local function updateDotESP(player)
+    if not player or player == LocalPlayer then return end
+    local char = player.Character
+    if not char or not char:FindFirstChild("Head") then return end
+    local role = getRole(player)
+    local color = roleColors[role] or roleColors.Unknown
+    local head = char.Head
+    local guiESP = head:FindFirstChild("DotESP")
+    if not guiESP then
+        guiESP = Instance.new("BillboardGui")
+        guiESP.Name = "DotESP"
+        guiESP.Adornee = head
+        guiESP.Size = UDim2.new(0, 12, 0, 12)
+        guiESP.AlwaysOnTop = true
+        guiESP.LightInfluence = 0
+        guiESP.StudsOffset = Vector3.new(0, 1, 0)
+        guiESP.Parent = head
+        local frame = Instance.new("Frame")
+        frame.Name = "Dot"
+        frame.BackgroundColor3 = color
+        frame.BackgroundTransparency = 0
+        frame.BorderSizePixel = 0
+        frame.AnchorPoint = Vector2.new(0.5,0.5)
+        frame.Position = UDim2.new(0.5,0,0.5,0)
+        frame.Size = UDim2.new(1,0,1,0)
+        frame.Parent = guiESP
+    else
+        local frame = guiESP:FindFirstChild("Dot")
+        if frame then
+            frame.BackgroundColor3 = color
+        end
+    end
+end
+
+local function clearDotESP(player)
+    if player.Character and player.Character:FindFirstChild("Head") then
+        local e = player.Character.Head:FindFirstChild("DotESP")
+        if e then e:Destroy() end
+    end
+end
+
+local playerESPConns = {}
+
 local function setupESPForPlayer(player)
     if player == LocalPlayer then return end
-    -- Dot
-    createDotHighlight(player)
-    -- Weapon highlight: detect when tool appears
-    local function onToolAdded(tool)
-        addWeaponHighlight(player, tool)
-    end
-    local function onToolRemoved(tool)
-        clearWeaponHighlightsForPlayer(player)
-    end
-    if player.Character then
-        for _, tool in ipairs(player.Character:GetChildren()) do
-            if tool:IsA("Tool") then
-                addWeaponHighlight(player, tool)
+    local conns = {}
+    playerESPConns[player] = conns
+    local function onCharAdded(char)
+        char:WaitForChild("Head", 5)
+        updateDotESP(player)
+        for _, child in ipairs(char:GetChildren()) do
+            if child:IsA("Tool") then
+                task.delay(0.1, function() addWeaponHighlight(player, child) end)
             end
         end
-        player.Character.ChildAdded:Connect(function(child)
+        local childAddedConn = char.ChildAdded:Connect(function(child)
             if child:IsA("Tool") then
-                addWeaponHighlight(player, child)
+                task.delay(0.1, function()
+                    addWeaponHighlight(player, child)
+                    updateDotESP(player)
+                end)
             end
         end)
-        player.Character.ChildRemoved:Connect(function(child)
+        local childRemovedConn = char.ChildRemoved:Connect(function(child)
             if child:IsA("Tool") then
-                clearWeaponHighlightsForPlayer(player)
+                if weaponHighlights[player] and weaponHighlights[player][child] then
+                    local hl = weaponHighlights[player][child]
+                    if hl and hl.Parent then hl:Destroy() end
+                    weaponHighlights[player][child] = nil
+                end
+                updateDotESP(player)
             end
         end)
+        table.insert(conns, childAddedConn)
+        table.insert(conns, childRemovedConn)
     end
-    -- GunDrop highlight: thêm logic khi gun drop xuất hiện
-    -- Sẽ xử lý ở phần GunAura
+    table.insert(conns, player.CharacterAdded:Connect(onCharAdded))
+    if player.Character and player.Character:FindFirstChild("Head") then
+        onCharAdded(player.Character)
+    end
+    local function connectBackpack(bp)
+        if bp then
+            local added = bp.ChildAdded:Connect(function() updateDotESP(player) end)
+            local removed = bp.ChildRemoved:Connect(function() updateDotESP(player) end)
+            table.insert(conns, added)
+            table.insert(conns, removed)
+        end
+    end
+    local backpack = player:FindFirstChild("Backpack")
+    if backpack then connectBackpack(backpack) end
+    table.insert(conns, player.ChildAdded:Connect(function(child)
+        if child.Name == "Backpack" then connectBackpack(child) end
+    end))
 end
 
 local function teardownESPForPlayer(player)
-    -- Xóa dot
-    if espDots[player] then
-        if espDots[player].Parent then espDots[player]:Destroy() end
-        espDots[player] = nil
+    local conns = playerESPConns[player]
+    if conns then
+        for _, conn in ipairs(conns) do
+            if conn and conn.Disconnect then conn:Disconnect() end
+        end
     end
-    -- Xóa weapon highlight
+    playerESPConns[player] = nil
+    clearDotESP(player)
     clearWeaponHighlightsForPlayer(player)
-    -- Xóa gunDrop highlight nếu có
-    if gunDropHighlights[player] then
-        if gunDropHighlights[player].Parent then gunDropHighlights[player]:Destroy() end
-        gunDropHighlights[player] = nil
-    end
 end
 
--- GunDrop highlight functions
-local function addGunDropHighlight(dropPart)
-    -- Tạo highlight cho dropped gun
-    if not dropPart or not dropPart:IsA("BasePart") then return end
+local function addGunDropHighlight(drop)
+    if not drop:IsA("BasePart") then return end
+    if gunDropHighlights[drop] then return end
     local hl = Instance.new("Highlight")
-    hl.Name = "_ESP_GUNDROP"
+    hl.Name = "_ESP_GUNDROP_HL"
+    hl.Adornee = drop
     hl.FillTransparency = 1
-    hl.OutlineColor = Color3.fromRGB(255, 200, 0)
-    hl.OutlineTransparency = 0.3
+    hl.OutlineColor = Color3.fromRGB(0, 255, 0)
+    hl.OutlineTransparency = 0.2
     hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    hl.Adornee = dropPart
-    hl.Parent = dropPart
-    gunDropHighlights[dropPart] = hl
+    hl.Parent = drop
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "_ESP_GUNDROP_BILLBOARD"
+    billboard.Adornee = drop
+    billboard.AlwaysOnTop = true
+    billboard.LightInfluence = 0
+    billboard.StudsOffset = Vector3.new(0, 2, 0)
+    billboard.Size = UDim2.new(0, 200, 0, 50)
+    billboard.Parent = drop
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Name = "GunDropLabel"
+    textLabel.Size = UDim2.new(1, 0, 1, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Text = "Gun drop here"
+    textLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+    textLabel.Font = Enum.Font.GothamBold
+    textLabel.TextSize = 24
+    textLabel.Parent = billboard
+    gunDropHighlights[drop] = {highlight = hl, billboard = billboard}
 end
 
-local function removeGunDropHighlight(dropPart)
-    if dropPart and gunDropHighlights[dropPart] then
-        local hl = gunDropHighlights[dropPart]
-        if hl and hl.Parent then hl:Destroy() end
-        gunDropHighlights[dropPart] = nil
+local function removeGunDropHighlight(drop)
+    local data = gunDropHighlights[drop]
+    if data then
+        if data.highlight then data.highlight:Destroy() end
+        if data.billboard then data.billboard:Destroy() end
+        gunDropHighlights[drop] = nil
     end
 end
-
--- Monitor players joining/leaving
-local function onPlayerAdded(player)
-    -- Khi player join, delay một chút để Character load
-    player.CharacterAdded:Connect(function(char)
-        task.wait(1)
-        if espEnabled then
-            setupESPForPlayer(player)
-        end
-    end)
-    if player.Character then
-        task.wait(1)
-        if espEnabled then
-            setupESPForPlayer(player)
-        end
-    end
-end
-
-local function onPlayerRemoving(player)
-    teardownESPForPlayer(player)
-end
-
--- ESP loop
-local espEnabled = false
-local espUpdateConn = nil
 
 local function enableESP()
-    if espEnabled then return end
-    espEnabled = true
-    -- Thiết lập cho những player hiện tại
+    if espGlobalConns.enabled then return end
+    espGlobalConns.enabled = true
     for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            setupESPForPlayer(player)
-        end
+        setupESPForPlayer(player)
     end
-    -- Kết nối events
-    Players.PlayerAdded:Connect(onPlayerAdded)
-    Players.PlayerRemoving:Connect(onPlayerRemoving)
-    -- Loop cập nhật dot position
-    espUpdateConn = RunService.Heartbeat:Connect(updateDotESP)
-    -- GunDrop detect: giả định gun drop là BasePart tên "GunDrop" xuất hiện trong Workspace
-    Workspace.DescendantAdded:Connect(function(obj)
+    espGlobalConns.playerAdded = Players.PlayerAdded:Connect(function(player)
+        setupESPForPlayer(player)
+    end)
+    espGlobalConns.renderStepped = RunService.RenderStepped:Connect(function()
+        detectRoundReset()
+        monitorSheriffAssignment()
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then updateDotESP(player) end
+        end
+    end)
+    for _, obj in ipairs(Workspace:GetDescendants()) do
         if obj:IsA("BasePart") and obj.Name == "GunDrop" then
             addGunDropHighlight(obj)
-            if gunAuraEnabled then
-                setupGunAuraOnDrop(obj)
-            end
+        end
+    end
+    espGlobalConns.gunDropAdded = Workspace.DescendantAdded:Connect(function(obj)
+        if obj:IsA("BasePart") and obj.Name == "GunDrop" then
+            addGunDropHighlight(obj)
+            setupGunAuraOnDrop(obj) -- giữ logic GunAura
         end
     end)
-    Workspace.DescendantRemoving:Connect(function(obj)
+    espGlobalConns.gunDropRemoving = Workspace.DescendantRemoving:Connect(function(obj)
         if obj:IsA("BasePart") and obj.Name == "GunDrop" then
             removeGunDropHighlight(obj)
-            if gunAuraEnabled then
-                cleanupGunAuraForDrop(obj)
-            end
+            cleanupGunAuraForDrop(obj)
         end
     end)
+    notify("ESP Enabled", "Dot ESP & GunDrop highlight ON", 3)
 end
 
 local function disableESP()
-    if not espEnabled then return end
-    espEnabled = false
-    -- Xóa highlight/dot
+    if not espGlobalConns.enabled then return end
+    espGlobalConns.enabled = false
+    if espGlobalConns.playerAdded then espGlobalConns.playerAdded:Disconnect() end
+    if espGlobalConns.renderStepped then espGlobalConns.renderStepped:Disconnect() end
+    if espGlobalConns.gunDropAdded then espGlobalConns.gunDropAdded:Disconnect() end
+    if espGlobalConns.gunDropRemoving then espGlobalConns.gunDropRemoving:Disconnect() end
     for _, player in ipairs(Players:GetPlayers()) do
         teardownESPForPlayer(player)
     end
-    clearDotESP()
-    -- Ngắt events
-    if espUpdateConn then espUpdateConn:Disconnect() espUpdateConn = nil end
-    -- Lưu ý: Các kết nối Players.PlayerAdded/Removing và Workspace.DescendantAdded không được lưu conn trả về,
-    -- nhưng vì chúng được Connect mỗi lần enableESP, không lưu conn có thể dẫn đến duplicate nếu enable lại.
-    -- Để đơn giản, bạn có thể quản lý conn riêng, nhưng ở đây giữ như cũ.
+    for drop, _ in pairs(gunDropHighlights) do
+        removeGunDropHighlight(drop)
+    end
+    notify("ESP Disabled", "Dot ESP & GunDrop highlight OFF", 3)
 end
 
--- Optimize: Dynamic Lighting Transitions
-local function applyMidnightSky()
-    -- Chuyển môi trường thành "Midnight"
-    pcall(function()
-        Lighting.ClockTime = 0
-        Lighting.Brightness = 1
-        Lighting.Ambient = Color3.new(0, 0, 0)
-        Lighting.OutdoorAmbient = Color3.new(0, 0, 0)
-        Lighting.FogStart = 0
-        Lighting.FogEnd = 1000
-        Lighting.GlobalShadows = false
-        for eff, enabled in pairs(originalLightingEffects) do
-            if eff and eff:IsA("PostEffect") or eff:IsA("Atmosphere") then
-                eff.Enabled = false
-            end
+-- Death notifications
+local function setupDeathNotification(player)
+    player.CharacterAdded:Connect(function(char)
+        local hum = char:WaitForChild("Humanoid", 5)
+        if hum then
+            hum.Died:Connect(function()
+                local role = getRole(player)
+                if role == "Sheriff" or role == "Hero" or role == "Murderer" then
+                    notify(role .. " Died", player.Name .. " (" .. role .. ") died.", 4)
+                end
+            end)
         end
     end)
+    if player.Character and player.Character:FindFirstChild("Humanoid") then
+        local hum = player.Character:FindFirstChild("Humanoid")
+        hum.Died:Connect(function()
+            local role = getRole(player)
+            if role == "Sheriff" or role == "Hero" or role == "Murderer" then
+                notify(role .. " Died", player.Name .. " (" .. role .. ") died.", 4)
+            end
+        end)
+    end
+end
+
+for _, player in ipairs(Players:GetPlayers()) do
+    setupDeathNotification(player)
+end
+Players.PlayerAdded:Connect(setupDeathNotification)
+
+-- Optimize: Dynamic Lighting Transitions
+local midnightDescConn = nil
+local function disablePostEffects()
+    Lighting.GlobalShadows = false
+    for _, eff in ipairs(Lighting:GetDescendants()) do
+        if eff:IsA("BloomEffect")
+        or eff:IsA("SunRaysEffect")
+        or eff:IsA("ColorCorrectionEffect")
+        or eff:IsA("BlurEffect")
+        or eff:IsA("ToneMapEffect")
+        or eff:IsA("DepthOfFieldEffect")
+        or eff:IsA("Atmosphere")
+        then
+            pcall(function() eff.Enabled = false end)
+        end
+    end
+end
+
+local function transitionLighting(toMidnight, duration)
+    duration = duration or 2
+    local startTime = tick()
+    local initial = {
+        ClockTime = Lighting.ClockTime,
+        Brightness = Lighting.Brightness,
+        Ambient = Lighting.Ambient,
+        OutdoorAmbient = Lighting.OutdoorAmbient,
+        FogColor = Lighting.FogColor,
+        FogStart = Lighting.FogStart,
+        FogEnd = Lighting.FogEnd,
+        GlobalShadows = Lighting.GlobalShadows,
+        EnvironmentDiffuseScale = Lighting.EnvironmentDiffuseScale,
+        EnvironmentSpecularScale = Lighting.EnvironmentSpecularScale,
+    }
+    local target = {}
+    if toMidnight then
+        target.ClockTime = 0
+        target.Brightness = 35
+        target.Ambient = Color3.new(0,0,0)
+        target.OutdoorAmbient = Color3.new(0,0,0)
+        target.FogColor = Color3.new(0,0,0)
+        target.FogStart = 0
+        target.FogEnd = 1e3
+        target.GlobalShadows = false
+        target.EnvironmentDiffuseScale = 0
+        target.EnvironmentSpecularScale = 0
+    else
+        target.ClockTime = originalLightingSettings.ClockTime
+        target.Brightness = originalLightingSettings.Brightness
+        target.Ambient = originalLightingSettings.Ambient
+        target.OutdoorAmbient = originalLightingSettings.OutdoorAmbient
+        target.FogColor = originalLightingSettings.FogColor
+        target.FogStart = originalLightingSettings.FogStart
+        target.FogEnd = originalLightingSettings.FogEnd
+        target.GlobalShadows = originalLightingSettings.GlobalShadows
+        target.EnvironmentDiffuseScale = originalLightingSettings.EnvironmentDiffuseScale
+        target.EnvironmentSpecularScale = originalLightingSettings.EnvironmentSpecularScale
+    end
+    task.spawn(function()
+        while true do
+            local elapsed = tick() - startTime
+            local t = math.clamp(elapsed / duration, 0, 1)
+            Lighting.ClockTime = initial.ClockTime + (target.ClockTime - initial.ClockTime) * t
+            Lighting.Brightness = initial.Brightness + (target.Brightness - initial.Brightness) * t
+            Lighting.Ambient = initial.Ambient:Lerp(target.Ambient, t)
+            Lighting.OutdoorAmbient = initial.OutdoorAmbient:Lerp(target.OutdoorAmbient, t)
+            Lighting.FogColor = initial.FogColor:Lerp(target.FogColor, t)
+            Lighting.FogStart = initial.FogStart + (target.FogStart - initial.FogStart) * t
+            Lighting.FogEnd = initial.FogEnd + (target.FogEnd - initial.FogEnd) * t
+            Lighting.EnvironmentDiffuseScale = initial.EnvironmentDiffuseScale + (target.EnvironmentDiffuseScale - initial.EnvironmentDiffuseScale) * t
+            Lighting.EnvironmentSpecularScale = initial.EnvironmentSpecularScale + (target.EnvironmentSpecularScale - initial.EnvironmentSpecularScale) * t
+            Lighting.GlobalShadows = target.GlobalShadows
+            if t >= 1 then break end
+            RunService.RenderStepped:Wait()
+        end
+    end)
+end
+
+local function applyMidnightSky()
+    transitionLighting(true, 2)
+    disablePostEffects()
+    if midnightDescConn then midnightDescConn:Disconnect() end
+    midnightDescConn = Lighting.DescendantAdded:Connect(function(obj)
+        if obj:IsA("Sky") then
+            pcall(function() obj:Destroy() end)
+        end
+    end)
+    for _, child in ipairs(Lighting:GetChildren()) do
+        if child:IsA("Sky") then
+            pcall(function() child:Destroy() end)
+        end
+    end
+    notify("Midnight Sky", "Transitioning to midnight...", 3)
 end
 
 local function restoreOriginalSky()
-    pcall(function()
-        for k, v in pairs(originalLightingSettings) do
-            Lighting[k] = v
+    transitionLighting(false, 2)
+    if midnightDescConn then
+        midnightDescConn:Disconnect()
+        midnightDescConn = nil
+    end
+    for eff, wasEnabled in pairs(originalLightingEffects) do
+        if eff and eff.Parent then
+            pcall(function() eff.Enabled = wasEnabled end)
         end
-        for eff, enabled in pairs(originalLightingEffects) do
-            if eff and eff:IsA("PostEffect") or eff:IsA("Atmosphere") then
-                eff.Enabled = enabled
-            end
-        end
-    end)
+    end
+    notify("Midnight Sky", "Restoring lighting...", 4)
 end
 
+-- Lower CPU load
 local function applyLowerCPULoad()
     if lowerCpuApplied then return end
     lowerCpuApplied = true
-    -- Ví dụ: disable decals, particles, track parts v.v.
-    -- Tùy game, có thể disable các effect không cần thiết
-    -- Ở đây chỉ ví dụ cấu trúc
-    lowerCpuConn = RunService.Heartbeat:Connect(function()
-        for _, part in ipairs(Workspace:GetDescendants()) do
-            if part:IsA("ParticleEmitter") or part:IsA("Trail") or part:IsA("Beam") then
-                part.Enabled = false
+    disablePostEffects()
+    local all = Workspace:GetDescendants()
+    local batchSize = 50
+    local total = #all
+    local function processObj(obj)
+        if obj:IsA("BasePart") then
+            local suc, col = pcall(function() return obj.Color end)
+            pcall(function() obj.Material = Enum.Material.SmoothPlastic end)
+            if suc and col then pcall(function() obj.Color = col end) end
+            pcall(function() obj.Reflectance = 0 end)
+            pcall(function() obj.CastShadow = false end)
+        end
+        if obj:IsA("SurfaceAppearance") then
+            pcall(function() obj:Destroy() end)
+        end
+        if obj:IsA("PointLight") or obj:IsA("SurfaceLight") or obj:IsA("SpotLight") then
+            pcall(function() obj.Enabled = false end)
+        end
+    end
+    task.spawn(function()
+        local i = 1
+        while i <= total do
+            local j = math.min(i + batchSize - 1, total)
+            for idx = i, j do
+                processObj(all[idx])
             end
+            i = j + 1
+            task.wait()
         end
     end)
+    if lowerCpuConn then lowerCpuConn:Disconnect() end
+    lowerCpuConn = Workspace.DescendantAdded:Connect(function(obj)
+        task.defer(function()
+            if obj:IsA("BasePart") or obj:IsA("PointLight") or obj:IsA("SurfaceLight") or obj:IsA("SpotLight") or obj:IsA("SurfaceAppearance") then
+                processObj(obj)
+            end
+        end)
+    end)
+    pcall(function() Lighting.Ambient = Lighting.Ambient * 0.5 end)
+    pcall(function() Lighting.OutdoorAmbient = Lighting.OutdoorAmbient * 0.5 end)
+    notify("Lower CPU", "Applied lower CPU optimizations.", 4)
 end
 
 local function restoreLightingOnly()
+    transitionLighting(false, 2)
     if lowerCpuConn then
         lowerCpuConn:Disconnect()
         lowerCpuConn = nil
     end
     lowerCpuApplied = false
-    -- Không restore lại các emitter vì có thể gây lag trở lại; nếu muốn restore, bạn cần lưu trạng thái cũ.
+    for eff, wasEnabled in pairs(originalLightingEffects) do
+        if eff and eff.Parent then
+            pcall(function() eff.Enabled = wasEnabled end)
+        end
+    end
+    notify("Restore Lighting", "Restoring lighting settings.", 4)
 end
 
--- Gun Aura functions
+-- Gun Aura
 local function cleanupGunAuraForDrop(drop)
-    if gunDropTouchedConns[drop] then
-        gunDropTouchedConns[drop]:Disconnect()
+    local conn = gunDropTouchedConns[drop]
+    if conn then
+        conn:Disconnect()
         gunDropTouchedConns[drop] = nil
     end
     gunDrops[drop] = nil
 end
 
 local function tryPickupViaTouched(drop)
-    if not drop or not drop.Parent then return end
-    local touchConn = drop.Touched:Connect(function(hit)
-        local plr = Players:GetPlayerFromCharacter(hit.Parent)
-        if plr == LocalPlayer then
-            -- Thực hiện pickup tùy game: giả định drop là một phần mà chạm vào auto pickup
-            pcall(function()
-                -- Ví dụ: if drop:FindFirstChild("Handle") then drop.Parent = LocalPlayer.Backpack end
-                drop:Destroy()
-                notify("GunAura", "Picked up via touch", 2)
-            end)
-        end
-    end)
-    gunDropTouchedConns[drop] = touchConn
+    if not Character or not RootPart then return end
+    if localRole == "Murderer" then return end
+    notify("Gun Aura", "Picked up via touch.", 2)
+    cleanupGunAuraForDrop(drop)
 end
 
 local function tryPickupViaRadius(drop)
-    if not drop or not drop.Parent then return end
-    if not RootPart then return end
-    local dist = (drop.Position - RootPart.Position).Magnitude
-    if dist <= gunAuraRadius then
-        pcall(function()
-            drop:Destroy()
-            notify("GunAura", "Picked up via radius", 2)
-        end)
+    if not Character or not RootPart then return end
+    if localRole == "Murderer" then return end
+    local success = pcall(function()
+        firetouchinterest(drop, RootPart, 0)
+        firetouchinterest(drop, RootPart, 1)
+    end)
+    if success then
+        notify("Gun Aura", "Picked up via radius.", 2)
     end
+    cleanupGunAuraForDrop(drop)
 end
 
 local function setupGunAuraOnDrop(drop)
-    if gunDrops[drop] then return end
+    if not drop:IsA("BasePart") then return end
+    cleanupGunAuraForDrop(drop)
     gunDrops[drop] = true
     if gunAuraEnabled then
-        tryPickupViaTouched(drop)
+        local conn = drop.Touched:Connect(function(hit)
+            if Character and hit.Parent and (hit.Parent == Character or hit.Parent:IsDescendantOf(Character)) then
+                tryPickupViaTouched(drop)
+            end
+        end)
+        gunDropTouchedConns[drop] = conn
     end
 end
 
 local function startGunAuraRadiusLoop()
-    if gunAuraLoopThread then return end
-    gunAuraLoopThread = RunService.Heartbeat:Connect(function()
-        for drop,_ in pairs(gunDrops) do
-            if drop and drop.Parent then
-                tryPickupViaRadius(drop)
-            else
-                cleanupGunAuraForDrop(drop)
+    gunAuraLoopThread = task.spawn(function()
+        while gunAuraEnabled do
+            if Character and RootPart then
+                local r2 = gunAuraRadius * gunAuraRadius
+                for drop,_ in pairs(gunDrops) do
+                    if drop and drop.Parent then
+                        local ok, pos = pcall(function() return drop.Position end)
+                        if ok and pos then
+                            local dx = pos.X - RootPart.Position.X
+                            local dy = pos.Y - RootPart.Position.Y
+                            local dz = pos.Z - RootPart.Position.Z
+                            if dx*dx + dy*dy + dz*dz <= r2 then
+                                tryPickupViaRadius(drop)
+                            end
+                        else
+                            cleanupGunAuraForDrop(drop)
+                        end
+                    else
+                        cleanupGunAuraForDrop(drop)
+                    end
+                end
             end
+            task.wait(0.2)
         end
     end)
 end
 
--- Kết nối Khởi tạo GunAura hiện tại
 Workspace.DescendantAdded:Connect(function(obj)
     if obj:IsA("BasePart") and obj.Name == "GunDrop" then
         setupGunAuraOnDrop(obj)
@@ -599,13 +834,7 @@ Workspace.DescendantRemoving:Connect(function(obj)
     end
 end)
 
--- UI: Sidebar Tab with Emoji, MiniToggle support (Improved for draggable and scrolling)
--- Nếu trước đó có GUI cũ, xóa
-local existing = LocalPlayer:FindFirstChild("PlayerGui") and LocalPlayer.PlayerGui:FindFirstChild("KevinzHub")
-if existing then
-    existing:Destroy()
-end
-
+-- UI: Sidebar Tab with Emoji, MiniToggle support, Sidebar Scrollable
 local gui = Instance.new("ScreenGui")
 gui.Name = "KevinzHub"
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
@@ -651,10 +880,7 @@ local topBar = Instance.new("Frame", window)
 topBar.Name = "TopBar"
 topBar.Size = UDim2.new(1, 0, 0, 30)
 topBar.Position = UDim2.new(0, 0, 0, 0)
--- Để vẫn trong suốt nhưng đảm bảo nhận input
 topBar.BackgroundTransparency = 1
-topBar.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-topBar.Active = true  -- để nhận input
 do
     local layout = Instance.new("UIListLayout", topBar)
     layout.FillDirection = Enum.FillDirection.Horizontal
@@ -721,17 +947,15 @@ do
     end)
 end
 
--- Drag window: cải tiến
+-- Drag window
 do
     local dragging = false
-    local dragStartPos = nil
-    local startWindowPos = nil
-
+    local dragStart, startPos
     topBar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 and window.Visible then
+        if window.Visible and input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = true
-            dragStartPos = input.Position
-            startWindowPos = window.Position
+            dragStart = input.Position
+            startPos = window.Position
             input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
                     dragging = false
@@ -740,14 +964,10 @@ do
         end
     end)
     topBar.InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement and window.Visible then
-            local delta = input.Position - dragStartPos
-            window.Position = UDim2.new(
-                startWindowPos.X.Scale,
-                startWindowPos.X.Offset + delta.X,
-                startWindowPos.Y.Scale,
-                startWindowPos.Y.Offset + delta.Y
-            )
+        if dragging and window.Visible and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = input.Position - dragStart
+            window.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
+                                        startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         end
     end)
 end
@@ -759,12 +979,18 @@ miniToggle.MouseButton1Click:Connect(function()
 end)
 
 -- Sidebar & ContentContainer
-local sidebar = Instance.new("Frame", window)
+-- Sidebar bây giờ là ScrollingFrame để có thể cuộn khi nhiều tab
+local sidebar = Instance.new("ScrollingFrame", window)
 sidebar.Name = "Sidebar"
-sidebar.Size = UDim2.new(0, 120, 1, -30)
+sidebar.Size = UDim2.new(0, 120, 1, -30)  -- chiều rộng cố định, chiều cao trừ topBar
 sidebar.Position = UDim2.new(0, 0, 0, 30)
 sidebar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 sidebar.BorderSizePixel = 0
+sidebar.ZIndex = 2
+sidebar.ClipsDescendants = true
+sidebar.ScrollBarThickness = 6
+sidebar.CanvasSize = UDim2.new(0, 0, 0, 0)
+sidebar.AutomaticCanvasSize = Enum.AutomaticSize.Y
 Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 8)
 
 local contentContainer = Instance.new("Frame", window)
@@ -833,7 +1059,7 @@ for index, tabInfo in ipairs(tabs) do
     lbl.Position = UDim2.new(0, 40, 0, 0)
     lbl.BackgroundTransparency = 1
     lbl.Text = tabInfo.Name
-    lbl.TextColor3 = Color3.fromRGB(230,230,230)
+    lbl.TextColor3 = Color3.fromRGB(230, 230, 230)
     lbl.Font = Enum.Font.Gotham
     lbl.TextSize = 14
     lbl.TextXAlignment = Enum.TextXAlignment.Left
@@ -843,11 +1069,12 @@ for index, tabInfo in ipairs(tabs) do
     frame.Size = UDim2.new(1, 0, 1, 0)
     frame.Position = UDim2.new(0, 0, 0, 0)
     frame.BackgroundTransparency = 1
+    frame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    frame.AutomaticCanvasSize = Enum.AutomaticSize.Y
     frame.ScrollBarThickness = 6
-    frame.ScrollingEnabled = true
+    frame.Visible = false
     frame.Parent = contentContainer
 
-    -- Tự động cập nhật CanvasSize dựa trên UIListLayout.AbsoluteContentSize
     local layout = Instance.new("UIListLayout", frame)
     layout.SortOrder = Enum.SortOrder.LayoutOrder
     layout.Padding = UDim.new(0, 8)
@@ -856,14 +1083,6 @@ for index, tabInfo in ipairs(tabs) do
     pad.PaddingBottom = UDim.new(0, 8)
     pad.PaddingLeft = UDim.new(0, 8)
     pad.PaddingRight = UDim.new(0, 8)
-    -- Khi nội dung thay đổi, cập nhật CanvasSize
-    local function updateCanvas()
-        frame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 4)
-    end
-    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateCanvas)
-    updateCanvas()
-
-    frame.Visible = false
 
     btn.MouseEnter:Connect(function()
         if not frame.Visible then
@@ -889,7 +1108,6 @@ for index, tabInfo in ipairs(tabs) do
     tabContentFrames[tabInfo.Name] = frame
 end
 
--- Mặc định tab đầu hiển thị
 if #tabs > 0 then
     local firstName = tabs[1].Name
     tabButtons[firstName].BackgroundColor3 = Color3.fromRGB(50, 50, 50)
@@ -943,16 +1161,6 @@ local function createInput(parent, labelText, getDefault, callback)
             input.Text = ""
         end
     end)
-
-    -- Cập nhật CanvasSize của parent ScrollingFrame khi thêm phần tử
-    local parentLayout = parent:FindFirstChildOfClass("UIListLayout")
-    if parentLayout and parent:IsA("ScrollingFrame") then
-        parentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-            parent.CanvasSize = UDim2.new(0, 0, 0, parentLayout.AbsoluteContentSize.Y + 4)
-        end)
-        parent.CanvasSize = UDim2.new(0, 0, 0, parentLayout.AbsoluteContentSize.Y + 4)
-    end
-
     return input
 end
 
@@ -999,16 +1207,6 @@ local function createSwitch(parent, labelText, callback)
         end
         pcall(function() callback(state) end)
     end)
-
-    -- Cập nhật CanvasSize của parent ScrollingFrame khi thêm phần tử
-    local parentLayout = parent:FindFirstChildOfClass("UIListLayout")
-    if parentLayout and parent:IsA("ScrollingFrame") then
-        parentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-            parent.CanvasSize = UDim2.new(0, 0, 0, parentLayout.AbsoluteContentSize.Y + 4)
-        end)
-        parent.CanvasSize = UDim2.new(0, 0, 0, parentLayout.AbsoluteContentSize.Y + 4)
-    end
-
     return toggle
 end
 
@@ -1155,5 +1353,3 @@ do
         end)
     end
 end
-
--- End of script
