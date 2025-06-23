@@ -1,4 +1,4 @@
--- Kevinz Hub Full Script v1.38 (Sidebar Tab UI with Emoji Icons, Dynamic Lighting Transitions, Event Cleanup, MiniToggle fix)
+-- Kevinz Hub Full Script v1.38 (Modified for draggable fix & scrolling fix)
 -- Place this LocalScript in StarterPlayerScripts or StarterGui
 
 -- Services
@@ -9,12 +9,13 @@ local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
 local Debris = game:GetService("Debris")
 local Workspace = workspace
+local UserInputService = game:GetService("UserInputService")
 
 -- Globals
 local LocalPlayer = Players.LocalPlayer
 local Character, Humanoid, RootPart = nil, nil, nil
 local Camera = Workspace.CurrentCamera
-local HUB_VERSION = "v1.38"
+local HUB_VERSION = "v1.38-fixed"
 
 -- Movement defaults
 local savedWalkSpeed = 16
@@ -832,7 +833,7 @@ Workspace.DescendantRemoving:Connect(function(obj)
     end
 end)
 
--- UI: Sidebar Tab with Emoji, MiniToggle support
+-- UI: Sidebar Tab with Emoji Icons, Dynamic Lighting Transitions, Event Cleanup, MiniToggle fix
 local gui = Instance.new("ScreenGui")
 gui.Name = "KevinzHub"
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
@@ -878,6 +879,7 @@ local topBar = Instance.new("Frame", window)
 topBar.Name = "TopBar"
 topBar.Size = UDim2.new(1, 0, 0, 30)
 topBar.Position = UDim2.new(0, 0, 0, 0)
+-- Cho phép nhận input để kéo: mặc định Frame chấp nhận InputBegan/InputChanged
 topBar.BackgroundTransparency = 1
 do
     local layout = Instance.new("UIListLayout", topBar)
@@ -945,15 +947,19 @@ do
     end)
 end
 
--- Drag window
+-- Drag window: sử dụng UserInputService pattern
 do
     local dragging = false
-    local dragStart, startPos
+    local dragStart = nil
+    local startPos = nil
+    local dragInput = nil
+
     topBar.InputBegan:Connect(function(input)
-        if window.Visible and input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = true
             dragStart = input.Position
             startPos = window.Position
+            -- Khi nút chuột buông, dừng kéo
             input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
                     dragging = false
@@ -961,11 +967,20 @@ do
             end)
         end
     end)
+
     topBar.InputChanged:Connect(function(input)
-        if dragging and window.Visible and input.UserInputType == Enum.UserInputType.MouseMovement then
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            dragInput = input
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input == dragInput then
             local delta = input.Position - dragStart
-            window.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
-                                        startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            window.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            )
         end
     end)
 end
@@ -1061,9 +1076,10 @@ for index, tabInfo in ipairs(tabs) do
     frame.Size = UDim2.new(1, 0, 1, 0)
     frame.Position = UDim2.new(0, 0, 0, 0)
     frame.BackgroundTransparency = 1
+    -- Không dùng AutomaticCanvasSize, mà cập nhật qua AbsoluteContentSize
     frame.CanvasSize = UDim2.new(0, 0, 0, 0)
-    frame.AutomaticCanvasSize = Enum.AutomaticSize.Y
     frame.ScrollBarThickness = 6
+    frame.ClipsDescendants = true
     frame.Visible = false
     frame.Parent = contentContainer
 
@@ -1075,6 +1091,12 @@ for index, tabInfo in ipairs(tabs) do
     pad.PaddingBottom = UDim.new(0, 8)
     pad.PaddingLeft = UDim.new(0, 8)
     pad.PaddingRight = UDim.new(0, 8)
+
+    -- Kết nối để update CanvasSize dựa trên nội dung
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        -- + padding trên và dưới (8 + 8) và có thể thêm 0-1 item spacing
+        frame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + pad.PaddingTop.Offset + pad.PaddingBottom.Offset)
+    end)
 
     btn.MouseEnter:Connect(function()
         if not frame.Visible then
