@@ -1,4 +1,4 @@
--- Kevinz Hub Full Script v1.38 (Sidebar Tab UI with Emoji Icons, Dynamic Lighting Transitions, Event Cleanup, MiniToggle fix)
+-- Kevinz Hub Full Script v1.39 (Sidebar Tab UI with Emoji Icons, Dynamic Lighting Transitions, Event Cleanup, MiniToggle fix, Scrollable Sidebar)
 -- Place this LocalScript in StarterPlayerScripts or StarterGui
 
 -- Services
@@ -14,7 +14,7 @@ local Workspace = workspace
 local LocalPlayer = Players.LocalPlayer
 local Character, Humanoid, RootPart = nil, nil, nil
 local Camera = Workspace.CurrentCamera
-local HUB_VERSION = "v1.38"
+local HUB_VERSION = "v1.39"
 
 -- Movement defaults
 local savedWalkSpeed = 16
@@ -977,12 +977,16 @@ miniToggle.MouseButton1Click:Connect(function()
 end)
 
 -- Sidebar & ContentContainer
-local sidebar = Instance.new("Frame", window)
+-- Thay đổi: Sidebar dùng ScrollingFrame để cuộn được khi quá nhiều tab hoặc nội dung vượt khung
+local sidebar = Instance.new("ScrollingFrame", window)
 sidebar.Name = "Sidebar"
 sidebar.Size = UDim2.new(0, 120, 1, -30)
 sidebar.Position = UDim2.new(0, 0, 0, 30)
 sidebar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 sidebar.BorderSizePixel = 0
+sidebar.CanvasSize = UDim2.new(0, 0, 0, 0)
+sidebar.AutomaticCanvasSize = Enum.AutomaticSize.Y
+sidebar.ScrollBarThickness = 6
 Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 8)
 
 local contentContainer = Instance.new("Frame", window)
@@ -1009,6 +1013,7 @@ local tabs = {
     { Name = "Optimize", Emoji = "⚡" },
     { Name = "GunAura",  Emoji = "🔫" },
     { Name = "Settings", Emoji = "⚙️" },
+    -- Nếu sau này bạn thêm tab mới, sidebar sẽ tự cuộn được
 }
 
 local tabButtons = {}
