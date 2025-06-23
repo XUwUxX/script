@@ -1,4 +1,4 @@
--- Kevinz Hub Full Script v1.39 (Sidebar Tab UI with Emoji Icons, Dynamic Lighting Transitions, Event Cleanup, MiniToggle fix, Sidebar Scrollable)
+-- Kevinz Hub Full Script v1.38 (Sidebar Tab UI with Emoji Icons, Dynamic Lighting Transitions, Event Cleanup, MiniToggle fix)
 -- Place this LocalScript in StarterPlayerScripts or StarterGui
 
 -- Services
@@ -14,7 +14,7 @@ local Workspace = workspace
 local LocalPlayer = Players.LocalPlayer
 local Character, Humanoid, RootPart = nil, nil, nil
 local Camera = Workspace.CurrentCamera
-local HUB_VERSION = "v1.39"
+local HUB_VERSION = "v1.38"
 
 -- Movement defaults
 local savedWalkSpeed = 16
@@ -524,13 +524,11 @@ local function enableESP()
     espGlobalConns.gunDropAdded = Workspace.DescendantAdded:Connect(function(obj)
         if obj:IsA("BasePart") and obj.Name == "GunDrop" then
             addGunDropHighlight(obj)
-            setupGunAuraOnDrop(obj) -- giữ logic GunAura
         end
     end)
     espGlobalConns.gunDropRemoving = Workspace.DescendantRemoving:Connect(function(obj)
         if obj:IsA("BasePart") and obj.Name == "GunDrop" then
             removeGunDropHighlight(obj)
-            cleanupGunAuraForDrop(obj)
         end
     end)
     notify("ESP Enabled", "Dot ESP & GunDrop highlight ON", 3)
@@ -834,7 +832,7 @@ Workspace.DescendantRemoving:Connect(function(obj)
     end
 end)
 
--- UI: Sidebar Tab with Emoji, MiniToggle support, Sidebar Scrollable
+-- UI: Sidebar Tab with Emoji, MiniToggle support
 local gui = Instance.new("ScreenGui")
 gui.Name = "KevinzHub"
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
@@ -979,18 +977,12 @@ miniToggle.MouseButton1Click:Connect(function()
 end)
 
 -- Sidebar & ContentContainer
--- Sidebar bây giờ là ScrollingFrame để có thể cuộn khi nhiều tab
-local sidebar = Instance.new("ScrollingFrame", window)
+local sidebar = Instance.new("Frame", window)
 sidebar.Name = "Sidebar"
-sidebar.Size = UDim2.new(0, 120, 1, -30)  -- chiều rộng cố định, chiều cao trừ topBar
+sidebar.Size = UDim2.new(0, 120, 1, -30)
 sidebar.Position = UDim2.new(0, 0, 0, 30)
 sidebar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 sidebar.BorderSizePixel = 0
-sidebar.ZIndex = 2
-sidebar.ClipsDescendants = true
-sidebar.ScrollBarThickness = 6
-sidebar.CanvasSize = UDim2.new(0, 0, 0, 0)
-sidebar.AutomaticCanvasSize = Enum.AutomaticSize.Y
 Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 8)
 
 local contentContainer = Instance.new("Frame", window)
