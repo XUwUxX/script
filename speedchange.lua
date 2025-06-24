@@ -14,7 +14,7 @@ local Workspace = workspace
 local LocalPlayer = Players.LocalPlayer
 local Character, Humanoid, RootPart = nil, nil, nil
 local Camera = Workspace.CurrentCamera
-local HUB_VERSION = "v1.39"
+local HUB_VERSION = "v1.40"
 
 -- Movement defaults
 local savedWalkSpeed = 16
@@ -32,7 +32,7 @@ local semiGodModeEnabled = false
 
 -- Gun Aura
 local gunAuraEnabled = false
-local gunAuraRadius = 10
+local gunAuraRadius = 13
 local gunDrops = {}
 local gunDropTouchedConns = {}
 local gunAuraLoopThread = nil
@@ -78,14 +78,13 @@ local function notify(title, text, duration)
         StarterGui:SetCore("SendNotification", {
             Title = title,
             Text = text,
-            Duration = duration or 3,
-            Button1 = "OK"
+            Duration = duration or 3
         })
     end)
 end
 
 task.delay(1, function()
-    notify("Kevinz Hub Loaded", "Version: " .. HUB_VERSION, 4)
+    notify("Kevinz Hub Loaded✅", "🚀Version: " .. HUB_VERSION, 4)
 end)
 
 -- Role detection
@@ -531,7 +530,7 @@ local function enableESP()
             removeGunDropHighlight(obj)
         end
     end)
-    notify("ESP Enabled", "Dot ESP & GunDrop highlight ON", 3)
+    notify("ESP Enabled✅", "Dot ESP", 3)
 end
 
 local function disableESP()
@@ -547,7 +546,7 @@ local function disableESP()
     for drop, _ in pairs(gunDropHighlights) do
         removeGunDropHighlight(drop)
     end
-    notify("ESP Disabled", "Dot ESP & GunDrop highlight OFF", 3)
+    notify("ESP Disabled❌", "Dot ESP", 3)
 end
 
 -- Death notifications
@@ -558,7 +557,7 @@ local function setupDeathNotification(player)
             hum.Died:Connect(function()
                 local role = getRole(player)
                 if role == "Sheriff" or role == "Hero" or role == "Murderer" then
-                    notify(role .. " Died", player.Name .. " (" .. role .. ") died.", 4)
+                    notify(role .. " Died👼", player.Name .. " (" .. role .. ") died.", 2)
                 end
             end)
         end
@@ -568,7 +567,7 @@ local function setupDeathNotification(player)
         hum.Died:Connect(function()
             local role = getRole(player)
             if role == "Sheriff" or role == "Hero" or role == "Murderer" then
-                notify(role .. " Died", player.Name .. " (" .. role .. ") died.", 4)
+                notify(role .. " Died💥", player.Name .. " (" .. role .. ") died.", 4)
             end
         end)
     end
@@ -670,7 +669,7 @@ local function applyMidnightSky()
             pcall(function() child:Destroy() end)
         end
     end
-    notify("Midnight Sky", "Transitioning to midnight...", 3)
+    notify("Midnight Sky🎧", "Transitioning to midnight...", 3)
 end
 
 local function restoreOriginalSky()
@@ -684,7 +683,7 @@ local function restoreOriginalSky()
             pcall(function() eff.Enabled = wasEnabled end)
         end
     end
-    notify("Midnight Sky", "Restoring lighting...", 4)
+    notify("Midnight Sky🎧", "Restoring lighting...", 4)
 end
 
 -- Lower CPU load
@@ -731,7 +730,7 @@ local function applyLowerCPULoad()
     end)
     pcall(function() Lighting.Ambient = Lighting.Ambient * 0.5 end)
     pcall(function() Lighting.OutdoorAmbient = Lighting.OutdoorAmbient * 0.5 end)
-    notify("Lower CPU", "Applied lower CPU optimizations.", 4)
+    notify("Lower CPU🏖", "Higher FPS", 4)
 end
 
 local function restoreLightingOnly()
@@ -746,7 +745,7 @@ local function restoreLightingOnly()
             pcall(function() eff.Enabled = wasEnabled end)
         end
     end
-    notify("Restore Lighting", "Restoring lighting settings.", 4)
+    notify("Restore Lighting✨", "Restoring lighting settings.", 4)
 end
 
 -- Gun Aura
@@ -762,7 +761,7 @@ end
 local function tryPickupViaTouched(drop)
     if not Character or not RootPart then return end
     if localRole == "Murderer" then return end
-    notify("Gun Aura", "Picked up via touch.", 2)
+    notify("Gun Aura✨", "Auto grab when gun near", 2)
     cleanupGunAuraForDrop(drop)
 end
 
@@ -774,7 +773,7 @@ local function tryPickupViaRadius(drop)
         firetouchinterest(drop, RootPart, 1)
     end)
     if success then
-        notify("Gun Aura", "Picked up via radius.", 2)
+        notify("Done auto grab✅", "🏖", 2)
     end
     cleanupGunAuraForDrop(drop)
 end
@@ -1229,7 +1228,7 @@ do
         end)
         createSwitch(parent, "Semi-God Mode", function(on)
             semiGodModeEnabled = on
-            notify("Semi-God Mode", on and "ON" or "OFF", 2)
+            notify("Semi-God Mode🔥", on and "ON" or "OFF", 2)
         end)
     end
 end
