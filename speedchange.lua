@@ -1,5 +1,5 @@
--- Kevinz Hub Full Script v1.41 (Sidebar Tab UI with Emoji Icons, Dynamic Lighting Transitions, Event Cleanup, MiniToggle fix, Scrollable Sidebar, Double Jump)
--- Place this LocalScript in StarterPlayerScripts or StarterGui
+-- Kevinz Hub Full Script v1.42 (Tích hợp thuật toán Double Jump cải tiến)
+-- Place this LocalScript in StarterPlayerScripts hoặc StarterGui
 
 -- Services
 local Players = game:GetService("Players")
@@ -13,9 +13,9 @@ local UserInputService = game:GetService("UserInputService")
 
 -- Globals
 local LocalPlayer = Players.LocalPlayer
-local Character, Humanoid, RootPart = nil, nil, nil
+local Character, Humanoid, RootPart
 local Camera = Workspace.CurrentCamera
-local HUB_VERSION = "v1.41"
+local HUB_VERSION = "v1.42"
 
 -- Movement defaults
 local savedWalkSpeed = 16
@@ -28,11 +28,20 @@ if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") th
     end
 end
 
+-- Double Jump improved variables
+local doubleJumpEnabled = false  -- sẽ gán từ UI toggle
+local maxJumps = 2
+local jumpCount = 0
+local wantJumpOnLand = false
+-- Ground detection control
+local groundRayParams = RaycastParams.new()
+groundRayParams.FilterType = Enum.RaycastFilterType.Blacklist
+groundRayParams.FilterDescendantsInstances = {}  -- cập nhật khi Character gán
+local checkingGround = false
+local groundCheckConn
+
 -- Semi-God
 local semiGodModeEnabled = false
-
--- Double Jump
-local doubleJumpEnabled = false
 
 -- Gun Aura
 local gunAuraEnabled = false
@@ -91,7 +100,7 @@ task.delay(1, function()
     notify("Kevinz Hub Loaded✅", "🚀Version: " .. HUB_VERSION, 4)
 end)
 
--- Role detection
+-- ========= Role detection =========
 local function updateLocalRole()
     local hasKnife = false
     local hasGun = false
@@ -156,101 +165,160 @@ local function setupLocalRoleListeners()
 end
 setupLocalRoleListeners()
 
--- Character/Humanoid setup
-local function onCharacterAdded(char)
-    Character = char
-    Humanoid = Character:WaitForChild("Humanoid", 5)
-    RootPart = Character:WaitForChild("HumanoidRootPart", 5)
-    if Humanoid then
-        -- Thiết lập tốc độ gốc
-        pcall(function() Humanoid.WalkSpeed = savedWalkSpeed end)
-        pcall(function() Humanoid.JumpPower = savedJumpPower end)
-        -- Semi-God: giữ máu
-        Humanoid.HealthChanged:Connect(function(h)
-            if semiGodModeEnabled and Humanoid and Humanoid.Parent and h <= 0 then
-                Humanoid.Health = 1
-                Humanoid:ChangeState(Enum.HumanoidStateType.Physics)
-                task.delay(2.5, function()
-                    if Humanoid and Humanoid.Parent and Humanoid:GetState() == Enum.HumanoidStateType.Physics then
-                        Humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
-                        Humanoid.Health = Humanoid.MaxHealth
-                    end
-                end)
-            end
-        end)
-        -- Double Jump setup
-        do
-            local hasDoubleJumped = false
-            -- Reset khi chạm đất
-            Humanoid.StateChanged:Connect(function(oldState, newState)
-                if newState == Enum.HumanoidStateType.Landed then
-                    hasDoubleJumped = false
-                end
-            end)
-            -- Input để nhảy đôi
-            UserInputService.InputBegan:Connect(function(input, gameProcessed)
-                if gameProcessed then return end
-                if not doubleJumpEnabled then return end
-                if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Enum.KeyCode.Space then
-                    if Humanoid and RootPart then
-                        local state = Humanoid:GetState()
-                        -- Cho phép double jump khi đang rơi (Freefall hoặc FallingDown)
-                        if state == Enum.HumanoidStateType.Freefall or state == Enum.HumanoidStateType.FallingDown then
-                            Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-                            hasDoubleJumped = true
-                            notify("Double Jump✨", "Executed", 2)
-                        end
-                    end
-                end
-            end)
-        end
-    end
-    -- Reset gun aura data mỗi lần respawn
-    for drop, conn in pairs(gunDropTouchedConns) do
-        if conn then conn:Disconnect() end
-    end
-    table.clear(gunDropTouchedConns)
-    table.clear(gunDrops)
+-- ========= Double Jump improved functions =========
 
-    -- Local bullet path highlight
-    Character.ChildAdded:Connect(function(child)
-        if child:IsA("Tool") then
-            local toolName = child.Name:lower()
-            if toolName:find("gun") or toolName:find("revolver") then
-                child.Equipped:Connect(function()
-                    child.Activated:Connect(function()
-                        if not Camera then Camera = Workspace.CurrentCamera end
-                        local origin = Camera.CFrame.Position
-                        local direction = Camera.CFrame.LookVector * 500
-                        local rayParams = RaycastParams.new()
-                        rayParams.FilterDescendantsInstances = {Character}
-                        rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-                        local result = Workspace:Raycast(origin, direction, rayParams)
-                        local hitPos = (result and result.Position) or (origin + direction)
-                        local diff = hitPos - origin
-                        local distance = diff.Magnitude
-                        local part = Instance.new("Part")
-                        part.Name = "_BulletPath"
-                        part.Anchored = true
-                        part.CanCollide = false
-                        part.Material = Enum.Material.Neon
-                        part.Color = Color3.new(1, 0, 0)
-                        part.Transparency = 0.5
-                        part.Size = Vector3.new(0.1, 0.1, distance)
-                        part.CFrame = CFrame.new(origin, hitPos) * CFrame.new(0, 0, -distance/2)
-                        part.Parent = Workspace
-                        Debris:AddItem(part, 0.5)
-                    end)
-                end)
+-- Ground check by raycast
+local function isGroundByRay()
+    if not RootPart or not Humanoid then return false end
+    groundRayParams.FilterDescendantsInstances = {Character}
+    local rayOrigin = RootPart.Position
+    local rayDir = Vector3.new(0, -1, 0) * (Humanoid.HipHeight + 0.1)
+    local result = workspace:Raycast(rayOrigin, rayDir, groundRayParams)
+    return result ~= nil
+end
+
+-- Start ground checking when in air
+local function startGroundCheck()
+    if checkingGround then return end
+    checkingGround = true
+    groundCheckConn = RunService.Heartbeat:Connect(function()
+        if not Humanoid or not RootPart then return end
+        local st = Humanoid:GetState()
+        if st == Enum.HumanoidStateType.Jumping or st == Enum.HumanoidStateType.Freefall then
+            if isGroundByRay() then
+                -- Grounded detected
+                jumpCount = 0
+                wantJumpOnLand = false
+                -- Dừng ground check
+                if groundCheckConn then
+                    groundCheckConn:Disconnect()
+                    groundCheckConn = nil
+                end
+                checkingGround = false
             end
         end
     end)
 end
+
+-- Called when Character respawn
+local function onCharacterAdded(char)
+    Character = char
+    jumpCount = 0
+    wantJumpOnLand = false
+    -- Disconnect any previous groundCheckConn
+    if groundCheckConn then
+        groundCheckConn:Disconnect()
+        groundCheckConn = nil
+        checkingGround = false
+    end
+    Humanoid = char:WaitForChild("Humanoid", 5)
+    RootPart = char:WaitForChild("HumanoidRootPart", 5)
+    if not Humanoid or not RootPart then return end
+
+    -- StateChanged để reset jumpCount khi grounded, detect jump lần đầu, detect rơi
+    Humanoid.StateChanged:Connect(function(oldState, newState)
+        -- Khi newState là ground states
+        if newState == Enum.HumanoidStateType.Landed
+           or newState == Enum.HumanoidStateType.Running
+           or newState == Enum.HumanoidStateType.Walking
+           or newState == Enum.HumanoidStateType.GettingUp then
+            jumpCount = 0
+            wantJumpOnLand = false
+            if groundCheckConn then
+                groundCheckConn:Disconnect()
+                groundCheckConn = nil
+                checkingGround = false
+            end
+        end
+        -- Khi bắt đầu jump từ ground
+        if newState == Enum.HumanoidStateType.Jumping then
+            if Humanoid.FloorMaterial and Humanoid.FloorMaterial ~= Enum.Material.Air then
+                jumpCount = 1
+                -- Bắt đầu groundCheck để detect landing tiếp
+                startGroundCheck()
+            end
+        end
+        -- Khi rơi
+        if newState == Enum.HumanoidStateType.Freefall then
+            startGroundCheck()
+        end
+    end)
+
+    -- Humanoid.Jumping event bổ trợ detect jump lần đầu
+    Humanoid.Jumping:Connect(function(active)
+        if active and Humanoid.FloorMaterial and Humanoid.FloorMaterial ~= Enum.Material.Air then
+            jumpCount = 1
+            startGroundCheck()
+        end
+    end)
+
+    -- Áp dụng movement defaults khi respawn
+    pcall(function() Humanoid.WalkSpeed = savedWalkSpeed end)
+    pcall(function() Humanoid.JumpPower = savedJumpPower end)
+
+    -- Semi-God health hack
+    Humanoid.HealthChanged:Connect(function(h)
+        if semiGodModeEnabled and Humanoid and Humanoid.Parent and h <= 0 then
+            Humanoid.Health = 1
+            Humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+            task.delay(2.5, function()
+                if Humanoid and Humanoid.Parent and Humanoid:GetState() == Enum.HumanoidStateType.Physics then
+                    Humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+                    Humanoid.Health = Humanoid.MaxHealth
+                end
+            end)
+        end
+    end)
+end
+
 LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
 if LocalPlayer.Character then
     onCharacterAdded(LocalPlayer.Character)
 end
 
+-- Handle JumpRequest globally
+UserInputService.JumpRequest:Connect(function()
+    if not doubleJumpEnabled then return end
+    if not Humanoid or not RootPart then return end
+
+    local st = Humanoid:GetState()
+    -- Nếu grounded: để engine xử lý jump đầu
+    if st == Enum.HumanoidStateType.Running
+       or st == Enum.HumanoidStateType.Walking
+       or st == Enum.HumanoidStateType.Landed
+       or st == Enum.HumanoidStateType.GettingUp then
+        return
+    end
+
+    -- Nếu in air
+    if st == Enum.HumanoidStateType.Jumping or st == Enum.HumanoidStateType.Freefall then
+        if jumpCount < maxJumps then
+            -- Kiểm tra near ground qua raycast
+            local nearGround = isGroundByRay()
+            if nearGround then
+                -- Thực hiện ngay jump phụ
+                Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                jumpCount = jumpCount + 1
+                -- Dừng ground check hiện tại
+                if groundCheckConn then
+                    groundCheckConn:Disconnect()
+                    groundCheckConn = nil
+                    checkingGround = false
+                end
+            else
+                -- Jump phụ mid-air
+                Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                jumpCount = jumpCount + 1
+                startGroundCheck()
+            end
+        else
+            -- Nếu đã hết lượt, không buffer thêm để tránh jump quá 2 lần
+            wantJumpOnLand = false
+        end
+    end
+end)
+
+-- ========= Weapon highlight & ESP (Dot + GunDrop) =========
 -- Weapon highlight
 local weaponHighlights = {}
 local function addWeaponHighlight(player, toolInstance)
@@ -287,7 +355,7 @@ local function clearWeaponHighlightsForPlayer(player)
     weaponHighlights[player] = nil
 end
 
--- ESP (Dot + Weapon + GunDrop)
+-- ESP Dot
 local roleColors = {
     Murderer = Color3.fromRGB(255, 50, 50),
     Sheriff = Color3.fromRGB(0, 89, 255),
@@ -611,7 +679,7 @@ for _, player in ipairs(Players:GetPlayers()) do
 end
 Players.PlayerAdded:Connect(setupDeathNotification)
 
--- Optimize: Dynamic Lighting Transitions
+-- ========= Optimize: Dynamic Lighting & Lower CPU =========
 local midnightDescConn = nil
 local function disablePostEffects()
     Lighting.GlobalShadows = false
@@ -781,7 +849,7 @@ local function restoreLightingOnly()
     notify("Restore Lighting✨", "Restoring lighting settings.", 4)
 end
 
--- Gun Aura
+-- ========= Gun Aura =========
 local function cleanupGunAuraForDrop(drop)
     local conn = gunDropTouchedConns[drop]
     if conn then
@@ -864,7 +932,7 @@ Workspace.DescendantRemoving:Connect(function(obj)
     end
 end)
 
--- UI: Sidebar Tab with Emoji, MiniToggle support
+-- ========= UI: Sidebar Tab with Emoji, MiniToggle support =========
 local gui = Instance.new("ScreenGui")
 gui.Name = "KevinzHub"
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
@@ -889,12 +957,12 @@ do
     stroke.Thickness = 1
 end
 
--- MiniToggle button (shows '+' when window minimized)
+-- MiniToggle button
 local miniToggle = Instance.new("TextButton")
 miniToggle.Name = "MiniToggle"
 miniToggle.Size = UDim2.new(0, 28, 0, 28)
 miniToggle.AnchorPoint = Vector2.new(0, 1)
-miniToggle.Position = UDim2.new(0, 0, 1, 0)  -- bottom-left corner of screen
+miniToggle.Position = UDim2.new(0, 0, 1, 0)
 miniToggle.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 miniToggle.Text = "+"
 miniToggle.Font = Enum.Font.GothamBold
@@ -1008,7 +1076,7 @@ miniToggle.MouseButton1Click:Connect(function()
     miniToggle.Visible = false
 end)
 
--- Sidebar & ContentContainer
+-- Sidebar & ContentContainer với ScrollingFrame
 local sidebar = Instance.new("ScrollingFrame", window)
 sidebar.Name = "Sidebar"
 sidebar.Size = UDim2.new(0, 120, 1, -30)
@@ -1044,7 +1112,6 @@ local tabs = {
     { Name = "Optimize", Emoji = "⚡" },
     { Name = "GunAura",  Emoji = "🔫" },
     { Name = "Settings", Emoji = "⚙️" },
-    -- Nếu sau này bạn thêm tab mới, sidebar sẽ tự cuộn được
 }
 
 local tabButtons = {}
@@ -1264,6 +1331,16 @@ do
         end)
         createSwitch(parent, "Double Jump", function(on)
             doubleJumpEnabled = on
+            -- Reset jumpCount khi tắt
+            if not on then
+                jumpCount = 0
+                wantJumpOnLand = false
+                if groundCheckConn then
+                    groundCheckConn:Disconnect()
+                    groundCheckConn = nil
+                    checkingGround = false
+                end
+            end
             notify("Double Jump", on and "Enabled" or "Disabled", 2)
         end)
     end
