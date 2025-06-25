@@ -619,8 +619,8 @@ function KevinzHub:MakeWindow(opt)
                 if slOpt.WithTextbox then
                     textbox = Instance.new("TextBox", secFrame)
                     textbox.Size = UDim2.new(0,textboxW,0,labelHeight+10)
-                    textbox.Position = UDim2.new(0,10+sliderW+gap,0,itemY)
-                    textbox.BackgroundColor3 = COLORS.ParagraphBg
+                    textbox.Position = UDim2.new(0,7+sliderW+gap,0,itemY)
+                    textbox.BackgroundColor3 = Color3.fromRGB(60, 80, 140)
                     textbox.TextColor3 = COLORS.LabelText
                     textbox.Font = Enum.Font.Gotham
                     textbox.TextSize = 14
