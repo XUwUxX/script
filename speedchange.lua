@@ -1,4 +1,4 @@
--- Kevinz Hub Full Script v1.42 (Tích hợp thuật toán Double Jump cải tiến)
+-- Kevinz Hub Full Script v1.43 (Thay thế Double Jump thành Infinity Jump)
 -- Place this LocalScript in StarterPlayerScripts hoặc StarterGui
 
 -- Services
@@ -15,7 +15,7 @@ local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Character, Humanoid, RootPart
 local Camera = Workspace.CurrentCamera
-local HUB_VERSION = "v1.42"
+local HUB_VERSION = "v1.43"
 
 -- Movement defaults
 local savedWalkSpeed = 16
@@ -28,17 +28,8 @@ if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") th
     end
 end
 
--- Double Jump improved variables
-local doubleJumpEnabled = false  -- sẽ gán từ UI toggle
-local maxJumps = 2
-local jumpCount = 0
-local wantJumpOnLand = false
--- Ground detection control
-local groundRayParams = RaycastParams.new()
-groundRayParams.FilterType = Enum.RaycastFilterType.Blacklist
-groundRayParams.FilterDescendantsInstances = {}  -- cập nhật khi Character gán
-local checkingGround = false
-local groundCheckConn
+-- Infinity Jump variable
+local infinityJumpEnabled = false  -- sẽ gán từ UI toggle
 
 -- Semi-God
 local semiGodModeEnabled = false
@@ -165,94 +156,14 @@ local function setupLocalRoleListeners()
 end
 setupLocalRoleListeners()
 
--- ========= Double Jump improved functions =========
-
--- Ground check by raycast
-local function isGroundByRay()
-    if not RootPart or not Humanoid then return false end
-    groundRayParams.FilterDescendantsInstances = {Character}
-    local rayOrigin = RootPart.Position
-    local rayDir = Vector3.new(0, -1, 0) * (Humanoid.HipHeight + 0.1)
-    local result = workspace:Raycast(rayOrigin, rayDir, groundRayParams)
-    return result ~= nil
-end
-
--- Start ground checking when in air
-local function startGroundCheck()
-    if checkingGround then return end
-    checkingGround = true
-    groundCheckConn = RunService.Heartbeat:Connect(function()
-        if not Humanoid or not RootPart then return end
-        local st = Humanoid:GetState()
-        if st == Enum.HumanoidStateType.Jumping or st == Enum.HumanoidStateType.Freefall then
-            if isGroundByRay() then
-                -- Grounded detected
-                jumpCount = 0
-                wantJumpOnLand = false
-                -- Dừng ground check
-                if groundCheckConn then
-                    groundCheckConn:Disconnect()
-                    groundCheckConn = nil
-                end
-                checkingGround = false
-            end
-        end
-    end)
-end
-
--- Called when Character respawn
+-- ========= Character / Humanoid setup =========
 local function onCharacterAdded(char)
     Character = char
-    jumpCount = 0
-    wantJumpOnLand = false
-    -- Disconnect any previous groundCheckConn
-    if groundCheckConn then
-        groundCheckConn:Disconnect()
-        groundCheckConn = nil
-        checkingGround = false
-    end
     Humanoid = char:WaitForChild("Humanoid", 5)
     RootPart = char:WaitForChild("HumanoidRootPart", 5)
     if not Humanoid or not RootPart then return end
 
-    -- StateChanged để reset jumpCount khi grounded, detect jump lần đầu, detect rơi
-    Humanoid.StateChanged:Connect(function(oldState, newState)
-        -- Khi newState là ground states
-        if newState == Enum.HumanoidStateType.Landed
-           or newState == Enum.HumanoidStateType.Running
-           or newState == Enum.HumanoidStateType.Walking
-           or newState == Enum.HumanoidStateType.GettingUp then
-            jumpCount = 0
-            wantJumpOnLand = false
-            if groundCheckConn then
-                groundCheckConn:Disconnect()
-                groundCheckConn = nil
-                checkingGround = false
-            end
-        end
-        -- Khi bắt đầu jump từ ground
-        if newState == Enum.HumanoidStateType.Jumping then
-            if Humanoid.FloorMaterial and Humanoid.FloorMaterial ~= Enum.Material.Air then
-                jumpCount = 1
-                -- Bắt đầu groundCheck để detect landing tiếp
-                startGroundCheck()
-            end
-        end
-        -- Khi rơi
-        if newState == Enum.HumanoidStateType.Freefall then
-            startGroundCheck()
-        end
-    end)
-
-    -- Humanoid.Jumping event bổ trợ detect jump lần đầu
-    Humanoid.Jumping:Connect(function(active)
-        if active and Humanoid.FloorMaterial and Humanoid.FloorMaterial ~= Enum.Material.Air then
-            jumpCount = 1
-            startGroundCheck()
-        end
-    end)
-
-    -- Áp dụng movement defaults khi respawn
+    -- Apply movement defaults
     pcall(function() Humanoid.WalkSpeed = savedWalkSpeed end)
     pcall(function() Humanoid.JumpPower = savedJumpPower end)
 
@@ -276,46 +187,13 @@ if LocalPlayer.Character then
     onCharacterAdded(LocalPlayer.Character)
 end
 
--- Handle JumpRequest globally
+-- ========= Infinity Jump handling =========
+-- UserInputService.JumpRequest để ép jump vô hạn khi enabled
 UserInputService.JumpRequest:Connect(function()
-    if not doubleJumpEnabled then return end
-    if not Humanoid or not RootPart then return end
-
-    local st = Humanoid:GetState()
-    -- Nếu grounded: để engine xử lý jump đầu
-    if st == Enum.HumanoidStateType.Running
-       or st == Enum.HumanoidStateType.Walking
-       or st == Enum.HumanoidStateType.Landed
-       or st == Enum.HumanoidStateType.GettingUp then
-        return
-    end
-
-    -- Nếu in air
-    if st == Enum.HumanoidStateType.Jumping or st == Enum.HumanoidStateType.Freefall then
-        if jumpCount < maxJumps then
-            -- Kiểm tra near ground qua raycast
-            local nearGround = isGroundByRay()
-            if nearGround then
-                -- Thực hiện ngay jump phụ
-                Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-                jumpCount = jumpCount + 1
-                -- Dừng ground check hiện tại
-                if groundCheckConn then
-                    groundCheckConn:Disconnect()
-                    groundCheckConn = nil
-                    checkingGround = false
-                end
-            else
-                -- Jump phụ mid-air
-                Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-                jumpCount = jumpCount + 1
-                startGroundCheck()
-            end
-        else
-            -- Nếu đã hết lượt, không buffer thêm để tránh jump quá 2 lần
-            wantJumpOnLand = false
-        end
-    end
+    if not infinityJumpEnabled then return end
+    if not Humanoid then return end
+    -- Ép Humanoid nhảy bất kể state hiện tại
+    Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
 end)
 
 -- ========= Weapon highlight & ESP (Dot + GunDrop) =========
@@ -1036,7 +914,7 @@ do
     closeScriptButton.Text = "X"
     closeScriptButton.Font = Enum.Font.GothamBold
     closeScriptButton.TextSize = 14
-    closeScriptButton.TextColor3 = Color3.fromRGB(230, 230, 230)
+    closeScriptButton.TextColor3 = Color3.fromRGB(230, 230,230)
     closeScriptButton.AutoButtonColor = false
     Instance.new("UICorner", closeScriptButton).CornerRadius = UDim.new(1, 0)
     closeScriptButton.LayoutOrder = 4
@@ -1329,19 +1207,9 @@ do
             semiGodModeEnabled = on
             notify("Semi-God Mode🔥", on and "ON" or "OFF", 2)
         end)
-        createSwitch(parent, "Double Jump", function(on)
-            doubleJumpEnabled = on
-            -- Reset jumpCount khi tắt
-            if not on then
-                jumpCount = 0
-                wantJumpOnLand = false
-                if groundCheckConn then
-                    groundCheckConn:Disconnect()
-                    groundCheckConn = nil
-                    checkingGround = false
-                end
-            end
-            notify("Double Jump", on and "Enabled" or "Disabled", 2)
+        createSwitch(parent, "Infinity Jump", function(on)
+            infinityJumpEnabled = on
+            notify("Infinity Jump", on and "Enabled" or "Disabled", 2)
         end)
     end
 end
