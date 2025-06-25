@@ -1,6 +1,6 @@
--- KevinzHub: API-Style UI Library (OrionLib-Like)
--- You can use: local KevinzHub = loadstring(game:HttpGet("..."))()
--- Doc: KevinzHub:MakeNotification, :MakeWindow, Window:MakeTab, Tab:AddSection, Section:AddButton, Section:AddSlider, KevinzHub:Init(), KevinzHub:Destroy()
+-- KevinzHub API Style UI Library
+-- Usage: local KevinzHub = loadstring(game:HttpGet("..."))()
+-- KevinzHub:MakeNotification(...), :MakeWindow(...), Window:MakeTab(...), Tab:AddSection(...), Section:AddButton, Section:AddSlider, etc.
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -49,9 +49,9 @@ local ANIM = {
 }
 
 local KevinzHub = {}
-local _ui = {} -- store all UI refs for destroy
+local _ui = {}
 
--- ========= UTILS =========
+-- Utility
 local function makeRoundedFrame(props)
     local f = Instance.new("Frame")
     for k,v in pairs(props) do f[k] = v end
@@ -96,10 +96,9 @@ local function addBtnAnim(btn)
     end)
 end
 
--- ========= MAIN KEVINZHUB API =========
-
+-- Notification API
 function KevinzHub:MakeNotification(opt)
-    -- opt: {Name, Content, Image, Time}
+    -- opt = {Name, Content, Image, Time}
     if not _ui.notifFrame then
         local notifFrame = Instance.new("Frame", _ui.screenGui or PlayerGui)
         notifFrame.Name = "NotificationFrame"
@@ -167,6 +166,7 @@ function KevinzHub:MakeNotification(opt)
     end)
 end
 
+-- Main Window API
 function KevinzHub:MakeWindow(opt)
     -- opt: {Name, HidePremium, SaveConfig, ConfigFolder}
     local screenGui = Instance.new("ScreenGui")
@@ -186,6 +186,7 @@ function KevinzHub:MakeWindow(opt)
     })
     _ui.window = window
 
+    -- TopBar
     local topBar = makeRoundedFrame({
         Name = "TopBar",
         Parent = window,
@@ -378,7 +379,6 @@ function KevinzHub:MakeWindow(opt)
         updateSidebarScroll()
     end)
 
-    -- Tab select anim
     local function selectTab(name)
         for n,btn in pairs(tabs) do
             local active = (n==name)
@@ -440,7 +440,7 @@ function KevinzHub:MakeWindow(opt)
         end)
         if tabOrder == 1 then selectTab(tabOpt.Name) end
 
-        -- Tab API: AddSection
+        -- Section API
         local Tab = {}
         local sectionOrder = 0
         function Tab:AddSection(secOpt)
@@ -566,7 +566,7 @@ function KevinzHub:MakeWindow(opt)
     end
 
     function Window:Destroy()
-        KevinzHub:Destroy() -- proxy
+        KevinzHub:Destroy()
     end
 
     return Window
@@ -578,7 +578,7 @@ function KevinzHub:Destroy()
     _ui = {}
 end
 
-function KevinzHub:Init() -- for compatibility, auto show
+function KevinzHub:Init()
     if _ui.screenGui then _ui.screenGui.Enabled = true end
 end
 
