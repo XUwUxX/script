@@ -1,4 +1,4 @@
--- KevinzHub API Style UI Library (FULL, FIXED & OPTIMIZED, textbox nền nổi bật)
+-- KevinzHub API Style UI Library (textbox bg 66,68,79, fix UserThumbnail headshot)
 -- Usage: local KevinzHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/XUwUxX/script/refs/heads/main/kevinzhub.lua"))()
 -- API: MakeNotification, MakeWindow, Tab:AddSection, Section:AddButton, Section:AddSlider, Section:AddToggle, etc.
 
@@ -37,7 +37,7 @@ local COLORS = {
     TabIconActive = Color3.fromRGB(0,180,80),
     NotifBg       = Color3.fromRGB(30,32,38),
     NotifText     = Color3.fromRGB(240,240,255),
-    TextboxBg     = Color3.fromRGB(65,85,150), -- Nền nổi bật cho textbox
+    TextboxBg     = Color3.fromRGB(66,68,79), -- Đổi thành (66,68,79)
 }
 
 local ANIM = {
@@ -102,7 +102,6 @@ function KevinzHub:MakeNotification(opt)
     -- opt = {Name, Content, Image, Time}
     local isCoreNotif = false
     if pcall(function() return game:GetService("StarterGui"):SetCore("SendNotification",{}) end) then
-        -- Nếu game hỗ trợ SetCore, dùng cả native notification
         isCoreNotif = true
         pcall(function()
             game:GetService("StarterGui"):SetCore("SendNotification",{
@@ -184,7 +183,6 @@ end
 
 -- Main Window API
 function KevinzHub:MakeWindow(opt)
-    -- opt: {Name, HidePremium, SaveConfig, ConfigFolder}
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "KevinzHubUI"
     screenGui.ResetOnSpawn = false
@@ -336,7 +334,7 @@ function KevinzHub:MakeWindow(opt)
     pad.PaddingTop, pad.PaddingLeft = UDim.new(0,10), UDim.new(0,8)
     pad.PaddingRight, pad.PaddingBottom = UDim.new(0,8), UDim.new(0,8)
 
-    -- SearchBar -- (FIX: clear text, no default text)
+    -- SearchBar
     local searchBar = Instance.new("TextBox")
     searchBar.Parent = sidebar
     searchBar.Size = UDim2.new(1,-16,0,28)
@@ -358,7 +356,7 @@ function KevinzHub:MakeWindow(opt)
     list.Padding = UDim.new(0,8)
     list.Parent = sidebar
 
-    -- User Info (PUT AT BOTTOM, always visible)
+    -- User Info (bottom, luôn hiện, headshot fix)
     local function renderUserInfo()
         local uf = Instance.new("Frame")
         uf.Name = "UserInfo"
@@ -369,9 +367,15 @@ function KevinzHub:MakeWindow(opt)
         uf.Parent = sidebar
 
         local thumb = ""
-        pcall(function()
-            thumb = Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
+        -- Sửa: dùng hàm đồng bộ, luôn trả về thumbnail
+        local success, result = pcall(function()
+            return Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
         end)
+        if success and typeof(result) == "string" and #result > 0 then
+            thumb = result
+        else
+            thumb = "rbxassetid://77339698" -- fallback: Roblox logo
+        end
         local av = Instance.new("ImageLabel", uf)
         av.Name="Avatar"; av.Size=UDim2.new(0,48,0,48); av.Position=UDim2.new(0,0,0,0)
         av.BackgroundTransparency=1; av.Image=thumb
@@ -383,7 +387,7 @@ function KevinzHub:MakeWindow(opt)
         return uf
     end
     local userInfoFrame = renderUserInfo()
-    userInfoFrame.LayoutOrder = 1e9 -- always at bottom
+    userInfoFrame.LayoutOrder = 1e9
 
     -- Tabs
     local tabs = {}
@@ -394,7 +398,6 @@ function KevinzHub:MakeWindow(opt)
     local scrolling = 0
     local function updateSidebarScroll()
         RunService.Heartbeat:Wait()
-        -- Exclude userInfoFrame height from scrollable area!
         local absContent = list.AbsoluteContentSize.Y + pad.PaddingTop.Offset + pad.PaddingBottom.Offset + searchBar.Size.Y.Offset + 6
         local visible = sidebarHolder.AbsoluteSize.Y - userInfoFrame.Size.Y.Offset - 16
         if absContent > visible then
@@ -403,7 +406,6 @@ function KevinzHub:MakeWindow(opt)
             sidebar.Position = UDim2.new(0,0,0,0)
             scrolling = 0
         end
-        -- User info always at bottom
         userInfoFrame.Position = UDim2.new(0,8,1,-userInfoFrame.Size.Y.Offset-8)
     end
     list:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateSidebarScroll)
@@ -420,7 +422,7 @@ function KevinzHub:MakeWindow(opt)
     end)
     updateSidebarScroll()
 
-    -- Tab filter logic (FIX: no ghost text, no bug)
+    -- Tab filter logic
     searchBar:GetPropertyChangedSignal("Text"):Connect(function()
         local query = searchBar.Text:lower()
         for tabName, tabBtn in pairs(tabs) do
@@ -544,10 +546,11 @@ function KevinzHub:MakeWindow(opt)
                 local textboxW = (slOpt.WithTextbox and 54) or 0
                 local gap = slOpt.WithTextbox and 10 or 0
 
+                local labelYOffset = 6
                 local lbl = Instance.new("TextLabel", secFrame)
                 lbl.Name = "SliderLabel"
                 lbl.Size = UDim2.new(0,sliderW+textboxW+gap,0,labelHeight)
-                lbl.Position = UDim2.new(0,10,0,itemY)
+                lbl.Position = UDim2.new(0,10,0,itemY-labelHeight-labelYOffset) -- label cao hơn
                 lbl.BackgroundTransparency = 1
                 lbl.Font = Enum.Font.Gotham
                 lbl.Text = slOpt.Name
@@ -557,7 +560,7 @@ function KevinzHub:MakeWindow(opt)
 
                 local sliderBg = makeRoundedFrame{
                     Name = slOpt.Name.."Slider", Parent = secFrame,
-                    Position = UDim2.new(0,10,0,itemY+labelHeight+2),
+                    Position = UDim2.new(0,10,0,itemY),
                     Size = UDim2.new(0,sliderW,0,12),
                     BackgroundColor3 = COLORS.SliderTrack
                 }
@@ -620,8 +623,8 @@ function KevinzHub:MakeWindow(opt)
                 if slOpt.WithTextbox then
                     textbox = Instance.new("TextBox", secFrame)
                     textbox.Size = UDim2.new(0,textboxW,0,labelHeight+10)
-                    textbox.Position = UDim2.new(0,10+sliderW+gap,0,itemY)
-                    textbox.BackgroundColor3 = COLORS.TextboxBg -- Nền nổi bật!
+                    textbox.Position = UDim2.new(0,10+sliderW+gap,0,itemY-3)
+                    textbox.BackgroundColor3 = COLORS.TextboxBg -- Đổi thành (66,68,79)
                     textbox.TextColor3 = COLORS.LabelText
                     textbox.Font = Enum.Font.Gotham
                     textbox.TextSize = 14
@@ -643,7 +646,6 @@ function KevinzHub:MakeWindow(opt)
             end
 
             function Section:AddToggle(opt)
-                -- Switch button (toggle)
                 local toggleW, toggleH = 48, 24
                 local toggleBg = makeRoundedFrame{
                     Name = opt.Name.."ToggleBG", Parent = secFrame,
