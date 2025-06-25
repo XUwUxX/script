@@ -546,7 +546,7 @@ function KevinzHub:MakeWindow(opt)
                 local lbl = Instance.new("TextLabel", secFrame)
                 lbl.Name = "SliderLabel"
                 lbl.Size = UDim2.new(0,sliderW+textboxW+gap,0,labelHeight)
-                lbl.Position = UDim2.new(0,10,0,itemY)
+                lbl.Position = UDim2.new(0,19,0,itemY)
                 lbl.BackgroundTransparency = 1
                 lbl.Font = Enum.Font.Gotham
                 lbl.Text = slOpt.Name
