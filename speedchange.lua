@@ -1,5 +1,5 @@
--- Kevinz Hub Full Script v1.40 (Sidebar Tab UI with Emoji Icons, Dynamic Lighting Transitions, Event Cleanup, MiniToggle fix, Scrollable Sidebar)
--- Đã thêm tính năng Double Jump (max 2 jumps) trong tab Movement
+-- Kevinz Hub Full Script v1.41 (Sidebar Tab UI with Emoji Icons, Dynamic Lighting Transitions, Event Cleanup, MiniToggle fix, Scrollable Sidebar, Improved Double Jump)
+-- Đã thêm tính năng Double Jump (maxJumpCount tùy chỉnh) trong tab Movement, với logic ổn định
 -- Place this LocalScript in StarterPlayerScripts or StarterGui
 
 -- Services
@@ -16,7 +16,7 @@ local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Character, Humanoid, RootPart = nil, nil, nil
 local Camera = Workspace.CurrentCamera
-local HUB_VERSION = "v1.40"
+local HUB_VERSION = "v1.41"
 
 -- Movement defaults
 local savedWalkSpeed = 16
@@ -31,9 +31,8 @@ end
 
 -- Double Jump / Infinity Jump settings
 local infinityJumpEnabled = false
-local maxJumpCount = 2  -- Số lần nhảy tối đa (1 lần nhảy chính + 1 lần nhảy giữa không trung)
--- Bảng lưu jumpCount theo từng Humanoid để reset khi chạm đất
-local jumpCountTable = {}
+local maxJumpCount = 2  -- Số lần nhảy tối đa (1 lần nhảy chính + (maxJumpCount-1) lần nhảy giữa không trung)
+-- Không dùng jumpCountTable chung nữa, sẽ quản lý jumpCount cục bộ trong onCharacterAdded
 
 -- Semi-God
 local semiGodModeEnabled = false
@@ -186,40 +185,30 @@ local function onCharacterAdded(char)
 
     -- Double Jump setup: chỉ khi Humanoid tồn tại
     if Humanoid then
-        -- Khởi tạo jumpCount cho Humanoid này
-        jumpCountTable[Humanoid] = 0
-        -- Reset jumpCount khi chạm đất
+        -- Biến cục bộ quản lý số lần đã nhảy
+        local jumpCount = 0
+        -- Kết nối StateChanged để reset và đánh dấu lần nhảy đầu
         Humanoid.StateChanged:Connect(function(oldState, newState)
-            if newState == Enum.HumanoidStateType.Landed or newState == Enum.HumanoidStateType.Running or newState == Enum.HumanoidStateType.Walking then
-                -- Khi trạng thái mới là Landed hoặc Running/Walking (đã xuống đất), reset
-                jumpCountTable[Humanoid] = 0
-            elseif newState == Enum.HumanoidStateType.Jumping then
-                -- Khi nhảy từ đất: nếu đang ở mặt đất thì đánh dấu đã dùng 1 jump
-                -- Tuy nhiên, logic sẽ handle trong InputBegan bên dưới
+            if newState == Enum.HumanoidStateType.Landed then
+                -- Khi chạm đất, reset
+                jumpCount = 0
+            elseif oldState ~= Enum.HumanoidStateType.Freefall and newState == Enum.HumanoidStateType.Jumping then
+                -- Khi nhảy từ mặt đất hoặc từ trạng thái khác thành Jumping, đặt jumpCount = 1
+                -- Lưu ý: auto jump lần đầu được Roblox xử lý, ta chỉ đánh dấu
+                jumpCount = 1
             end
         end)
+
         -- Bắt Input Space để implement Double Jump
         UserInputService.InputBegan:Connect(function(input, gameProcessed)
             if gameProcessed then return end
             if not infinityJumpEnabled then return end
             if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Enum.KeyCode.Space then
                 if not Humanoid or not Humanoid.Parent then return end
-                -- Kiểm tra FloorMaterial: nếu trên đất (FloorMaterial ~= Air) => nhảy bình thường: gán jumpCount=1
-                local floorMat = Humanoid.FloorMaterial
-                if floorMat and floorMat ~= Enum.Material.Air then
-                    -- Nhảy lần đầu
-                    jumpCountTable[Humanoid] = 1
-                    -- Roblox sẽ tự handle nhảy khi nhấn Space, ta không cần gọi ChangeState ở đây
-                    -- Nhưng nếu muốn đảm bảo, có thể gọi:
-                    -- Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-                else
-                    -- Đang ở giữa không trung: nếu chưa dùng hết maxJumpCount thì cho nhảy tiếp
-                    local used = jumpCountTable[Humanoid] or 0
-                    if used < maxJumpCount then
-                        -- Cho phép nhảy giữa không trung
-                        Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-                        jumpCountTable[Humanoid] = used + 1
-                    end
+                -- Khi đang ở giữa không trung (Freefall) và chưa đạt maxJumpCount
+                if Humanoid:GetState() == Enum.HumanoidStateType.Freefall and jumpCount < maxJumpCount then
+                    jumpCount = jumpCount + 1
+                    Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
                 end
             end
         end)
@@ -1284,16 +1273,12 @@ do
             notify("Semi-God Mode🔥", on and "ON" or "OFF", 2)
         end)
         -- Double Jump toggle
-        createSwitch(parent, "Double Jump (2 jumps)", function(on)
+        createSwitch(parent, "Double Jump", function(on)
             infinityJumpEnabled = on
             if on then
-                notify("Double Jump", "Enabled (max 2 jumps)", 2)
+                notify("Double Jump", "Enabled (max " .. tostring(maxJumpCount) .. " jumps)", 2)
             else
                 notify("Double Jump", "Disabled", 2)
-                -- Khi tắt, reset jumpCount nếu cần
-                if Humanoid then
-                    jumpCountTable[Humanoid] = 0
-                end
             end
         end)
         createInput(parent, "Max Jump Count", function() return maxJumpCount end, function(v)
