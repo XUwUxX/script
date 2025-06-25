@@ -1,6 +1,6 @@
--- KevinzHub API Style UI Library (Full Optimized Version)
--- Usage: local KevinzHub = loadstring(game:HttpGet("YOUR_RAW_LINK_HERE"))()
--- API: MakeNotification, MakeWindow, Window:MakeTab, Tab:AddSection, Section:AddButton/Slider/Toggle, etc.
+-- KevinzHub API Style UI Library (FULL, FIXED & OPTIMIZED)
+-- Usage: local KevinzHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/XUwUxX/script/refs/heads/main/kevinzhub.lua"))()
+-- API: MakeNotification, MakeWindow, Tab:AddSection, Section:AddButton, Section:AddSlider, Section:AddToggle, etc.
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -37,7 +37,6 @@ local COLORS = {
     TabIconActive = Color3.fromRGB(0,180,80),
     NotifBg       = Color3.fromRGB(30,32,38),
     NotifText     = Color3.fromRGB(240,240,255),
-    SearchBg      = Color3.fromRGB(41,42,48),
 }
 
 local ANIM = {
@@ -49,7 +48,8 @@ local ANIM = {
     NotifFadeOut = 0.35,
 }
 
-local KevinzHub, _ui = {}, {}
+local KevinzHub = {}
+local _ui = {}
 
 -- Utility
 local function makeRoundedFrame(props)
@@ -96,9 +96,24 @@ local function addBtnAnim(btn)
     end)
 end
 
--- Notification API
+-- Notification API (roblox StarterGui:SetCore fallback if possible)
 function KevinzHub:MakeNotification(opt)
     -- opt = {Name, Content, Image, Time}
+    local isCoreNotif = false
+    if pcall(function() return game:GetService("StarterGui"):SetCore("SendNotification",{}) end) then
+        -- Nếu game hỗ trợ SetCore, dùng cả native notification
+        isCoreNotif = true
+        pcall(function()
+            game:GetService("StarterGui"):SetCore("SendNotification",{
+                Title = opt.Name or "Kevinzhub",
+                Text = opt.Content or "",
+                Duration = opt.Time or 2.5,
+                Icon = opt.Image or "rbxassetid://6655732457"
+            })
+        end)
+    end
+
+    -- Custom notification (UI)
     if not _ui.notifFrame then
         local notifFrame = Instance.new("Frame", _ui.screenGui or PlayerGui)
         notifFrame.Name = "NotificationFrame"
@@ -166,20 +181,9 @@ function KevinzHub:MakeNotification(opt)
     end)
 end
 
-local function GameAutoNotif()
-    if game.PlaceId and type(game.PlaceId) == "number" then
-        local placeName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
-        KevinzHub:MakeNotification{
-            Name = "Game: "..placeName,
-            Content = "PlaceId: "..tostring(game.PlaceId),
-            Image = "rbxassetid://4483345998",
-            Time = 4
-        }
-    end
-end
-
 -- Main Window API
 function KevinzHub:MakeWindow(opt)
+    -- opt: {Name, HidePremium, SaveConfig, ConfigFolder}
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "KevinzHubUI"
     screenGui.ResetOnSpawn = false
@@ -331,20 +335,20 @@ function KevinzHub:MakeWindow(opt)
     pad.PaddingTop, pad.PaddingLeft = UDim.new(0,10), UDim.new(0,8)
     pad.PaddingRight, pad.PaddingBottom = UDim.new(0,8), UDim.new(0,8)
 
-    -- Search bar fix: always empty, no autofill
+    -- SearchBar -- (FIX: clear text, no default text)
     local searchBar = Instance.new("TextBox")
     searchBar.Parent = sidebar
     searchBar.Size = UDim2.new(1,-16,0,28)
     searchBar.Position = UDim2.new(0,8,0,4)
-    searchBar.BackgroundColor3 = COLORS.SearchBg
+    searchBar.PlaceholderText = "Tìm tab..."
+    searchBar.Text = ""
+    searchBar.BackgroundColor3 = COLORS.ParagraphBg
     searchBar.TextColor3 = COLORS.LabelText
     searchBar.ClearTextOnFocus = true
     searchBar.Font = Enum.Font.Gotham
     searchBar.TextSize = 15
     searchBar.BorderSizePixel = 0
     searchBar.ZIndex = 2
-    searchBar.PlaceholderText = "Tìm tab..."
-    searchBar.Text = "" -- always empty
     local searchCorner = Instance.new("UICorner", searchBar)
     searchCorner.CornerRadius = UDim.new(0,7)
 
@@ -353,49 +357,60 @@ function KevinzHub:MakeWindow(opt)
     list.Padding = UDim.new(0,8)
     list.Parent = sidebar
 
-    -- UserInfo (bottom)
-    local userFrame = Instance.new("Frame", sidebar)
-    userFrame.Name = "UserInfo"
-    userFrame.BackgroundTransparency = 1
-    userFrame.Size = UDim2.new(1,-16,0,54)
-    userFrame.Position = UDim2.new(0,8,1,-64)
-    userFrame.AnchorPoint = Vector2.new(0,1)
-    userFrame.ZIndex = 20
-    local thumb = ""
-    pcall(function()
-        thumb = Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
-    end)
-    local av = Instance.new("ImageLabel", userFrame)
-    av.Name="Avatar"; av.Size=UDim2.new(0,48,0,48); av.Position=UDim2.new(0,0,0,3)
-    av.BackgroundTransparency=1; av.Image=thumb
-    local nm = Instance.new("TextLabel", userFrame)
-    nm.Name="Username"; nm.Size=UDim2.new(1,-60,1,0); nm.Position=UDim2.new(0,56,0,0)
-    nm.BackgroundTransparency=1; nm.Font=Enum.Font.GothamBold; nm.Text=LocalPlayer.Name
-    nm.TextSize=15; nm.TextColor3=COLORS.LabelText; nm.TextXAlignment=Enum.TextXAlignment.Left
+    -- User Info (PUT AT BOTTOM, always visible)
+    local function renderUserInfo()
+        local uf = Instance.new("Frame")
+        uf.Name = "UserInfo"
+        uf.BackgroundTransparency=1
+        uf.AnchorPoint = Vector2.new(0,1)
+        uf.Position = UDim2.new(0,8,1,-12)
+        uf.Size = UDim2.new(1,-16,0,50)
+        uf.Parent = sidebar
 
-    local tabs, tabContents, tabOrder = {}, {}, 0
+        local thumb = ""
+        pcall(function()
+            thumb = Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
+        end)
+        local av = Instance.new("ImageLabel", uf)
+        av.Name="Avatar"; av.Size=UDim2.new(0,48,0,48); av.Position=UDim2.new(0,0,0,0)
+        av.BackgroundTransparency=1; av.Image=thumb
 
+        local nm = Instance.new("TextLabel", uf)
+        nm.Name="Username"; nm.Size=UDim2.new(1,-60,1,0); nm.Position=UDim2.new(0,56,0,0)
+        nm.BackgroundTransparency=1; nm.Font=Enum.Font.GothamBold; nm.Text=LocalPlayer.Name
+        nm.TextSize=15; nm.TextColor3=COLORS.LabelText; nm.TextXAlignment=Enum.TextXAlignment.Left
+        return uf
+    end
+    local userInfoFrame = renderUserInfo()
+    userInfoFrame.LayoutOrder = 1e9 -- always at bottom
+
+    -- Tabs
+    local tabs = {}
+    local tabContents = {}
+    local tabOrder = 0
+
+    -- Dynamic sidebar scroll
     local scrolling = 0
     local function updateSidebarScroll()
         RunService.Heartbeat:Wait()
+        -- Exclude userInfoFrame height from scrollable area!
         local absContent = list.AbsoluteContentSize.Y + pad.PaddingTop.Offset + pad.PaddingBottom.Offset + searchBar.Size.Y.Offset + 6
-        local userInfoHeight = userFrame.Size.Y.Offset + 12
-        local visible = sidebarHolder.AbsoluteSize.Y - userInfoHeight
+        local visible = sidebarHolder.AbsoluteSize.Y - userInfoFrame.Size.Y.Offset - 16
         if absContent > visible then
             sidebar.Position = UDim2.new(0,0,0,-scrolling)
         else
             sidebar.Position = UDim2.new(0,0,0,0)
             scrolling = 0
         end
-        userFrame.Position = UDim2.new(0,8,1,-userInfoHeight)
+        -- User info always at bottom
+        userInfoFrame.Position = UDim2.new(0,8,1,-userInfoFrame.Size.Y.Offset-8)
     end
     list:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateSidebarScroll)
     sidebarHolder:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateSidebarScroll)
     sidebarHolder.InputChanged:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseWheel then
             local absContent = list.AbsoluteContentSize.Y + pad.PaddingTop.Offset + pad.PaddingBottom.Offset + searchBar.Size.Y.Offset + 6
-            local userInfoHeight = userFrame.Size.Y.Offset + 12
-            local visible = sidebarHolder.AbsoluteSize.Y - userInfoHeight
+            local visible = sidebarHolder.AbsoluteSize.Y - userInfoFrame.Size.Y.Offset - 16
             if absContent > visible then
                 scrolling = math.clamp(scrolling - input.Position.Z * 26, 0, absContent - visible)
                 sidebar.Position = UDim2.new(0,0,0,-scrolling)
@@ -404,18 +419,12 @@ function KevinzHub:MakeWindow(opt)
     end)
     updateSidebarScroll()
 
-    -- Sidebar search fix
+    -- Tab filter logic (FIX: no ghost text, no bug)
     searchBar:GetPropertyChangedSignal("Text"):Connect(function()
         local query = searchBar.Text:lower()
         for tabName, tabBtn in pairs(tabs) do
             tabBtn.Visible = (query == "" or tabName:lower():find(query))
         end
-        updateSidebarScroll()
-    end)
-    searchBar.FocusLost:Connect(function()
-        -- always clear after search to avoid sticky text
-        searchBar.Text = ""
-        for _,tabBtn in pairs(tabs) do tabBtn.Visible = true end
         updateSidebarScroll()
     end)
 
@@ -504,7 +513,6 @@ function KevinzHub:MakeWindow(opt)
 
             local Section = {}
             local itemY = 34
-
             function Section:AddButton(btnOpt)
                 local btn = makeRoundedFrame{
                     Name = btnOpt.Name.."Btn", Parent = secFrame,
@@ -528,12 +536,28 @@ function KevinzHub:MakeWindow(opt)
                 end)
                 itemY = itemY + 40
             end
-
             function Section:AddSlider(slOpt)
+                -- Support WithTextbox: true
+                local labelHeight = 25
+                local sliderW = 160
+                local textboxW = (slOpt.WithTextbox and 54) or 0
+                local gap = slOpt.WithTextbox and 10 or 0
+
+                local lbl = Instance.new("TextLabel", secFrame)
+                lbl.Name = "SliderLabel"
+                lbl.Size = UDim2.new(0,sliderW+textboxW+gap,0,labelHeight)
+                lbl.Position = UDim2.new(0,10,0,itemY)
+                lbl.BackgroundTransparency = 1
+                lbl.Font = Enum.Font.Gotham
+                lbl.Text = slOpt.Name
+                lbl.TextSize = 14
+                lbl.TextColor3 = COLORS.LabelText
+                lbl.TextXAlignment = Enum.TextXAlignment.Left
+
                 local sliderBg = makeRoundedFrame{
                     Name = slOpt.Name.."Slider", Parent = secFrame,
-                    Position = UDim2.new(0,10,0,itemY+10),
-                    Size = UDim2.new(0,180,0,12),
+                    Position = UDim2.new(0,10,0,itemY+labelHeight+2),
+                    Size = UDim2.new(0,sliderW,0,12),
                     BackgroundColor3 = COLORS.SliderTrack
                 }
                 local sliderFill = makeRoundedFrame{
@@ -551,15 +575,19 @@ function KevinzHub:MakeWindow(opt)
                 local corner = Instance.new("UICorner", sliderKnob)
                 corner.CornerRadius = UDim.new(0, 6)
                 local val = slOpt.Default or slOpt.Min or 0
-                local min, max = slOpt.Min, slOpt.Max
-                local function setSlider(v)
-                    v = math.clamp(v, min, max)
+
+                local function setSlider(v,updateTextbox)
+                    v = math.clamp(tonumber(v) or slOpt.Min, slOpt.Min, slOpt.Max)
                     val = v
-                    local percent = (v-min)/(max-min)
+                    local percent = (v-slOpt.Min)/(slOpt.Max-slOpt.Min)
                     sliderFill.Size = UDim2.new(0, percent*sliderBg.Size.X.Offset, 1, 0)
                     sliderKnob.Position = UDim2.new(0, percent*sliderBg.Size.X.Offset-9, 0, -3)
+                    if updateTextbox and slOpt.WithTextbox and textbox then
+                        textbox.Text = tostring(math.floor(v))
+                    end
+                    if slOpt.Callback then slOpt.Callback(v) end
                 end
-                setSlider(val)
+                setSlider(val,true)
                 local draggingSlider = false
                 sliderKnob.InputBegan:Connect(function(i)
                     if i.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -574,117 +602,94 @@ function KevinzHub:MakeWindow(opt)
                 sliderBg.InputChanged:Connect(function(i)
                     if draggingSlider and i.UserInputType == Enum.UserInputType.MouseMovement then
                         local x = math.clamp(i.Position.X - sliderBg.AbsolutePosition.X, 0, sliderBg.AbsoluteSize.X)
-                        local v = math.floor(min + (x/sliderBg.AbsoluteSize.X)*(max-min))
-                        setSlider(v)
-                        if slOpt.Callback then slOpt.Callback(v) end
-                        if slOpt._textbox then slOpt._textbox.Text = tostring(v) end
-                        slValLbl.Text = slOpt.Name .. ": " .. tostring(v)
+                        local v = math.floor(slOpt.Min + (x/sliderBg.AbsoluteSize.X)*(slOpt.Max-slOpt.Min))
+                        setSlider(v,true)
                     end
                 end)
-                local slValLbl = Instance.new("TextLabel", secFrame)
-                slValLbl.Name = "SliderLabel"
-                slValLbl.Size = UDim2.new(0,108,0,16)
-                slValLbl.Position = UDim2.new(0,10,0,itemY)
-                slValLbl.BackgroundTransparency = 1
-                slValLbl.Font = Enum.Font.Gotham
-                slValLbl.Text = slOpt.Name .. ": " .. tostring(val)
-                slValLbl.TextSize = 14
-                slValLbl.TextColor3 = COLORS.LabelText
-                slValLbl.TextXAlignment = Enum.TextXAlignment.Left
-
-                -- TextBox for slider (if WithTextbox)
-                if slOpt.WithTextbox then
-                    local tb = Instance.new("TextBox", secFrame)
-                    tb.Size = UDim2.new(0,56,0,18)
-                    tb.Position = UDim2.new(0, sliderBg.Position.X.Offset + sliderBg.Size.X.Offset + 18, 0, itemY-2)
-                    tb.BackgroundColor3 = COLORS.SearchBg
-                    tb.TextColor3 = COLORS.LabelText
-                    tb.ClearTextOnFocus = false
-                    tb.Font = Enum.Font.Gotham
-                    tb.TextSize = 14
-                    tb.Text = tostring(val)
-                    tb.PlaceholderText = ""
-                    tb.TextXAlignment = Enum.TextXAlignment.Center
-                    tb.TextYAlignment = Enum.TextYAlignment.Center
-                    local tbc = Instance.new("UICorner", tb)
-                    tbc.CornerRadius = UDim.new(0,6)
-                    slOpt._textbox = tb
-                    local function setFromBox()
-                        local n = tonumber(tb.Text)
-                        if n then
-                            n = math.clamp(math.floor(n), min, max)
-                            setSlider(n)
-                            if slOpt.Callback then slOpt.Callback(n) end
-                            slValLbl.Text = slOpt.Name .. ": " .. tostring(n)
-                        else
-                            tb.Text = tostring(val)
-                        end
+                sliderBg.InputBegan:Connect(function(i)
+                    if i.UserInputType == Enum.UserInputType.MouseButton1 then
+                        local x = math.clamp(i.Position.X - sliderBg.AbsolutePosition.X, 0, sliderBg.AbsoluteSize.X)
+                        local v = math.floor(slOpt.Min + (x/sliderBg.AbsoluteSize.X)*(slOpt.Max-slOpt.Min))
+                        setSlider(v,true)
                     end
-                    tb.FocusLost:Connect(setFromBox)
-                    tb:GetPropertyChangedSignal("Text"):Connect(function()
-                        -- update slider when typing valid
-                        local n = tonumber(tb.Text)
-                        if n and tb:IsFocused() then
-                            setSlider(n)
-                            slValLbl.Text = slOpt.Name .. ": " .. tostring(n)
+                end)
+
+                -- TextBox support
+                local textbox
+                if slOpt.WithTextbox then
+                    textbox = Instance.new("TextBox", secFrame)
+                    textbox.Size = UDim2.new(0,textboxW,0,labelHeight+10)
+                    textbox.Position = UDim2.new(0,10+sliderW+gap,0,itemY)
+                    textbox.BackgroundColor3 = COLORS.ParagraphBg
+                    textbox.TextColor3 = COLORS.LabelText
+                    textbox.Font = Enum.Font.Gotham
+                    textbox.TextSize = 14
+                    textbox.Text = tostring(val)
+                    textbox.ClearTextOnFocus = true
+                    textbox.PlaceholderText = ""
+                    textbox.TextXAlignment = Enum.TextXAlignment.Center
+                    textbox.BorderSizePixel = 0
+                    local corner = Instance.new("UICorner", textbox)
+                    corner.CornerRadius = UDim.new(0,6)
+                    textbox.FocusLost:Connect(function(enter)
+                        if enter then
+                            setSlider(textbox.Text,false)
                         end
                     end)
                 end
 
-                sliderBg.InputBegan:Connect(function(i)
-                    if i.UserInputType == Enum.UserInputType.MouseButton1 then
-                        local x = math.clamp(i.Position.X - sliderBg.AbsolutePosition.X, 0, sliderBg.AbsoluteSize.X)
-                        local v = math.floor(min + (x/sliderBg.AbsoluteSize.X)*(max-min))
-                        setSlider(v)
-                        if slOpt.Callback then slOpt.Callback(v) end
-                        if slOpt._textbox then slOpt._textbox.Text = tostring(v) end
-                        slValLbl.Text = slOpt.Name .. ": " .. tostring(v)
-                    end
-                end)
-                itemY = itemY + 46
+                itemY = itemY + labelHeight+22
             end
 
             function Section:AddToggle(opt)
+                -- Switch button (toggle)
+                local toggleW, toggleH = 48, 24
                 local toggleBg = makeRoundedFrame{
-                    Name = opt.Name.."Toggle", Parent = secFrame,
-                    Position = UDim2.new(0,10,0,itemY+8),
-                    Size = UDim2.new(0,44,0,22),
+                    Name = opt.Name.."ToggleBG", Parent = secFrame,
+                    Position = UDim2.new(0,10,0,itemY),
+                    Size = UDim2.new(0,toggleW,0,toggleH),
                     BackgroundColor3 = COLORS.ToggleBg
                 }
                 local knob = makeRoundedFrame{
                     Name = "Knob", Parent = toggleBg,
                     Position = UDim2.new(0,3,0,3),
-                    Size = UDim2.new(0,16,0,16),
+                    Size = UDim2.new(0,18,0,18),
                     BackgroundColor3 = COLORS.ToggleOff
                 }
-                local toggled = opt.Default or false
-                local function update()
-                    local targetX = toggled and (toggleBg.Size.X.Offset - knob.Size.X.Offset - 3) or 3
-                    TweenService:Create(knob, TweenInfo.new(ANIM.TweenTime, Enum.EasingStyle.Quint), {Position=UDim2.new(0,targetX,0,3)}):Play()
-                    TweenService:Create(toggleBg, TweenInfo.new(ANIM.TweenTime, Enum.EasingStyle.Quint),
-                        {BackgroundColor3 = toggled and COLORS.ToggleOn or COLORS.ToggleBg}
-                    ):Play()
-                    knob.BackgroundColor3 = toggled and COLORS.ToggleKnobOn or COLORS.ToggleOff
+                local on = opt.Default or false
+                local function updateAppearance(animated)
+                    local targetX = on and (toggleBg.Size.X.Offset - knob.Size.X.Offset - 3) or 3
+                    if animated then
+                        TweenService:Create(knob, TweenInfo.new(ANIM.TweenTime, Enum.EasingStyle.Quint), {Position=UDim2.new(0,targetX,0,3)}):Play()
+                        TweenService:Create(toggleBg, TweenInfo.new(ANIM.TweenTime, Enum.EasingStyle.Quint),
+                            {BackgroundColor3 = on and COLORS.ToggleOn or COLORS.ToggleBg}
+                        ):Play()
+                    else
+                        knob.Position = UDim2.new(0,targetX,0,3)
+                        toggleBg.BackgroundColor3 = on and COLORS.ToggleOn or COLORS.ToggleBg
+                    end
+                    knob.BackgroundColor3 = on and COLORS.ToggleKnobOn or COLORS.ToggleOff
                 end
-                update()
+                updateAppearance(false)
                 toggleBg.InputBegan:Connect(function(i)
                     if i.UserInputType==Enum.UserInputType.MouseButton1 then
-                        toggled = not toggled
-                        update()
-                        if opt.Callback then opt.Callback(toggled) end
+                        on = not on
+                        updateAppearance(true)
+                        if opt.Callback then opt.Callback(on) end
                     end
                 end)
                 local toggleLbl = Instance.new("TextLabel", secFrame)
                 toggleLbl.Name = "ToggleLabel"
-                toggleLbl.Position = UDim2.new(0,62,0,itemY+7)
-                toggleLbl.Size = UDim2.new(1,-70,0,24)
+                toggleLbl.Position = UDim2.new(0,10+toggleW+12,0,itemY)
+                toggleLbl.Size = UDim2.new(0,180,0,toggleH)
                 toggleLbl.BackgroundTransparency = 1
                 toggleLbl.Font = Enum.Font.Gotham
                 toggleLbl.Text = opt.Name
                 toggleLbl.TextSize = 15
                 toggleLbl.TextColor3 = COLORS.LabelText
                 toggleLbl.TextXAlignment = Enum.TextXAlignment.Left
-                itemY = itemY + 38
+
+                itemY = itemY + toggleH + 10
             end
 
             return Section
@@ -695,9 +700,6 @@ function KevinzHub:MakeWindow(opt)
     function Window:Destroy()
         KevinzHub:Destroy()
     end
-
-    -- Game info notify
-    GameAutoNotif()
 
     return Window
 end
