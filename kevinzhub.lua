@@ -1,4 +1,4 @@
--- KevinzHub API Style UI Library (FULL, FIXED & OPTIMIZED)
+-- KevinzHub API Style UI Library (FULL, FIXED & OPTIMIZED, textbox nền nổi bật)
 -- Usage: local KevinzHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/XUwUxX/script/refs/heads/main/kevinzhub.lua"))()
 -- API: MakeNotification, MakeWindow, Tab:AddSection, Section:AddButton, Section:AddSlider, Section:AddToggle, etc.
 
@@ -37,6 +37,7 @@ local COLORS = {
     TabIconActive = Color3.fromRGB(0,180,80),
     NotifBg       = Color3.fromRGB(30,32,38),
     NotifText     = Color3.fromRGB(240,240,255),
+    TextboxBg     = Color3.fromRGB(65,85,150), -- Nền nổi bật cho textbox
 }
 
 local ANIM = {
@@ -538,7 +539,7 @@ function KevinzHub:MakeWindow(opt)
             end
             function Section:AddSlider(slOpt)
                 -- Support WithTextbox: true
-                local labelHeight = 25
+                local labelHeight = 18
                 local sliderW = 160
                 local textboxW = (slOpt.WithTextbox and 54) or 0
                 local gap = slOpt.WithTextbox and 10 or 0
@@ -546,7 +547,7 @@ function KevinzHub:MakeWindow(opt)
                 local lbl = Instance.new("TextLabel", secFrame)
                 lbl.Name = "SliderLabel"
                 lbl.Size = UDim2.new(0,sliderW+textboxW+gap,0,labelHeight)
-                lbl.Position = UDim2.new(0,19,0,itemY)
+                lbl.Position = UDim2.new(0,10,0,itemY)
                 lbl.BackgroundTransparency = 1
                 lbl.Font = Enum.Font.Gotham
                 lbl.Text = slOpt.Name
@@ -619,8 +620,8 @@ function KevinzHub:MakeWindow(opt)
                 if slOpt.WithTextbox then
                     textbox = Instance.new("TextBox", secFrame)
                     textbox.Size = UDim2.new(0,textboxW,0,labelHeight+10)
-                    textbox.Position = UDim2.new(0,7+sliderW+gap,0,itemY)
-                    textbox.BackgroundColor3 = Color3.fromRGB(60, 80, 140)
+                    textbox.Position = UDim2.new(0,10+sliderW+gap,0,itemY)
+                    textbox.BackgroundColor3 = COLORS.TextboxBg -- Nền nổi bật!
                     textbox.TextColor3 = COLORS.LabelText
                     textbox.Font = Enum.Font.Gotham
                     textbox.TextSize = 14
