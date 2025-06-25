@@ -1,4 +1,4 @@
--- Kevinz Hub Full Script v1.39 (Sidebar Tab UI with Emoji Icons, Dynamic Lighting Transitions, Event Cleanup, MiniToggle fix, Scrollable Sidebar)
+-- Kevinz Hub Full Script v1.41 (Sidebar Tab UI with Emoji Icons, Dynamic Lighting Transitions, Event Cleanup, MiniToggle fix, Scrollable Sidebar, Double Jump)
 -- Place this LocalScript in StarterPlayerScripts or StarterGui
 
 -- Services
@@ -9,12 +9,13 @@ local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
 local Debris = game:GetService("Debris")
 local Workspace = workspace
+local UserInputService = game:GetService("UserInputService")
 
 -- Globals
 local LocalPlayer = Players.LocalPlayer
 local Character, Humanoid, RootPart = nil, nil, nil
 local Camera = Workspace.CurrentCamera
-local HUB_VERSION = "v1.40"
+local HUB_VERSION = "v1.41"
 
 -- Movement defaults
 local savedWalkSpeed = 16
@@ -29,6 +30,9 @@ end
 
 -- Semi-God
 local semiGodModeEnabled = false
+
+-- Double Jump
+local doubleJumpEnabled = false
 
 -- Gun Aura
 local gunAuraEnabled = false
@@ -158,8 +162,10 @@ local function onCharacterAdded(char)
     Humanoid = Character:WaitForChild("Humanoid", 5)
     RootPart = Character:WaitForChild("HumanoidRootPart", 5)
     if Humanoid then
+        -- Thiết lập tốc độ gốc
         pcall(function() Humanoid.WalkSpeed = savedWalkSpeed end)
         pcall(function() Humanoid.JumpPower = savedJumpPower end)
+        -- Semi-God: giữ máu
         Humanoid.HealthChanged:Connect(function(h)
             if semiGodModeEnabled and Humanoid and Humanoid.Parent and h <= 0 then
                 Humanoid.Health = 1
@@ -172,7 +178,34 @@ local function onCharacterAdded(char)
                 end)
             end
         end)
+        -- Double Jump setup
+        do
+            local hasDoubleJumped = false
+            -- Reset khi chạm đất
+            Humanoid.StateChanged:Connect(function(oldState, newState)
+                if newState == Enum.HumanoidStateType.Landed then
+                    hasDoubleJumped = false
+                end
+            end)
+            -- Input để nhảy đôi
+            UserInputService.InputBegan:Connect(function(input, gameProcessed)
+                if gameProcessed then return end
+                if not doubleJumpEnabled then return end
+                if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Enum.KeyCode.Space then
+                    if Humanoid and RootPart then
+                        local state = Humanoid:GetState()
+                        -- Cho phép double jump khi đang rơi (Freefall hoặc FallingDown)
+                        if state == Enum.HumanoidStateType.Freefall or state == Enum.HumanoidStateType.FallingDown then
+                            Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                            hasDoubleJumped = true
+                            notify("Double Jump✨", "Executed", 2)
+                        end
+                    end
+                end
+            end)
+        end
     end
+    -- Reset gun aura data mỗi lần respawn
     for drop, conn in pairs(gunDropTouchedConns) do
         if conn then conn:Disconnect() end
     end
@@ -976,7 +1009,6 @@ miniToggle.MouseButton1Click:Connect(function()
 end)
 
 -- Sidebar & ContentContainer
--- Thay đổi: Sidebar dùng ScrollingFrame để cuộn được khi quá nhiều tab hoặc nội dung vượt khung
 local sidebar = Instance.new("ScrollingFrame", window)
 sidebar.Name = "Sidebar"
 sidebar.Size = UDim2.new(0, 120, 1, -30)
@@ -1229,6 +1261,10 @@ do
         createSwitch(parent, "Semi-God Mode", function(on)
             semiGodModeEnabled = on
             notify("Semi-God Mode🔥", on and "ON" or "OFF", 2)
+        end)
+        createSwitch(parent, "Double Jump", function(on)
+            doubleJumpEnabled = on
+            notify("Double Jump", on and "Enabled" or "Disabled", 2)
         end)
     end
 end
