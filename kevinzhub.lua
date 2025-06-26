@@ -1,4 +1,4 @@
--- KevinzHub API Style UI Library (UI/UX spacing đẹp, shadow alpha chiều sâu, headshot fix, thuật toán clean)
+-- KevinzHub API Style UI Library (headshot fix, UI/UX spacing tối ưu đẹp)
 -- Usage: local KevinzHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/XUwUxX/script/refs/heads/main/kevinzhub.lua"))()
 
 local Players = game:GetService("Players")
@@ -37,15 +37,7 @@ local COLORS = {
     NotifBg       = Color3.fromRGB(30,32,38),
     NotifText     = Color3.fromRGB(240,240,255),
     TextboxBg     = Color3.fromRGB(66,68,79),
-    SectionBg     = Color3.fromRGB(32,33,40),
-    Shadow        = Color3.fromRGB(0,0,0),
-}
-
-local ALPHA = {
-    WindowShadow  = 0.25,
-    SectionShadow = 0.16,
-    ButtonShadow  = 0.13,
-    NotifShadow   = 0.18,
+    SectionBg     = Color3.fromRGB(32,33,40)
 }
 
 local ANIM = {
@@ -60,8 +52,8 @@ local ANIM = {
 local KevinzHub = {}
 local _ui = {}
 
--- Utility: Rounded frame with optional shadow
-local function makeRoundedFrame(props, shadowAlpha)
+-- Utility
+local function makeRoundedFrame(props)
     local f = Instance.new("Frame")
     for k,v in pairs(props) do f[k] = v end
     f.BorderSizePixel = 0
@@ -70,21 +62,6 @@ local function makeRoundedFrame(props, shadowAlpha)
     local stroke = Instance.new("UIStroke", f)
     stroke.Color = COLORS.Outline
     stroke.Thickness = 1.15
-    if shadowAlpha and shadowAlpha > 0 then
-        local shadow = Instance.new("ImageLabel")
-        shadow.Name = "Shadow"
-        shadow.Parent = f
-        shadow.ZIndex = (f.ZIndex or 1) - 1
-        shadow.BackgroundTransparency = 1
-        shadow.Image = "rbxassetid://1316045217" -- Soft shadow
-        shadow.ImageColor3 = COLORS.Shadow
-        shadow.ImageTransparency = shadowAlpha
-        shadow.ScaleType = Enum.ScaleType.Slice
-        shadow.SliceCenter = Rect.new(10,10,118,118)
-        shadow.Size = UDim2.new(1, 24, 1, 24)
-        shadow.Position = UDim2.new(0, -12, 0, -12)
-        shadow.ClipsDescendants = false
-    end
     return f
 end
 
@@ -153,7 +130,7 @@ function KevinzHub:MakeNotification(opt)
         Size = UDim2.new(1,0,0,54),
         BackgroundColor3 = COLORS.NotifBg,
         LayoutOrder = os.clock()*1000
-    }, ALPHA.NotifShadow
+    }
     notif.BackgroundTransparency = 1
     notif.ZIndex = 201
     local stroke = notif:FindFirstChildOfClass("UIStroke")
@@ -215,8 +192,7 @@ function KevinzHub:MakeWindow(opt)
         Position = UDim2.fromScale(0.5,0.5),
         Size = UDim2.new(0,720,0,540),
         BackgroundColor3 = COLORS.WindowBg,
-        ZIndex = 10,
-    }, ALPHA.WindowShadow)
+    })
     _ui.window = window
 
     -- TopBar
@@ -226,7 +202,6 @@ function KevinzHub:MakeWindow(opt)
         Position = UDim2.new(0,0,0,0),
         Size = UDim2.new(1,0,0,38),
         BackgroundColor3 = COLORS.TopBarBg,
-        ZIndex = 11,
     })
     topBar.ClipsDescendants = true
 
@@ -376,7 +351,7 @@ function KevinzHub:MakeWindow(opt)
     list.Padding = UDim.new(0,8)
     list.Parent = sidebar
 
-    -- User Info bottom (headshot luôn hiện, spacing đẹp)
+    -- User Info bottom (headshot luôn hiện)
     local function renderUserInfo()
         local uf = Instance.new("Frame")
         uf.Name = "UserInfo"
@@ -388,6 +363,7 @@ function KevinzHub:MakeWindow(opt)
 
         local thumb = ""
         local thumbReady = false
+        -- Gọi bất đồng bộ, nhưng fallback luôn là logo Roblox
         local av = Instance.new("ImageLabel", uf)
         av.Name="Avatar"; av.Size=UDim2.new(0,48,0,48); av.Position=UDim2.new(0,0,0,4)
         av.BackgroundTransparency=1; av.Image="rbxassetid://77339698"
@@ -521,12 +497,12 @@ function KevinzHub:MakeWindow(opt)
         local sectionOrder = 0
         function Tab:AddSection(secOpt)
             sectionOrder = sectionOrder + 1
-            local secFrame = makeRoundedFrame({
+            local secFrame = makeRoundedFrame{
                 Name = secOpt.Name.."Section", Parent = ct,
                 Size = UDim2.new(1,-32,0,0),
                 Position = UDim2.new(0,16,0,20 + (sectionOrder-1)*132),
                 BackgroundColor3 = COLORS.SectionBg,
-            }, ALPHA.SectionShadow)
+            }
             secFrame.AutomaticSize = Enum.AutomaticSize.Y
             local secLbl = Instance.new("TextLabel", secFrame)
             secLbl.Size = UDim2.new(1,-14,0,25)
@@ -541,12 +517,12 @@ function KevinzHub:MakeWindow(opt)
             local Section = {}
             local itemY = 36
             function Section:AddButton(btnOpt)
-                local btn = makeRoundedFrame({
+                local btn = makeRoundedFrame{
                     Name = btnOpt.Name.."Btn", Parent = secFrame,
                     Size = UDim2.new(0,145,0,32),
                     Position = UDim2.new(0,12,0,itemY),
                     BackgroundColor3 = COLORS.ButtonBg
-                }, ALPHA.ButtonShadow)
+                }
                 local lbl = Instance.new("TextLabel", btn)
                 lbl.Size = UDim2.fromScale(1,1)
                 lbl.BackgroundTransparency = 1
