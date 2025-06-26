@@ -215,39 +215,8 @@ local function onCharacterAdded(char)
     table.clear(gunDropTouchedConns)
     table.clear(gunDrops)
 
-    -- Local bullet path highlight
-    Character.ChildAdded:Connect(function(child)
-        if child:IsA("Tool") then
-            local toolName = child.Name:lower()
-            if toolName:find("gun") or toolName:find("revolver") then
-                child.Equipped:Connect(function()
-                    child.Activated:Connect(function()
-                        if not Camera then Camera = Workspace.CurrentCamera end
-                        local origin = Camera.CFrame.Position
-                        local direction = Camera.CFrame.LookVector * 500
-                        local rayParams = RaycastParams.new()
-                        rayParams.FilterDescendantsInstances = {Character}
-                        rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-                        local result = Workspace:Raycast(origin, direction, rayParams)
-                        local hitPos = (result and result.Position) or (origin + direction)
-                        local diff = hitPos - origin
-                        local distance = diff.Magnitude
-                        local part = Instance.new("Part")
-                        part.Name = "_BulletPath"
-                        part.Anchored = true
-                        part.CanCollide = false
-                        part.Material = Enum.Material.Neon
-                        part.Color = Color3.new(1, 0, 0)
-                        part.Transparency = 0.5
-                        part.Size = Vector3.new(0.1, 0.1, distance)
-                        part.CFrame = CFrame.new(origin, hitPos) * CFrame.new(0, 0, -distance/2)
-                        part.Parent = Workspace
-                        Debris:AddItem(part, 0.5)
-                    end)
-                end)
-            end
-        end
-    end)
+    -- [REMOVED: Bullet path highlight]
+    -- (No code for gun bullet highlight here anymore)
 end
 LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
 if LocalPlayer.Character then onCharacterAdded(LocalPlayer.Character) end
