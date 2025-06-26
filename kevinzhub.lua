@@ -1,4 +1,4 @@
--- KevinzHub API Style UI Library (headshot fix, UI/UX spacing tối ưu đẹp, spacing đều tự động, không lỗi ẩn, hiệu ứng & bo góc nâng cao)
+-- KevinzHub API Style UI Library (headshot fix, UI/UX spacing tối ưu đẹp, spacing đều tự động, không lỗi ẩn)
 -- Usage: local KevinzHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/XUwUxX/script/refs/heads/main/kevinzhub.lua"))()
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -36,58 +36,35 @@ local COLORS = {
     NotifBg       = Color3.fromRGB(30,32,38),
     NotifText     = Color3.fromRGB(240,240,255),
     TextboxBg     = Color3.fromRGB(66,68,79),
-    SectionBg     = Color3.fromRGB(32,33,40),
-    Shadow        = Color3.fromRGB(10, 15, 22), -- for shadow effect
+    SectionBg     = Color3.fromRGB(32,33,40)
 }
 
 local ANIM = {
-    FadeTime     = 0.19,
-    TweenTime    = 0.21,
-    TabMoveTime  = 0.15,
-    PressTime    = 0.09,
-    NotifFadeIn  = 0.23,
-    NotifFadeOut = 0.35,
-    ShadowAppear = 0.23,
-    ShadowFade   = 0.19,
+    FadeTime     = 0.17,
+    TweenTime    = 0.19,
+    TabMoveTime  = 0.13,
+    PressTime    = 0.07,
+    NotifFadeIn  = 0.22,
+    NotifFadeOut = 0.32,
 }
 
 local KevinzHub = {}
 local _ui = {}
 
--- Utility: Make rounded frame with optional shadow effect
-local function makeRoundedFrame(props, round, shadow)
+-- Utility
+local function makeRoundedFrame(props)
     local f = Instance.new("Frame")
     for k,v in pairs(props) do f[k] = v end
     f.BorderSizePixel = 0
-    local cr = UDim.new(0, round or 12)
     local uc = Instance.new("UICorner", f)
-    uc.CornerRadius = cr
+    uc.CornerRadius = UDim.new(0,8)
     local stroke = Instance.new("UIStroke", f)
     stroke.Color = COLORS.Outline
     stroke.Thickness = 1.15
-    if shadow then
-        local shadowF = Instance.new("ImageLabel")
-        shadowF.Name = "Shadow"
-        shadowF.Parent = f
-        shadowF.Image = "rbxassetid://1316045217" -- soft shadow asset
-        shadowF.BackgroundTransparency = 1
-        shadowF.ImageTransparency = 0.2
-        shadowF.Size = UDim2.new(1, 18, 1, 18)
-        shadowF.Position = UDim2.new(0, -9, 0, -6)
-        shadowF.ZIndex = f.ZIndex or 1
-        shadowF.ScaleType = Enum.ScaleType.Slice
-        shadowF.SliceCenter = Rect.new(23,23,277,277)
-        shadowF.Visible = true
-        shadowF.ImageColor3 = COLORS.Shadow
-        -- Animate shadow fade in
-        shadowF.ImageTransparency = 1
-        TweenService:Create(shadowF, TweenInfo.new(ANIM.ShadowAppear, Enum.EasingStyle.Quint), {ImageTransparency = 0.2}):Play()
-    end
     return f
 end
 
--- Button animation with rounded highlight & shadow
-local function addBtnAnim(btn, round)
+local function addBtnAnim(btn)
     local highlight = Instance.new("Frame")
     highlight.Name = "Highlight"
     highlight.BackgroundTransparency = 1
@@ -96,46 +73,25 @@ local function addBtnAnim(btn, round)
     highlight.ZIndex = 99
     highlight.Parent = btn
     local corner = Instance.new("UICorner", highlight)
-    corner.CornerRadius = UDim.new(0,round or 10)
-    -- Optional button shadow
-    local shadow = Instance.new("ImageLabel")
-    shadow.Name = "BtnShadow"
-    shadow.Image = "rbxassetid://1316045217"
-    shadow.BackgroundTransparency = 1
-    shadow.ImageTransparency = 0.6
-    shadow.Size = UDim2.new(1, 12, 1, 12)
-    shadow.Position = UDim2.new(0, -6, 0, -4)
-    shadow.ZIndex = btn.ZIndex or 1
-    shadow.ScaleType = Enum.ScaleType.Slice
-    shadow.SliceCenter = Rect.new(23,23,277,277)
-    shadow.ImageColor3 = COLORS.Shadow
-    shadow.Parent = btn
-    shadow.Visible = false
-
+    corner.CornerRadius = UDim.new(0,8)
     btn.MouseEnter:Connect(function()
         TweenService:Create(btn, TweenInfo.new(ANIM.FadeTime, Enum.EasingStyle.Quint), {BackgroundColor3=COLORS.ButtonHover}):Play()
         TweenService:Create(highlight, TweenInfo.new(ANIM.FadeTime, Enum.EasingStyle.Quint), {BackgroundTransparency=0.92}):Play()
-        shadow.Visible = true
-        TweenService:Create(shadow, TweenInfo.new(ANIM.ShadowAppear, Enum.EasingStyle.Quint), {ImageTransparency=0.2}):Play()
     end)
     btn.MouseLeave:Connect(function()
         TweenService:Create(btn, TweenInfo.new(ANIM.FadeTime, Enum.EasingStyle.Quint), {BackgroundColor3=COLORS.ButtonBg}):Play()
         TweenService:Create(highlight, TweenInfo.new(ANIM.FadeTime, Enum.EasingStyle.Quint), {BackgroundTransparency=1}):Play()
-        TweenService:Create(shadow, TweenInfo.new(ANIM.ShadowFade, Enum.EasingStyle.Quint), {ImageTransparency=0.6}):Play()
-        task.delay(ANIM.ShadowFade, function() if btn:IsDescendantOf(game) then shadow.Visible = false end end)
     end)
     btn.InputBegan:Connect(function(i)
         if i.UserInputType==Enum.UserInputType.MouseButton1 then
             TweenService:Create(btn, TweenInfo.new(ANIM.PressTime, Enum.EasingStyle.Quint), {BackgroundColor3=COLORS.ButtonPress}):Play()
             TweenService:Create(highlight, TweenInfo.new(ANIM.PressTime, Enum.EasingStyle.Quint), {BackgroundTransparency=0.8}):Play()
-            TweenService:Create(shadow, TweenInfo.new(ANIM.PressTime, Enum.EasingStyle.Quint), {ImageTransparency=0.1}):Play()
         end
     end)
     btn.InputEnded:Connect(function(i)
         if i.UserInputType==Enum.UserInputType.MouseButton1 then
             TweenService:Create(btn, TweenInfo.new(ANIM.PressTime, Enum.EasingStyle.Quint), {BackgroundColor3=COLORS.ButtonHover}):Play()
             TweenService:Create(highlight, TweenInfo.new(ANIM.PressTime, Enum.EasingStyle.Quint), {BackgroundTransparency=0.92}):Play()
-            TweenService:Create(shadow, TweenInfo.new(ANIM.PressTime, Enum.EasingStyle.Quint), {ImageTransparency=0.2}):Play()
         end
     end)
 end
@@ -173,7 +129,7 @@ function KevinzHub:MakeNotification(opt)
         Size = UDim2.new(1,0,0,54),
         BackgroundColor3 = COLORS.NotifBg,
         LayoutOrder = os.clock()*1000
-    }, 14, true -- bo góc rộng + shadow
+    }
     notif.BackgroundTransparency = 1
     notif.ZIndex = 201
     local stroke = notif:FindFirstChildOfClass("UIStroke")
@@ -235,8 +191,7 @@ function KevinzHub:MakeWindow(opt)
         Position = UDim2.fromScale(0.5,0.5),
         Size = UDim2.new(0,720,0,540),
         BackgroundColor3 = COLORS.WindowBg,
-        ZIndex = 8,
-    }, 16, true) -- bo góc lớn + shadow
+    })
     _ui.window = window
 
     -- TopBar
@@ -246,8 +201,7 @@ function KevinzHub:MakeWindow(opt)
         Position = UDim2.new(0,0,0,0),
         Size = UDim2.new(1,0,0,38),
         BackgroundColor3 = COLORS.TopBarBg,
-        ZIndex = 10,
-    }, 16)
+    })
     topBar.ClipsDescendants = true
 
     local icon = Instance.new("ImageLabel", topBar)
@@ -273,16 +227,14 @@ function KevinzHub:MakeWindow(opt)
         Name = "MinimizeButton", Parent = topBar,
         Size = UDim2.new(0,32,0,32),
         Position = UDim2.new(1,-78,0.5,-16),
-        BackgroundColor3 = COLORS.ButtonBg,
-        ZIndex = 12,
-    }, 10
+        BackgroundColor3 = COLORS.ButtonBg
+    }
     local btnClose = makeRoundedFrame{
         Name = "CloseButton", Parent = topBar,
         Size = UDim2.new(0,32,0,32),
         Position = UDim2.new(1,-40,0.5,-16),
-        BackgroundColor3 = COLORS.ButtonBg,
-        ZIndex = 12,
-    }, 10
+        BackgroundColor3 = COLORS.ButtonBg
+    }
     local btnMinLbl = Instance.new("TextLabel", btnMin)
     btnMinLbl.Size = UDim2.fromScale(1,1)
     btnMinLbl.BackgroundTransparency = 1
@@ -301,7 +253,7 @@ function KevinzHub:MakeWindow(opt)
     btnCloseLbl.TextColor3 = COLORS.LabelText
     btnCloseLbl.TextXAlignment = Enum.TextXAlignment.Center
     btnCloseLbl.TextYAlignment = Enum.TextYAlignment.Center
-    addBtnAnim(btnClose, 10); addBtnAnim(btnMin, 10)
+    addBtnAnim(btnClose); addBtnAnim(btnMin)
     btnClose.InputBegan:Connect(function(i)
         if i.UserInputType==Enum.UserInputType.MouseButton1 then
             KevinzHub:Destroy()
@@ -314,9 +266,8 @@ function KevinzHub:MakeWindow(opt)
                 Name = "Restore", Parent = screenGui,
                 Size = UDim2.new(0,32,0,32),
                 Position = UDim2.new(0,18,0,18),
-                BackgroundColor3 = COLORS.ButtonBg,
-                ZIndex = 15,
-            }, 10, true
+                BackgroundColor3 = COLORS.ButtonBg
+            }
             local rbl = Instance.new("TextLabel", rb)
             rbl.Size = UDim2.fromScale(1,1)
             rbl.BackgroundTransparency = 1
@@ -326,7 +277,7 @@ function KevinzHub:MakeWindow(opt)
             rbl.TextColor3 = COLORS.LabelText
             rbl.TextXAlignment = Enum.TextXAlignment.Center
             rbl.TextYAlignment = Enum.TextYAlignment.Center
-            addBtnAnim(rb, 10)
+            addBtnAnim(rb)
             rb.InputBegan:Connect(function(ii)
                 if ii.UserInputType==Enum.UserInputType.MouseButton1 then
                     window.Visible=true; rb:Destroy()
@@ -334,7 +285,7 @@ function KevinzHub:MakeWindow(opt)
             end)
         end
     end)
-    -- Drag logic
+    -- Drag logic (bo góc tốt nhất, không bị lỗi, thành phần hiện đầy đủ)
     do
         local dragging, startPos, dragStart
         topBar.InputBegan:Connect(function(i)
@@ -369,9 +320,8 @@ function KevinzHub:MakeWindow(opt)
     local sidebar = makeRoundedFrame{
         Name = "Sidebar", Parent = sidebarHolder,
         Position = UDim2.new(0,0,0,0), Size = UDim2.new(1,0,1,0),
-        BackgroundColor3 = COLORS.SidebarBg,
-        ZIndex = 9,
-    }, 13, true
+        BackgroundColor3 = COLORS.SidebarBg
+    }
     sidebar.ClipsDescendants = true
 
     local pad = Instance.new("UIPadding", sidebar)
@@ -391,9 +341,9 @@ function KevinzHub:MakeWindow(opt)
     searchBar.Font = Enum.Font.Gotham
     searchBar.TextSize = 15
     searchBar.BorderSizePixel = 0
-    searchBar.ZIndex = 11
+    searchBar.ZIndex = 2
     local searchCorner = Instance.new("UICorner", searchBar)
-    searchCorner.CornerRadius = UDim.new(0,9)
+    searchCorner.CornerRadius = UDim.new(0,7)
 
     local list = Instance.new("UIListLayout", sidebar)
     list.SortOrder = Enum.SortOrder.LayoutOrder
@@ -412,12 +362,9 @@ function KevinzHub:MakeWindow(opt)
 
         local thumb = ""
         local thumbReady = false
-        -- Gọi bất đồng bộ, nhưng fallback luôn là logo Roblox
         local av = Instance.new("ImageLabel", uf)
         av.Name="Avatar"; av.Size=UDim2.new(0,48,0,48); av.Position=UDim2.new(0,0,0,4)
         av.BackgroundTransparency=1; av.Image="rbxassetid://77339698"
-        local avCorner = Instance.new("UICorner", av)
-        avCorner.CornerRadius = UDim.new(1,0) -- full round for avatar
         coroutine.wrap(function()
             local id = LocalPlayer.UserId
             local img, isReady
@@ -509,9 +456,8 @@ function KevinzHub:MakeWindow(opt)
         local btn = makeRoundedFrame{
             Name = tabOpt.Name.."Btn", Parent = sidebar,
             Size = UDim2.new(1,-16,0,44), LayoutOrder = tabOrder,
-            BackgroundColor3 = COLORS.TabInactive,
-            ZIndex = 12,
-        }, 10, true
+            BackgroundColor3 = COLORS.TabInactive
+        }
         local icon = Instance.new("ImageLabel", btn)
         icon.Name = "TabIcon"
         icon.Size = UDim2.new(0,22,0,22)
@@ -528,20 +474,19 @@ function KevinzHub:MakeWindow(opt)
         lbl.TextSize = 15
         lbl.TextColor3 = COLORS.LabelText
         lbl.TextXAlignment = Enum.TextXAlignment.Left
-        addBtnAnim(btn, 10)
+        addBtnAnim(btn)
         local ct = makeRoundedFrame{
             Name = tabOpt.Name.."Content", Parent = window,
             Position = UDim2.new(0,192,0,44),
             Size = UDim2.new(1,-210,1,-62),
             BackgroundColor3 = COLORS.ContentBg,
-            Visible = false,
-            ZIndex = 14,
-        }, 12, true
+            Visible = false
+        }
         ct.ClipsDescendants = true
         -- Section layout dùng UIListLayout spacing đều, không lỗi ẩn/lỗi dính
         local sectionList = Instance.new("UIListLayout", ct)
         sectionList.SortOrder = Enum.SortOrder.LayoutOrder
-        sectionList.Padding = UDim.new(0, 24) -- Spacing đều giữa các section
+        sectionList.Padding = UDim.new(0, 24)
         sectionList.HorizontalAlignment = Enum.HorizontalAlignment.Center
         sectionList.VerticalAlignment = Enum.VerticalAlignment.Top
         tabs[tabOpt.Name], tabContents[tabOpt.Name] = btn, ct
@@ -560,14 +505,13 @@ function KevinzHub:MakeWindow(opt)
                 Name = secOpt.Name.."Section", Parent = ct,
                 Size = UDim2.new(1,-32,0,0),
                 BackgroundColor3 = COLORS.SectionBg,
-                LayoutOrder = sectionOrder,
-                ZIndex = 15,
-            }, 10, true
+                LayoutOrder = sectionOrder
+            }
             secFrame.AutomaticSize = Enum.AutomaticSize.Y
             -- Section nội dung dùng UIListLayout để spacing đều các item
             local itemsList = Instance.new("UIListLayout", secFrame)
             itemsList.SortOrder = Enum.SortOrder.LayoutOrder
-            itemsList.Padding = UDim.new(0, 12) -- Khoảng cách đều giữa các item
+            itemsList.Padding = UDim.new(0, 12)
             itemsList.HorizontalAlignment = Enum.HorizontalAlignment.Left
             itemsList.VerticalAlignment = Enum.VerticalAlignment.Top
 
@@ -589,9 +533,8 @@ function KevinzHub:MakeWindow(opt)
                     Name = btnOpt.Name.."Btn", Parent = secFrame,
                     Size = UDim2.new(0,145,0,32),
                     BackgroundColor3 = COLORS.ButtonBg,
-                    LayoutOrder = itemOrder,
-                    ZIndex = 16,
-                }, 8, true
+                    LayoutOrder = itemOrder
+                }
                 local lbl = Instance.new("TextLabel", btn)
                 lbl.Size = UDim2.fromScale(1,1)
                 lbl.BackgroundTransparency = 1
@@ -600,7 +543,7 @@ function KevinzHub:MakeWindow(opt)
                 lbl.TextSize = 15
                 lbl.TextColor3 = COLORS.LabelText
                 lbl.TextXAlignment = Enum.TextXAlignment.Center
-                addBtnAnim(btn, 8)
+                addBtnAnim(btn)
                 btn.InputBegan:Connect(function(i)
                     if i.UserInputType==Enum.UserInputType.MouseButton1 then
                         if btnOpt.Callback then btnOpt.Callback() end
@@ -609,7 +552,172 @@ function KevinzHub:MakeWindow(opt)
                 itemOrder = itemOrder + 1
             end
 
-            -- ... (Slider, Toggle, ... giữ nguyên, hoặc thêm bo góc/shadow tương tự nếu muốn)
+            function Section:AddSlider(slOpt)
+                local sliderW, sliderH = 166, 13
+                local labelHeight = 18
+                local textboxW = (slOpt.WithTextbox and 54) or 0
+                local gap = slOpt.WithTextbox and 12 or 0
+                local labelYOffset = 7
+
+                local container = Instance.new("Frame", secFrame)
+                container.Name = "SliderContainer"
+                container.Size = UDim2.new(1,0,0,sliderH+labelHeight+11)
+                container.BackgroundTransparency = 1
+                container.LayoutOrder = itemOrder
+
+                local lbl = Instance.new("TextLabel", container)
+                lbl.Name = "SliderLabel"
+                lbl.Size = UDim2.new(1,0,0,labelHeight)
+                lbl.Position = UDim2.new(0,0,0,0)
+                lbl.BackgroundTransparency = 1
+                lbl.Font = Enum.Font.Gotham
+                lbl.Text = slOpt.Name
+                lbl.TextSize = 14
+                lbl.TextColor3 = COLORS.LabelText
+                lbl.TextXAlignment = Enum.TextXAlignment.Left
+
+                local sliderBg = makeRoundedFrame{
+                    Name = slOpt.Name.."Slider", Parent = container,
+                    Position = UDim2.new(0,0,0,labelHeight+2),
+                    Size = UDim2.new(0,sliderW,0,sliderH),
+                    BackgroundColor3 = COLORS.SliderTrack
+                }
+                local sliderFill = makeRoundedFrame{
+                    Name = "SliderFill", Parent = sliderBg,
+                    Position = UDim2.new(0,0,0,0),
+                    Size = UDim2.new(0,0,1,0),
+                    BackgroundColor3 = COLORS.SliderFill
+                }
+                local sliderKnob = Instance.new("Frame", sliderBg)
+                sliderKnob.Name = "SliderKnob"
+                sliderKnob.Size = UDim2.new(0,18,0,18)
+                sliderKnob.Position = UDim2.new(0,0,0,-2)
+                sliderKnob.BackgroundColor3 = COLORS.SliderKnob
+                sliderKnob.BorderSizePixel = 0
+                local corner = Instance.new("UICorner", sliderKnob)
+                corner.CornerRadius = UDim.new(0, 6)
+                local val = slOpt.Default or slOpt.Min or 0
+
+                local function setSlider(v,updateTextbox)
+                    v = math.clamp(tonumber(v) or slOpt.Min, slOpt.Min, slOpt.Max)
+                    val = v
+                    local percent = (v-slOpt.Min)/(slOpt.Max-slOpt.Min)
+                    sliderFill.Size = UDim2.new(0, percent*sliderBg.Size.X.Offset, 1, 0)
+                    sliderKnob.Position = UDim2.new(0, percent*sliderBg.Size.X.Offset-9, 0, -2)
+                    if updateTextbox and slOpt.WithTextbox and textbox then
+                        textbox.Text = tostring(math.floor(v))
+                    end
+                    if slOpt.Callback then slOpt.Callback(v) end
+                end
+                setSlider(val,true)
+                local draggingSlider = false
+                sliderKnob.InputBegan:Connect(function(i)
+                    if i.UserInputType == Enum.UserInputType.MouseButton1 then
+                        draggingSlider = true
+                    end
+                end)
+                sliderBg.InputEnded:Connect(function(i)
+                    if i.UserInputState == Enum.UserInputState.End then
+                        draggingSlider = false
+                    end
+                end)
+                sliderBg.InputChanged:Connect(function(i)
+                    if draggingSlider and i.UserInputType == Enum.UserInputType.MouseMovement then
+                        local x = math.clamp(i.Position.X - sliderBg.AbsolutePosition.X, 0, sliderBg.AbsoluteSize.X)
+                        local v = math.floor(slOpt.Min + (x/sliderBg.AbsoluteSize.X)*(slOpt.Max-slOpt.Min))
+                        setSlider(v,true)
+                    end
+                end)
+                sliderBg.InputBegan:Connect(function(i)
+                    if i.UserInputType == Enum.UserInputType.MouseButton1 then
+                        local x = math.clamp(i.Position.X - sliderBg.AbsolutePosition.X, 0, sliderBg.AbsoluteSize.X)
+                        local v = math.floor(slOpt.Min + (x/sliderBg.AbsoluteSize.X)*(slOpt.Max-slOpt.Min))
+                        setSlider(v,true)
+                    end
+                end)
+
+                local textbox
+                if slOpt.WithTextbox then
+                    textbox = Instance.new("TextBox", container)
+                    textbox.Size = UDim2.new(0,textboxW,0,labelHeight+11)
+                    textbox.Position = UDim2.new(0,sliderW+gap,0,labelHeight)
+                    textbox.BackgroundColor3 = COLORS.TextboxBg
+                    textbox.TextColor3 = COLORS.LabelText
+                    textbox.Font = Enum.Font.Gotham
+                    textbox.TextSize = 14
+                    textbox.Text = tostring(val)
+                    textbox.ClearTextOnFocus = true
+                    textbox.PlaceholderText = ""
+                    textbox.TextXAlignment = Enum.TextXAlignment.Center
+                    textbox.BorderSizePixel = 0
+                    local corner = Instance.new("UICorner", textbox)
+                    corner.CornerRadius = UDim.new(0,6)
+                    textbox.FocusLost:Connect(function(enter)
+                        if enter then
+                            setSlider(textbox.Text,false)
+                        end
+                    end)
+                end
+
+                itemOrder = itemOrder + 1
+            end
+
+            function Section:AddToggle(opt)
+                local toggleW, toggleH = 48, 24
+
+                local container = Instance.new("Frame", secFrame)
+                container.Name = "ToggleContainer"
+                container.Size = UDim2.new(1,0,0,toggleH)
+                container.BackgroundTransparency = 1
+                container.LayoutOrder = itemOrder
+
+                local toggleBg = makeRoundedFrame{
+                    Name = opt.Name.."ToggleBG", Parent = container,
+                    Position = UDim2.new(0,0,0,0),
+                    Size = UDim2.new(0,toggleW,0,toggleH),
+                    BackgroundColor3 = COLORS.ToggleBg
+                }
+                local knob = makeRoundedFrame{
+                    Name = "Knob", Parent = toggleBg,
+                    Position = UDim2.new(0,3,0,3),
+                    Size = UDim2.new(0,18,0,18),
+                    BackgroundColor3 = COLORS.ToggleOff
+                }
+                local on = opt.Default or false
+                local function updateAppearance(animated)
+                    local targetX = on and (toggleBg.Size.X.Offset - knob.Size.X.Offset - 3) or 3
+                    if animated then
+                        TweenService:Create(knob, TweenInfo.new(ANIM.TweenTime, Enum.EasingStyle.Quint), {Position=UDim2.new(0,targetX,0,3)}):Play()
+                        TweenService:Create(toggleBg, TweenInfo.new(ANIM.TweenTime, Enum.EasingStyle.Quint),
+                            {BackgroundColor3 = on and COLORS.ToggleOn or COLORS.ToggleBg}
+                        ):Play()
+                    else
+                        knob.Position = UDim2.new(0,targetX,0,3)
+                        toggleBg.BackgroundColor3 = on and COLORS.ToggleOn or COLORS.ToggleBg
+                    end
+                    knob.BackgroundColor3 = on and COLORS.ToggleKnobOn or COLORS.ToggleOff
+                end
+                updateAppearance(false)
+                toggleBg.InputBegan:Connect(function(i)
+                    if i.UserInputType==Enum.UserInputType.MouseButton1 then
+                        on = not on
+                        updateAppearance(true)
+                        if opt.Callback then opt.Callback(on) end
+                    end
+                end)
+                local toggleLbl = Instance.new("TextLabel", container)
+                toggleLbl.Name = "ToggleLabel"
+                toggleLbl.Position = UDim2.new(0,toggleW+14,0,0)
+                toggleLbl.Size = UDim2.new(0,180,0,toggleH)
+                toggleLbl.BackgroundTransparency = 1
+                toggleLbl.Font = Enum.Font.Gotham
+                toggleLbl.Text = opt.Name
+                toggleLbl.TextSize = 15
+                toggleLbl.TextColor3 = COLORS.LabelText
+                toggleLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+                itemOrder = itemOrder + 1
+            end
 
             return Section
         end
