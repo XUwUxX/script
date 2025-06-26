@@ -55,14 +55,13 @@ local _ui = {}
 
 -- Utility
 local function playClickSound(parent)
-    -- parent = button or UI element to parent the sound to (for .Parented properly)
     local snd = Instance.new("Sound")
     snd.SoundId = CLICK_SOUND_ID
     snd.Volume = 1
     snd.PlayOnRemove = true
     snd.Name = "KevinzHubClickSound"
     snd.Parent = parent or (PlayerGui or workspace)
-    snd:Destroy() -- PlayOnRemove will play when destroyed
+    snd:Destroy()
 end
 
 local function makeRoundedFrame(props)
@@ -220,10 +219,10 @@ function KevinzHub:MakeWindow(opt)
 
     local icon = Instance.new("ImageLabel", topBar)
     icon.Name = "GameIcon"
-    icon.Size = UDim2.new(0,34,0,34)
+    icon.Size = UDim2.new(0,26,0,26)
     icon.Position = UDim2.new(0,13,0.5,-13)
     icon.BackgroundTransparency = 1
-    icon.Image = "rbxassetid://11767069582"
+    icon.Image = "rbxassetid://9158926514" -- logo KevinzHub
 
     local titleLabel = Instance.new("TextLabel", topBar)
     titleLabel.Name = "Title"
@@ -284,6 +283,7 @@ function KevinzHub:MakeWindow(opt)
                 Position = UDim2.new(0,18,0,18),
                 BackgroundColor3 = COLORS.ButtonBg
             }
+            -- Sử dụng ImageLabel với asset id "1912438810" thay vì dấu "X"
             local rbl = Instance.new("ImageLabel", rb)
             rbl.Size = UDim2.fromScale(1,1)
             rbl.BackgroundTransparency = 1
@@ -377,7 +377,6 @@ function KevinzHub:MakeWindow(opt)
 
         local thumb = ""
         local thumbReady = false
-        -- Gọi bất đồng bộ, nhưng fallback luôn là logo Roblox
         local av = Instance.new("ImageLabel", uf)
         av.Name="Avatar"; av.Size=UDim2.new(0,48,0,48); av.Position=UDim2.new(0,0,0,4)
         av.BackgroundTransparency=1; av.Image="rbxassetid://77339698"
@@ -452,12 +451,7 @@ function KevinzHub:MakeWindow(opt)
             TweenService:Create(btn, TweenInfo.new(ANIM.TweenTime, Enum.EasingStyle.Quint),
                 {BackgroundColor3 = active and COLORS.TabActive or COLORS.TabInactive}
             ):Play()
-            local icon = btn:FindFirstChild("TabIcon")
-            if icon then
-                TweenService:Create(icon, TweenInfo.new(ANIM.TweenTime, Enum.EasingStyle.Quint), {
-                    ImageColor3 = active and COLORS.TabIconActive or COLORS.TabIconTint
-                }):Play()
-            end
+            -- KHÔNG đổi màu icon tab nữa, chỉ đổi màu nền button
             tabContents[n].Visible = active
             if active then
                 tabContents[n].Position = tabContents[n].Position + UDim2.new(0,0,0,8)
@@ -479,8 +473,9 @@ function KevinzHub:MakeWindow(opt)
         icon.Size = UDim2.new(0,22,0,22)
         icon.Position = UDim2.new(0,10,0.5,-11)
         icon.BackgroundTransparency = 1
-        icon.Image = tabOpt.Icon or "rbxassetid://4483345998"
-        icon.ImageColor3 = COLORS.TabIconTint
+        icon.Image = "rbxassetid://11718192673" -- asset icon tab mới
+        -- KHÔNG đổi màu icon khi active/inactive
+
         local lbl = Instance.new("TextLabel", btn)
         lbl.Size = UDim2.new(1,-38,1,0)
         lbl.Position = UDim2.new(0,38,0,0)
@@ -502,7 +497,7 @@ function KevinzHub:MakeWindow(opt)
         -- Section layout dùng UIListLayout spacing đều, không lỗi ẩn/lỗi dính
         local sectionList = Instance.new("UIListLayout", ct)
         sectionList.SortOrder = Enum.SortOrder.LayoutOrder
-        sectionList.Padding = UDim.new(0, 24) -- Spacing đều giữa các section
+        sectionList.Padding = UDim.new(0, 24)
         sectionList.HorizontalAlignment = Enum.HorizontalAlignment.Center
         sectionList.VerticalAlignment = Enum.VerticalAlignment.Top
         tabs[tabOpt.Name], tabContents[tabOpt.Name] = btn, ct
@@ -525,10 +520,9 @@ function KevinzHub:MakeWindow(opt)
                 LayoutOrder = sectionOrder
             }
             secFrame.AutomaticSize = Enum.AutomaticSize.Y
-            -- Section nội dung dùng UIListLayout để spacing đều các item
             local itemsList = Instance.new("UIListLayout", secFrame)
             itemsList.SortOrder = Enum.SortOrder.LayoutOrder
-            itemsList.Padding = UDim.new(0, 12) -- Khoảng cách đều giữa các item
+            itemsList.Padding = UDim.new(0, 12)
             itemsList.HorizontalAlignment = Enum.HorizontalAlignment.Left
             itemsList.VerticalAlignment = Enum.VerticalAlignment.Top
 
