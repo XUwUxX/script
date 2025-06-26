@@ -284,15 +284,13 @@ function KevinzHub:MakeWindow(opt)
                 Position = UDim2.new(0,18,0,18),
                 BackgroundColor3 = COLORS.ButtonBg
             }
-            local rbl = Instance.new("TextLabel", rb)
+            local rbl = Instance.new("ImageLabel", rb)
             rbl.Size = UDim2.fromScale(1,1)
             rbl.BackgroundTransparency = 1
-            rbl.Font = Enum.Font.GothamBold
-            rbl.Text = "X"
-            rbl.TextSize = 20
-            rbl.TextColor3 = COLORS.LabelText
-            rbl.TextXAlignment = Enum.TextXAlignment.Center
-            rbl.TextYAlignment = Enum.TextYAlignment.Center
+            rbl.Image = "rbxassetid://1912438810"
+            rbl.ImageColor3 = COLORS.LabelText
+            rbl.ScaleType = Enum.ScaleType.Fit
+
             addBtnAnim(rb)
             rb.InputBegan:Connect(function(ii)
                 if ii.UserInputType==Enum.UserInputType.MouseButton1 then
