@@ -1,6 +1,5 @@
--- KevinzHub API UI Library: Hiệu ứng ripple, alpha chiều sâu, spacing hài hòa, headshot chuẩn, thuật toán tối ưu nhất
+-- KevinzHub API Style UI Library (UI/UX spacing đẹp, shadow alpha chiều sâu, headshot fix, thuật toán clean)
 -- Usage: local KevinzHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/XUwUxX/script/refs/heads/main/kevinzhub.lua"))()
--- API: MakeNotification, MakeWindow, Tab:AddSection, Section:AddButton, Section:AddSlider, Section:AddToggle, etc.
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -21,7 +20,6 @@ local COLORS = {
     ButtonBg      = Color3.fromRGB(48,49,60),
     ButtonHover   = Color3.fromRGB(60,70,100),
     ButtonPress   = Color3.fromRGB(40,45,80),
-    ButtonShadow  = Color3.fromRGB(80,90,140),
     ToggleBg      = Color3.fromRGB(46,47,56),
     ToggleOn      = Color3.fromRGB(0,180,80),
     ToggleOff     = Color3.fromRGB(70,70,80),
@@ -39,13 +37,15 @@ local COLORS = {
     NotifBg       = Color3.fromRGB(30,32,38),
     NotifText     = Color3.fromRGB(240,240,255),
     TextboxBg     = Color3.fromRGB(66,68,79),
-    SectionBg     = Color3.fromRGB(32,33,40)
+    SectionBg     = Color3.fromRGB(32,33,40),
+    Shadow        = Color3.fromRGB(0,0,0),
 }
 
 local ALPHA = {
-    Shadow      = 0.3, -- alpha thấp cho depth
-    Ripple      = 0.33,
-    Sidebar     = 0.92
+    WindowShadow  = 0.25,
+    SectionShadow = 0.16,
+    ButtonShadow  = 0.13,
+    NotifShadow   = 0.18,
 }
 
 local ANIM = {
@@ -55,14 +55,13 @@ local ANIM = {
     PressTime    = 0.07,
     NotifFadeIn  = 0.22,
     NotifFadeOut = 0.32,
-    RippleTime   = 0.44
 }
 
 local KevinzHub = {}
 local _ui = {}
 
--- Utility
-local function makeRoundedFrame(props)
+-- Utility: Rounded frame with optional shadow
+local function makeRoundedFrame(props, shadowAlpha)
     local f = Instance.new("Frame")
     for k,v in pairs(props) do f[k] = v end
     f.BorderSizePixel = 0
@@ -71,53 +70,34 @@ local function makeRoundedFrame(props)
     local stroke = Instance.new("UIStroke", f)
     stroke.Color = COLORS.Outline
     stroke.Thickness = 1.15
+    if shadowAlpha and shadowAlpha > 0 then
+        local shadow = Instance.new("ImageLabel")
+        shadow.Name = "Shadow"
+        shadow.Parent = f
+        shadow.ZIndex = (f.ZIndex or 1) - 1
+        shadow.BackgroundTransparency = 1
+        shadow.Image = "rbxassetid://1316045217" -- Soft shadow
+        shadow.ImageColor3 = COLORS.Shadow
+        shadow.ImageTransparency = shadowAlpha
+        shadow.ScaleType = Enum.ScaleType.Slice
+        shadow.SliceCenter = Rect.new(10,10,118,118)
+        shadow.Size = UDim2.new(1, 24, 1, 24)
+        shadow.Position = UDim2.new(0, -12, 0, -12)
+        shadow.ClipsDescendants = false
+    end
     return f
 end
 
--- Ripple effect: pos in button local space
-local function rippleEffect(btn, pos, rippleColor, z)
-    local ripple = Instance.new("Frame")
-    ripple.BackgroundTransparency = 1-ALPHA.Ripple
-    ripple.BackgroundColor3 = rippleColor or Color3.fromRGB(255,255,255)
-    ripple.Size = UDim2.new(0,0,0,0)
-    ripple.Position = UDim2.new(0,pos.X - 1,0,pos.Y - 1)
-    ripple.AnchorPoint = Vector2.new(0.5,0.5)
-    ripple.ZIndex = (z or 1000)
-    ripple.ClipsDescendants = true
-    local corner = Instance.new("UICorner", ripple)
-    corner.CornerRadius = UDim.new(1,0)
-    ripple.Parent = btn
-    local maxD = math.max(btn.AbsoluteSize.X,btn.AbsoluteSize.Y)*2
-    TweenService:Create(ripple,TweenInfo.new(ANIM.RippleTime,Enum.EasingStyle.Sine),{
-        Size=UDim2.new(0,maxD,0,maxD),
-        BackgroundTransparency=1
-    }):Play()
-    game:GetService("Debris"):AddItem(ripple, ANIM.RippleTime+0.1)
-end
-
--- Button animation + ripple + shadow
 local function addBtnAnim(btn)
-    -- shadow
-    local shadow = Instance.new("Frame", btn)
-    shadow.BackgroundColor3 = COLORS.ButtonShadow
-    shadow.BackgroundTransparency = 1-ALPHA.Shadow
-    shadow.Size = UDim2.new(1,8,1,8)
-    shadow.Position = UDim2.new(0,-4,0,-4)
-    shadow.ZIndex = btn.ZIndex-1
-    shadow.BorderSizePixel = 0
-    shadow.Name = "BtnShadow"
-    local corner = Instance.new("UICorner", shadow)
-    corner.CornerRadius = UDim.new(0, 10)
-    -- highlight
     local highlight = Instance.new("Frame")
     highlight.Name = "Highlight"
     highlight.BackgroundTransparency = 1
     highlight.BackgroundColor3 = Color3.fromRGB(255,255,255)
     highlight.Size = UDim2.new(1,0,1,0)
-    highlight.ZIndex = btn.ZIndex+2
+    highlight.ZIndex = 99
     highlight.Parent = btn
-    local corner2 = Instance.new("UICorner", highlight)
-    corner2.CornerRadius = UDim.new(0,8)
+    local corner = Instance.new("UICorner", highlight)
+    corner.CornerRadius = UDim.new(0,8)
     btn.MouseEnter:Connect(function()
         TweenService:Create(btn, TweenInfo.new(ANIM.FadeTime, Enum.EasingStyle.Quint), {BackgroundColor3=COLORS.ButtonHover}):Play()
         TweenService:Create(highlight, TweenInfo.new(ANIM.FadeTime, Enum.EasingStyle.Quint), {BackgroundTransparency=0.92}):Play()
@@ -130,11 +110,6 @@ local function addBtnAnim(btn)
         if i.UserInputType==Enum.UserInputType.MouseButton1 then
             TweenService:Create(btn, TweenInfo.new(ANIM.PressTime, Enum.EasingStyle.Quint), {BackgroundColor3=COLORS.ButtonPress}):Play()
             TweenService:Create(highlight, TweenInfo.new(ANIM.PressTime, Enum.EasingStyle.Quint), {BackgroundTransparency=0.8}):Play()
-            local localPos
-            pcall(function()
-                localPos = btn:ToObjectSpace(i.Position)
-            end)
-            rippleEffect(btn, localPos or Vector2.new(btn.AbsoluteSize.X/2,btn.AbsoluteSize.Y/2), Color3.fromRGB(255,255,255), btn.ZIndex+3)
         end
     end)
     btn.InputEnded:Connect(function(i)
@@ -178,7 +153,7 @@ function KevinzHub:MakeNotification(opt)
         Size = UDim2.new(1,0,0,54),
         BackgroundColor3 = COLORS.NotifBg,
         LayoutOrder = os.clock()*1000
-    }
+    }, ALPHA.NotifShadow
     notif.BackgroundTransparency = 1
     notif.ZIndex = 201
     local stroke = notif:FindFirstChildOfClass("UIStroke")
@@ -225,7 +200,6 @@ function KevinzHub:MakeNotification(opt)
     end)
 end
 
--- Main Window API (các phần spacing, shadow, ripple đều đã tối ưu)
 function KevinzHub:MakeWindow(opt)
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "KevinzHubUI"
@@ -241,7 +215,8 @@ function KevinzHub:MakeWindow(opt)
         Position = UDim2.fromScale(0.5,0.5),
         Size = UDim2.new(0,720,0,540),
         BackgroundColor3 = COLORS.WindowBg,
-    })
+        ZIndex = 10,
+    }, ALPHA.WindowShadow)
     _ui.window = window
 
     -- TopBar
@@ -251,6 +226,7 @@ function KevinzHub:MakeWindow(opt)
         Position = UDim2.new(0,0,0,0),
         Size = UDim2.new(1,0,0,38),
         BackgroundColor3 = COLORS.TopBarBg,
+        ZIndex = 11,
     })
     topBar.ClipsDescendants = true
 
@@ -364,7 +340,7 @@ function KevinzHub:MakeWindow(opt)
     sidebarHolder.Name = "SidebarHolder"
     sidebarHolder.Position = UDim2.new(0,0,0,38)
     sidebarHolder.Size = UDim2.new(0,192,1,-38)
-    sidebarHolder.BackgroundTransparency = 1-ALPHA.Sidebar
+    sidebarHolder.BackgroundTransparency = 1
     sidebarHolder.ClipsDescendants = true
 
     local sidebar = makeRoundedFrame{
@@ -372,8 +348,8 @@ function KevinzHub:MakeWindow(opt)
         Position = UDim2.new(0,0,0,0), Size = UDim2.new(1,0,1,0),
         BackgroundColor3 = COLORS.SidebarBg
     }
-    sidebar.BackgroundTransparency = 1-ALPHA.Sidebar
     sidebar.ClipsDescendants = true
+
     local pad = Instance.new("UIPadding", sidebar)
     pad.PaddingTop, pad.PaddingLeft = UDim.new(0,10), UDim.new(0,8)
     pad.PaddingRight, pad.PaddingBottom = UDim.new(0,8), UDim.new(0,8)
@@ -400,7 +376,7 @@ function KevinzHub:MakeWindow(opt)
     list.Padding = UDim.new(0,8)
     list.Parent = sidebar
 
-    -- User Info bottom (headshot luôn hiện, spacing hài hòa)
+    -- User Info bottom (headshot luôn hiện, spacing đẹp)
     local function renderUserInfo()
         local uf = Instance.new("Frame")
         uf.Name = "UserInfo"
@@ -429,6 +405,7 @@ function KevinzHub:MakeWindow(opt)
             end
             if thumbReady then av.Image = thumb end
         end)()
+
         local nm = Instance.new("TextLabel", uf)
         nm.Name="Username"; nm.Size=UDim2.new(1,-60,1,0); nm.Position=UDim2.new(0,56,0,0)
         nm.BackgroundTransparency=1; nm.Font=Enum.Font.GothamBold; nm.Text=LocalPlayer.Name
@@ -544,12 +521,12 @@ function KevinzHub:MakeWindow(opt)
         local sectionOrder = 0
         function Tab:AddSection(secOpt)
             sectionOrder = sectionOrder + 1
-            local secFrame = makeRoundedFrame{
+            local secFrame = makeRoundedFrame({
                 Name = secOpt.Name.."Section", Parent = ct,
                 Size = UDim2.new(1,-32,0,0),
                 Position = UDim2.new(0,16,0,20 + (sectionOrder-1)*132),
                 BackgroundColor3 = COLORS.SectionBg,
-            }
+            }, ALPHA.SectionShadow)
             secFrame.AutomaticSize = Enum.AutomaticSize.Y
             local secLbl = Instance.new("TextLabel", secFrame)
             secLbl.Size = UDim2.new(1,-14,0,25)
@@ -564,12 +541,12 @@ function KevinzHub:MakeWindow(opt)
             local Section = {}
             local itemY = 36
             function Section:AddButton(btnOpt)
-                local btn = makeRoundedFrame{
+                local btn = makeRoundedFrame({
                     Name = btnOpt.Name.."Btn", Parent = secFrame,
                     Size = UDim2.new(0,145,0,32),
                     Position = UDim2.new(0,12,0,itemY),
                     BackgroundColor3 = COLORS.ButtonBg
-                }
+                }, ALPHA.ButtonShadow)
                 local lbl = Instance.new("TextLabel", btn)
                 lbl.Size = UDim2.fromScale(1,1)
                 lbl.BackgroundTransparency = 1
@@ -724,7 +701,6 @@ function KevinzHub:MakeWindow(opt)
                         on = not on
                         updateAppearance(true)
                         if opt.Callback then opt.Callback(on) end
-                        rippleEffect(toggleBg, Vector2.new(toggleBg.AbsoluteSize.X/2, toggleBg.AbsoluteSize.Y/2), Color3.new(0,1,0), toggleBg.ZIndex+2)
                     end
                 end)
                 local toggleLbl = Instance.new("TextLabel", secFrame)
