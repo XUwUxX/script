@@ -48,10 +48,23 @@ local ANIM = {
     NotifFadeOut = 0.32,
 }
 
+local CLICK_SOUND_ID = "rbxassetid://535716488"
+
 local KevinzHub = {}
 local _ui = {}
 
 -- Utility
+local function playClickSound(parent)
+    -- parent = button or UI element to parent the sound to (for .Parented properly)
+    local snd = Instance.new("Sound")
+    snd.SoundId = CLICK_SOUND_ID
+    snd.Volume = 1
+    snd.PlayOnRemove = true
+    snd.Name = "KevinzHubClickSound"
+    snd.Parent = parent or (PlayerGui or workspace)
+    snd:Destroy() -- PlayOnRemove will play when destroyed
+end
+
 local function makeRoundedFrame(props)
     local f = Instance.new("Frame")
     for k,v in pairs(props) do f[k] = v end
@@ -86,6 +99,7 @@ local function addBtnAnim(btn)
         if i.UserInputType==Enum.UserInputType.MouseButton1 then
             TweenService:Create(btn, TweenInfo.new(ANIM.PressTime, Enum.EasingStyle.Quint), {BackgroundColor3=COLORS.ButtonPress}):Play()
             TweenService:Create(highlight, TweenInfo.new(ANIM.PressTime, Enum.EasingStyle.Quint), {BackgroundTransparency=0.8}):Play()
+            playClickSound(btn)
         end
     end)
     btn.InputEnded:Connect(function(i)
@@ -209,7 +223,7 @@ function KevinzHub:MakeWindow(opt)
     icon.Size = UDim2.new(0,26,0,26)
     icon.Position = UDim2.new(0,13,0.5,-13)
     icon.BackgroundTransparency = 1
-    icon.Image = "rbxassetid://17770659125"
+    icon.Image = "rbxassetid://4483345998"
 
     local titleLabel = Instance.new("TextLabel", topBar)
     titleLabel.Name = "Title"
@@ -256,11 +270,13 @@ function KevinzHub:MakeWindow(opt)
     addBtnAnim(btnClose); addBtnAnim(btnMin)
     btnClose.InputBegan:Connect(function(i)
         if i.UserInputType==Enum.UserInputType.MouseButton1 then
+            playClickSound(btnClose)
             KevinzHub:Destroy()
         end
     end)
     btnMin.InputBegan:Connect(function(i)
         if i.UserInputType==Enum.UserInputType.MouseButton1 then
+            playClickSound(btnMin)
             window.Visible = false
             local rb = makeRoundedFrame{
                 Name = "Restore", Parent = screenGui,
@@ -280,12 +296,13 @@ function KevinzHub:MakeWindow(opt)
             addBtnAnim(rb)
             rb.InputBegan:Connect(function(ii)
                 if ii.UserInputType==Enum.UserInputType.MouseButton1 then
+                    playClickSound(rb)
                     window.Visible=true; rb:Destroy()
                 end
             end)
         end
     end)
-    -- Drag logic (bo góc tốt nhất, không bị lỗi, thành phần hiện đầy đủ)
+    -- Drag logic
     do
         local dragging, startPos, dragStart
         topBar.InputBegan:Connect(function(i)
@@ -362,6 +379,7 @@ function KevinzHub:MakeWindow(opt)
 
         local thumb = ""
         local thumbReady = false
+        -- Gọi bất đồng bộ, nhưng fallback luôn là logo Roblox
         local av = Instance.new("ImageLabel", uf)
         av.Name="Avatar"; av.Size=UDim2.new(0,48,0,48); av.Position=UDim2.new(0,0,0,4)
         av.BackgroundTransparency=1; av.Image="rbxassetid://77339698"
@@ -463,7 +481,7 @@ function KevinzHub:MakeWindow(opt)
         icon.Size = UDim2.new(0,22,0,22)
         icon.Position = UDim2.new(0,10,0.5,-11)
         icon.BackgroundTransparency = 1
-        icon.Image = tabOpt.Icon or "rbxassetid://18109861079"
+        icon.Image = tabOpt.Icon or "rbxassetid://4483345998"
         icon.ImageColor3 = COLORS.TabIconTint
         local lbl = Instance.new("TextLabel", btn)
         lbl.Size = UDim2.new(1,-38,1,0)
@@ -486,12 +504,13 @@ function KevinzHub:MakeWindow(opt)
         -- Section layout dùng UIListLayout spacing đều, không lỗi ẩn/lỗi dính
         local sectionList = Instance.new("UIListLayout", ct)
         sectionList.SortOrder = Enum.SortOrder.LayoutOrder
-        sectionList.Padding = UDim.new(0, 24)
+        sectionList.Padding = UDim.new(0, 24) -- Spacing đều giữa các section
         sectionList.HorizontalAlignment = Enum.HorizontalAlignment.Center
         sectionList.VerticalAlignment = Enum.VerticalAlignment.Top
         tabs[tabOpt.Name], tabContents[tabOpt.Name] = btn, ct
         btn.InputBegan:Connect(function(i)
             if i.UserInputType==Enum.UserInputType.MouseButton1 then
+                playClickSound(btn)
                 selectTab(tabOpt.Name)
             end
         end)
@@ -511,7 +530,7 @@ function KevinzHub:MakeWindow(opt)
             -- Section nội dung dùng UIListLayout để spacing đều các item
             local itemsList = Instance.new("UIListLayout", secFrame)
             itemsList.SortOrder = Enum.SortOrder.LayoutOrder
-            itemsList.Padding = UDim.new(0, 12)
+            itemsList.Padding = UDim.new(0, 12) -- Khoảng cách đều giữa các item
             itemsList.HorizontalAlignment = Enum.HorizontalAlignment.Left
             itemsList.VerticalAlignment = Enum.VerticalAlignment.Top
 
@@ -546,6 +565,7 @@ function KevinzHub:MakeWindow(opt)
                 addBtnAnim(btn)
                 btn.InputBegan:Connect(function(i)
                     if i.UserInputType==Enum.UserInputType.MouseButton1 then
+                        playClickSound(btn)
                         if btnOpt.Callback then btnOpt.Callback() end
                     end
                 end)
@@ -614,6 +634,7 @@ function KevinzHub:MakeWindow(opt)
                 sliderKnob.InputBegan:Connect(function(i)
                     if i.UserInputType == Enum.UserInputType.MouseButton1 then
                         draggingSlider = true
+                        playClickSound(sliderKnob)
                     end
                 end)
                 sliderBg.InputEnded:Connect(function(i)
@@ -633,6 +654,7 @@ function KevinzHub:MakeWindow(opt)
                         local x = math.clamp(i.Position.X - sliderBg.AbsolutePosition.X, 0, sliderBg.AbsoluteSize.X)
                         local v = math.floor(slOpt.Min + (x/sliderBg.AbsoluteSize.X)*(slOpt.Max-slOpt.Min))
                         setSlider(v,true)
+                        playClickSound(sliderBg)
                     end
                 end)
 
@@ -655,6 +677,7 @@ function KevinzHub:MakeWindow(opt)
                     textbox.FocusLost:Connect(function(enter)
                         if enter then
                             setSlider(textbox.Text,false)
+                            playClickSound(textbox)
                         end
                     end)
                 end
@@ -702,6 +725,7 @@ function KevinzHub:MakeWindow(opt)
                     if i.UserInputType==Enum.UserInputType.MouseButton1 then
                         on = not on
                         updateAppearance(true)
+                        playClickSound(toggleBg)
                         if opt.Callback then opt.Callback(on) end
                     end
                 end)
