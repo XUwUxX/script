@@ -912,112 +912,113 @@ function KevinzHub:MakeWindow(opt)
             end
 
             function Section:AddDropdown(opt)
-                local open = false
-                local container = Instance.new("Frame", secFrame)
-                container.Name = (opt.Name or "Dropdown").."Dropdown"
-                container.Size = UDim2.new(0, 150, 0, 32)
-                container.BackgroundTransparency = 1
-                container.LayoutOrder = itemOrder
-                itemOrder = itemOrder + 1
+    local open = false
+    local container = Instance.new("Frame", secFrame)
+    container.Name = (opt.Name or "Dropdown").."Dropdown"
+    container.Size = UDim2.new(0, 150, 0, 32)
+    container.BackgroundTransparency = 1
+    container.LayoutOrder = itemOrder
+    itemOrder = itemOrder + 1
 
-                local mainBtn = makeRoundedFrame{
-                    Name = "DropdownMain", Parent = container,
-                    Size = UDim2.new(1,0,0,28),
-                    BackgroundColor3 = COLORS.DropdownBG
-                }
-                local label = Instance.new("TextLabel", mainBtn)
-                label.BackgroundTransparency = 1
-                label.Font = Enum.Font.Gotham
-                label.Text = tostring(opt.Default or (opt.Values and opt.Values[1]) or "")
-                label.TextSize = 13
-                label.TextColor3 = COLORS.LabelText
-                label.TextXAlignment = Enum.TextXAlignment.Left
-                label.Size = UDim2.new(1, -32, 1, 0)
-                label.Position = UDim2.new(0, 8, 0, 0)
+    local mainBtn = makeRoundedFrame{
+        Name = "DropdownMain", Parent = container,
+        Size = UDim2.new(1,0,0,28),
+        BackgroundColor3 = COLORS.DropdownBG
+    }
+    local label = Instance.new("TextLabel", mainBtn)
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.Gotham
+    label.Text = tostring(opt.Default or (opt.Values and opt.Values[1]) or "")
+    label.TextSize = 13
+    label.TextColor3 = COLORS.LabelText
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Size = UDim2.new(1, -32, 1, 0)
+    label.Position = UDim2.new(0, 8, 0, 0)
 
-                local arrow = Instance.new("ImageLabel", mainBtn)
-                arrow.Image = "rbxassetid://6034818371"
-                arrow.BackgroundTransparency = 1
-                arrow.Size = UDim2.new(0,16,0,16)
-                arrow.Position = UDim2.new(1, -22, 0.5, -8)
-                arrow.ImageColor3 = COLORS.LabelText
+    local arrow = Instance.new("ImageLabel", mainBtn)
+    arrow.Image = "rbxassetid://6034818371"
+    arrow.BackgroundTransparency = 1
+    arrow.Size = UDim2.new(0,16,0,16)
+    arrow.Position = UDim2.new(1, -22, 0.5, -8)
+    arrow.ImageColor3 = COLORS.LabelText
 
-                local selected = opt.Default
-                local callback = opt.Callback
+    local selected = opt.Default
+    local callback = opt.Callback
 
-                local menu = makeRoundedFrame{
-                    Name = "DropdownMenu", Parent = container,
-                    Size = UDim2.new(1, 0, 0, 0),
-                    BackgroundColor3 = COLORS.DropdownBG,
-                    Visible = false
-                }
-                menu.Position = UDim2.new(0,0,1,2)
-                menu.ZIndex = 10
-                menu.ClipsDescendants = true
-                menu.AutomaticSize = Enum.AutomaticSize.Y
+    local menu = makeRoundedFrame{
+        Name = "DropdownMenu", Parent = container,
+        Size = UDim2.new(1, 0, 0, 0),
+        BackgroundColor3 = COLORS.DropdownBG,
+        Visible = false
+    }
+    menu.Position = UDim2.new(0,0,1,2)
+    menu.ZIndex = 10
+    menu.ClipsDescendants = true
+    menu.AutomaticSize = Enum.AutomaticSize.Y
 
-                local list = Instance.new("UIListLayout", menu)
-                list.SortOrder = Enum.SortOrder.LayoutOrder
-                list.Padding = UDim.new(0, 2)
-                local function updateDropdownItems(values)
-                    for _,c in pairs(menu:GetChildren()) do
-                        if c:IsA("Frame") then c:Destroy() end
-                    end
-                    for idx, v in ipairs(values or opt.Values or {}) do
-                        local item = makeRoundedFrame{
-                            Name = tostring(v).."Item", Parent = menu,
-                            Size = UDim2.new(1,0,0,26),
-                            BackgroundColor3 = COLORS.DropdownBG
-                        }
-                        local lbl = Instance.new("TextLabel", item)
-                        lbl.BackgroundTransparency = 1
-                        lbl.Font = Enum.Font.Gotham
-                        lbl.Text = tostring(v)
-                        lbl.TextSize = 13
-                        lbl.TextColor3 = COLORS.LabelText
-                        lbl.TextXAlignment = Enum.TextXAlignment.Left
-                        lbl.Size = UDim2.new(1, -8, 1, 0)
-                        lbl.Position = UDim2.new(0, 8, 0, 0)
-                        item.LayoutOrder = idx
-                        item.InputBegan:Connect(function(i)
-                            if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
-                                selected = v
-                                label.Text = tostring(v)
-                                menu.Visible = false
-                                open = false
-                                if callback then callback(selected) end
-                                playClickSound(item)
-                            end
-                        end)
-                        addBtnAnim(item)
-                    end
+    local list = Instance.new("UIListLayout", menu)
+    list.SortOrder = Enum.SortOrder.LayoutOrder
+    list.Padding = UDim.new(0, 2)
+    local function updateDropdownItems(values)
+        for _,c in pairs(menu:GetChildren()) do
+            if c:IsA("Frame") then c:Destroy() end
+        end
+        for idx, v in ipairs(values or opt.Values or {}) do
+            local item = makeRoundedFrame{
+                Name = tostring(v).."Item", Parent = menu,
+                Size = UDim2.new(1,0,0,26),
+                BackgroundColor3 = COLORS.DropdownBG
+            }
+            local lbl = Instance.new("TextLabel", item)
+            lbl.BackgroundTransparency = 1
+            lbl.Font = Enum.Font.Gotham
+            lbl.Text = tostring(v)
+            lbl.TextSize = 13
+            lbl.TextColor3 = COLORS.LabelText
+            lbl.TextXAlignment = Enum.TextXAlignment.Left
+            lbl.Size = UDim2.new(1, -8, 1, 0)
+            lbl.Position = UDim2.new(0, 8, 0, 0)
+            item.LayoutOrder = idx
+            item.InputBegan:Connect(function(i)
+                if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+                    selected = v
+                    label.Text = tostring(v)
+                    menu.Visible = false
+                    open = false
+                    if callback then callback(selected) end
+                    playClickSound(item)
                 end
-                updateDropdownItems(opt.Values or {})
+            end)
+            addBtnAnim(item)
+        end
+    end
+    updateDropdownItems(opt.Values or {})
 
-                mainBtn.InputBegan:Connect(function(i)
-                    if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
-                        open = not open
-                        menu.Visible = open
-                        playClickSound(mainBtn)
-                    end
-                end)
-                if UserInputService.TouchEnabled then
-                    mainBtn.TouchTap:Connect(function()
-                        open = not open
-                        menu.Visible = open
-                        playClickSound(mainBtn)
-                    end)
-                end
+    mainBtn.InputBegan:Connect(function(i)
+        if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+            open = not open
+            menu.Visible = open
+            playClickSound(mainBtn)
+        end
+    end)
+    if UserInputService.TouchEnabled then
+        mainBtn.TouchTap:Connect(function()
+            open = not open
+            menu.Visible = open
+            playClickSound(mainBtn)
+        end)
+    end
 
-                function container:GetSelected()
-                    return selected
-                end
-                function container:UpdateValues(newVals)
-                    updateDropdownItems(newVals)
-                end
+    -- THÊM method GetSelected vào container:
+    function container:GetSelected()
+        return selected
+    end
+    function container:UpdateValues(newVals)
+        updateDropdownItems(newVals)
+    end
 
-                return container
-            end
+    return container
+end
 
             function Section:AddColorPicker(opt)
                 local container = Instance.new("Frame", secFrame)
