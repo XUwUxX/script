@@ -912,21 +912,18 @@ function KevinzHub:MakeWindow(opt)
             end
 
             function Section:AddDropdown(opt)
-                -- opt: {Name, Values, Default, Callback}
                 local open = false
                 local values = opt.Values or {}
                 local selected = opt.Default or values[1]
                 local callback = opt.Callback
 
-                -- Container
                 local container = Instance.new("Frame", secFrame)
-                container.Name = (opt.Name or "Dropdown") .. "Dropdown"
+                container.Name = (opt.Name or "Dropdown").."Dropdown"
                 container.Size = UDim2.new(0, 180, 0, 36)
                 container.BackgroundTransparency = 1
                 container.LayoutOrder = itemOrder
                 itemOrder = itemOrder + 1
 
-                -- Optional title
                 if opt.Name then
                     local nameLabel = Instance.new("TextLabel", container)
                     nameLabel.BackgroundTransparency = 1
@@ -939,16 +936,13 @@ function KevinzHub:MakeWindow(opt)
                     nameLabel.Position = UDim2.new(0, 0, 0, -18)
                 end
 
-                -- Main button
-                local mainBtn = makeRoundedFrame {
-                    Name = "DropdownMain",
-                    Parent = container,
+                local mainBtn = makeRoundedFrame{
+                    Name = "DropdownMain", Parent = container,
                     Size = UDim2.new(1, 0, 0, 28),
                     BackgroundColor3 = COLORS.DropdownBG
                 }
                 addBtnAnim(mainBtn)
 
-                -- Selected value label
                 local label = Instance.new("TextLabel", mainBtn)
                 label.BackgroundTransparency = 1
                 label.Font = Enum.Font.Gotham
@@ -961,23 +955,20 @@ function KevinzHub:MakeWindow(opt)
                 label.Position = UDim2.new(0, 8, 0, 0)
                 label.ClipsDescendants = false
 
-                -- Arrow
                 local arrow = Instance.new("ImageLabel", mainBtn)
                 arrow.Image = "rbxassetid://6034818371"
                 arrow.BackgroundTransparency = 1
-                arrow.Size = UDim2.new(0, 16, 0, 16)
+                arrow.Size = UDim2.new(0,16,0,16)
                 arrow.Position = UDim2.new(1, -22, 0.5, -8)
                 arrow.ImageColor3 = COLORS.LabelText
 
-                -- Dropdown menu
-                local menu = makeRoundedFrame {
-                    Name = "DropdownMenu",
-                    Parent = container,
+                local menu = makeRoundedFrame{
+                    Name = "DropdownMenu", Parent = container,
                     Size = UDim2.new(1, 0, 0, 0),
                     BackgroundColor3 = COLORS.DropdownBG,
                     Visible = false
                 }
-                menu.Position = UDim2.new(0, 0, 1, 2)
+                menu.Position = UDim2.new(0,0,1,2)
                 menu.ZIndex = 10
                 menu.ClipsDescendants = true
                 menu.AutomaticSize = Enum.AutomaticSize.Y
@@ -988,22 +979,23 @@ function KevinzHub:MakeWindow(opt)
 
                 local function updateDropdownItems(newVals)
                     values = newVals or values
-                    for _, c in pairs(menu:GetChildren()) do
+                    for _,c in pairs(menu:GetChildren()) do
                         if c:IsA("Frame") then c:Destroy() end
                     end
                     for idx, v in ipairs(values) do
-                        local item = makeRoundedFrame {
-                            Name = tostring(v) .. "Item",
-                            Parent = menu,
-                            Size = UDim2.new(1, 0, 0, 32),
+                        local item = makeRoundedFrame{
+                            Name = tostring(v).."Item", Parent = menu,
+                            Size = UDim2.new(1,0,0,32),
                             BackgroundColor3 = COLORS.DropdownBG
                         }
                         addBtnAnim(item)
+
                         local padding = Instance.new("UIPadding", item)
                         padding.PaddingLeft = UDim.new(0, 12)
                         padding.PaddingRight = UDim.new(0, 8)
+
                         local lbl = Instance.new("TextLabel", item)
-                        lbl.BackgroundTransparency = 1
+                        lbl.BackgroundTransparency = 0 -- ĐẢM BẢO LABEL HIỆN
                         lbl.Font = Enum.Font.Gotham
                         lbl.Text = tostring(v)
                         lbl.TextSize = 14
@@ -1013,6 +1005,7 @@ function KevinzHub:MakeWindow(opt)
                         lbl.Size = UDim2.new(1, 0, 1, 0)
                         lbl.Position = UDim2.new(0, 0, 0, 0)
                         lbl.ClipsDescendants = false
+
                         item.LayoutOrder = idx
 
                         item.InputBegan:Connect(function(i)
@@ -1054,7 +1047,6 @@ function KevinzHub:MakeWindow(opt)
                     end)
                 end
 
-                -- Hide menu if click outside
                 local function dismissMenuOnClick()
                     if not open then return end
                     menu.Visible = false
@@ -1077,7 +1069,6 @@ function KevinzHub:MakeWindow(opt)
                     end
                 end)
 
-                -- Return table
                 local dropdown = {}
                 dropdown.Container = container
                 function dropdown:GetSelected()
