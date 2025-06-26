@@ -49,7 +49,7 @@ local ANIM = {
 }
 
 local CLICK_SOUND_ID = "rbxassetid://535716488"
-local KEVINZHUB_VERSION = "1.2.3" -- <-- Version NÀY LÀ CỐ ĐỊNH, CHỈ THAY ĐỔI ĐƯỢC BÊN TRONG LIB
+local KEVINZHUB_VERSION = "2"
 
 local KevinzHub = {}
 local _ui = {}
