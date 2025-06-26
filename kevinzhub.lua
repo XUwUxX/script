@@ -983,6 +983,80 @@ function KevinzHub:MakeWindow(opt)
     list.Padding = UDim.new(0, 2)
 
     -- Hàm cập nhật lại danh sách lựa chọn
+    function Section:AddDropdown(opt)
+    -- opt: {Name, Values, Default, Callback}
+    local open = false
+    local values = opt.Values or {}
+    local selected = opt.Default or values[1]
+    local callback = opt.Callback
+
+    -- Container Frame
+    local container = Instance.new("Frame", secFrame)
+    container.Name = (opt.Name or "Dropdown").."Dropdown"
+    container.Size = UDim2.new(0, 180, 0, 36)
+    container.BackgroundTransparency = 1
+    container.LayoutOrder = itemOrder
+    itemOrder = itemOrder + 1
+
+    -- Label cho tiêu đề dropdown (nếu có)
+    if opt.Name then
+        local nameLabel = Instance.new("TextLabel", container)
+        nameLabel.BackgroundTransparency = 1
+        nameLabel.Font = Enum.Font.Gotham
+        nameLabel.Text = opt.Name
+        nameLabel.TextSize = 13
+        nameLabel.TextColor3 = COLORS.LabelText
+        nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+        nameLabel.Size = UDim2.new(1, 0, 0, 16)
+        nameLabel.Position = UDim2.new(0, 0, 0, -18)
+    end
+
+    -- Main button (shows selected value)
+    local mainBtn = makeRoundedFrame{
+        Name = "DropdownMain", Parent = container,
+        Size = UDim2.new(1, 0, 0, 28),
+        BackgroundColor3 = COLORS.DropdownBG
+    }
+    addBtnAnim(mainBtn)
+
+    -- Giá trị đang chọn
+    local label = Instance.new("TextLabel", mainBtn)
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.Gotham
+    label.Text = tostring(selected)
+    label.TextSize = 14
+    label.TextColor3 = COLORS.LabelText
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.TextYAlignment = Enum.TextYAlignment.Center
+    label.Size = UDim2.new(1, -32, 1, 0)
+    label.Position = UDim2.new(0, 8, 0, 0)
+    label.ClipsDescendants = false
+
+    -- Mũi tên
+    local arrow = Instance.new("ImageLabel", mainBtn)
+    arrow.Image = "rbxassetid://6034818371"
+    arrow.BackgroundTransparency = 1
+    arrow.Size = UDim2.new(0,16,0,16)
+    arrow.Position = UDim2.new(1, -22, 0.5, -8)
+    arrow.ImageColor3 = COLORS.LabelText
+
+    -- Danh sách lựa chọn
+    local menu = makeRoundedFrame{
+        Name = "DropdownMenu", Parent = container,
+        Size = UDim2.new(1, 0, 0, 0),
+        BackgroundColor3 = COLORS.DropdownBG,
+        Visible = false
+    }
+    menu.Position = UDim2.new(0,0,1,2)
+    menu.ZIndex = 10
+    menu.ClipsDescendants = true
+    menu.AutomaticSize = Enum.AutomaticSize.Y
+
+    local list = Instance.new("UIListLayout", menu)
+    list.SortOrder = Enum.SortOrder.LayoutOrder
+    list.Padding = UDim.new(0, 4) -- Dãn cách đẹp
+
+    -- Hàm cập nhật lại danh sách lựa chọn
     local function updateDropdownItems(newVals)
         values = newVals or values
         -- Xoá cũ
@@ -993,19 +1067,28 @@ function KevinzHub:MakeWindow(opt)
         for idx, v in ipairs(values) do
             local item = makeRoundedFrame{
                 Name = tostring(v).."Item", Parent = menu,
-                Size = UDim2.new(1,0,0,26),
+                Size = UDim2.new(1,0,0,32), -- cao hơn để dễ click
                 BackgroundColor3 = COLORS.DropdownBG
             }
             addBtnAnim(item)
+
+            -- Thêm Padding cho option text
+            local padding = Instance.new("UIPadding", item)
+            padding.PaddingLeft = UDim.new(0, 12)
+            padding.PaddingRight = UDim.new(0, 8)
+
             local lbl = Instance.new("TextLabel", item)
             lbl.BackgroundTransparency = 1
             lbl.Font = Enum.Font.Gotham
             lbl.Text = tostring(v)
-            lbl.TextSize = 13
+            lbl.TextSize = 14
             lbl.TextColor3 = COLORS.LabelText
             lbl.TextXAlignment = Enum.TextXAlignment.Left
-            lbl.Size = UDim2.new(1, -8, 1, 0)
-            lbl.Position = UDim2.new(0, 8, 0, 0)
+            lbl.TextYAlignment = Enum.TextYAlignment.Center
+            lbl.Size = UDim2.new(1, 0, 1, 0)
+            lbl.Position = UDim2.new(0, 0, 0, 0)
+            lbl.ClipsDescendants = false
+
             item.LayoutOrder = idx
 
             item.InputBegan:Connect(function(i)
@@ -1064,7 +1147,6 @@ function KevinzHub:MakeWindow(opt)
             local mouse = UserInputService:GetMouseLocation()
             local absPos = menu.AbsolutePosition
             local absSize = menu.AbsoluteSize
-            -- Không nằm trong menu thì ẩn
             if mouse.X < absPos.X or mouse.X > absPos.X+absSize.X or mouse.Y < absPos.Y or mouse.Y > absPos.Y+absSize.Y then
                 dismissMenuOnClick()
             end
