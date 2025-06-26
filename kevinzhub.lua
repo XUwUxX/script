@@ -236,6 +236,59 @@ function KevinzHub:MakeWindow(opt)
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
     titleLabel.TextYAlignment = Enum.TextYAlignment.Center
 
+    -- Version Rectangle with Shiny Glow & Shadow
+    local versionFrame = Instance.new("Frame")
+    versionFrame.Name = "VersionFrame"
+    versionFrame.Parent = topBar
+    versionFrame.BackgroundColor3 = Color3.fromRGB(255, 235, 80)
+    versionFrame.Position = UDim2.new(0, titleLabel.Position.X.Offset + 0, 0.5, -11)
+    versionFrame.Size = UDim2.new(0, 38, 0, 22)
+    versionFrame.AnchorPoint = Vector2.new(0, 0)
+    versionFrame.BorderSizePixel = 0
+    versionFrame.BackgroundTransparency = 0
+    versionFrame.ZIndex = titleLabel.ZIndex
+
+    local versionCorner = Instance.new("UICorner", versionFrame)
+    versionCorner.CornerRadius = UDim.new(0, 6)
+
+    local versionStroke = Instance.new("UIStroke", versionFrame)
+    versionStroke.Thickness = 2.2
+    versionStroke.Color = Color3.fromRGB(255, 255, 140)
+    versionStroke.Transparency = 0.2
+
+    local versionGlow = Instance.new("UIStroke", versionFrame)
+    versionGlow.Thickness = 7
+    versionGlow.Color = Color3.fromRGB(255, 255, 120)
+    versionGlow.Transparency = 0.7
+    versionGlow.ApplyStrokeMode = Enum.ApplyStrokeMode.Outer
+
+    -- Shadow/Chiều sâu cho versionFrame
+    local versionShadow = Instance.new("ImageLabel", versionFrame)
+    versionShadow.Name = "Shadow"
+    versionShadow.BackgroundTransparency = 1
+    versionShadow.Image = "rbxassetid://13160452133"
+    versionShadow.Size = UDim2.new(1, 14, 1, 14)
+    versionShadow.Position = UDim2.new(0, -7, 0, -7)
+    versionShadow.ZIndex = versionFrame.ZIndex - 1
+    versionShadow.ImageColor3 = Color3.fromRGB(220, 180, 25)
+    versionShadow.ImageTransparency = 0.36
+
+    local versionLabel = Instance.new("TextLabel", versionFrame)
+    versionLabel.Size = UDim2.new(1, 0, 1, 0)
+    versionLabel.BackgroundTransparency = 1
+    versionLabel.Text = "v1"
+    versionLabel.Font = Enum.Font.GothamBold
+    versionLabel.TextColor3 = Color3.fromRGB(255, 255, 200)
+    versionLabel.TextStrokeTransparency = 0.3
+    versionLabel.TextSize = 15
+    versionLabel.TextXAlignment = Enum.TextXAlignment.Center
+    versionLabel.TextYAlignment = Enum.TextYAlignment.Center
+
+    task.defer(function()
+        RunService.RenderStepped:Wait()
+        versionFrame.Position = UDim2.new(0, titleLabel.Position.X.Offset + titleLabel.TextBounds.X + 9, 0.5, -11)
+    end)
+
     local btnMin = makeRoundedFrame{
         Name = "MinimizeButton", Parent = topBar,
         Size = UDim2.new(0,32,0,32),
@@ -283,7 +336,7 @@ function KevinzHub:MakeWindow(opt)
                 Position = UDim2.new(0,18,0,18),
                 BackgroundColor3 = COLORS.ButtonBg
             }
-            -- Sử dụng ImageLabel với asset id "1912438810" thay vì dấu "X"
+            -- Restore icon là image
             local rbl = Instance.new("ImageLabel", rb)
             rbl.Size = UDim2.fromScale(1,1)
             rbl.BackgroundTransparency = 1
@@ -451,7 +504,6 @@ function KevinzHub:MakeWindow(opt)
             TweenService:Create(btn, TweenInfo.new(ANIM.TweenTime, Enum.EasingStyle.Quint),
                 {BackgroundColor3 = active and COLORS.TabActive or COLORS.TabInactive}
             ):Play()
-            -- KHÔNG đổi màu icon tab nữa, chỉ đổi màu nền button
             tabContents[n].Visible = active
             if active then
                 tabContents[n].Position = tabContents[n].Position + UDim2.new(0,0,0,8)
@@ -473,9 +525,7 @@ function KevinzHub:MakeWindow(opt)
         icon.Size = UDim2.new(0,22,0,22)
         icon.Position = UDim2.new(0,10,0.5,-11)
         icon.BackgroundTransparency = 1
-        icon.Image = "rbxassetid://11718192673" -- asset icon tab mới
-        -- KHÔNG đổi màu icon khi active/inactive
-
+        icon.Image = "rbxassetid://11718192673"
         local lbl = Instance.new("TextLabel", btn)
         lbl.Size = UDim2.new(1,-38,1,0)
         lbl.Position = UDim2.new(0,38,0,0)
@@ -494,7 +544,6 @@ function KevinzHub:MakeWindow(opt)
             Visible = false
         }
         ct.ClipsDescendants = true
-        -- Section layout dùng UIListLayout spacing đều, không lỗi ẩn/lỗi dính
         local sectionList = Instance.new("UIListLayout", ct)
         sectionList.SortOrder = Enum.SortOrder.LayoutOrder
         sectionList.Padding = UDim.new(0, 24)
