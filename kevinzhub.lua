@@ -912,29 +912,53 @@ function KevinzHub:MakeWindow(opt)
             end
 
             function Section:AddDropdown(opt)
+    -- opt: {Name, Values, Default, Callback}
     local open = false
+    local values = opt.Values or {}
+    local selected = opt.Default or values[1]
+    local callback = opt.Callback
+
+    -- Container Frame
     local container = Instance.new("Frame", secFrame)
     container.Name = (opt.Name or "Dropdown").."Dropdown"
-    container.Size = UDim2.new(0, 150, 0, 32)
+    container.Size = UDim2.new(0, 180, 0, 36)
     container.BackgroundTransparency = 1
     container.LayoutOrder = itemOrder
     itemOrder = itemOrder + 1
 
+    -- Main button (shows selected value)
     local mainBtn = makeRoundedFrame{
         Name = "DropdownMain", Parent = container,
-        Size = UDim2.new(1,0,0,28),
+        Size = UDim2.new(1, 0, 0, 28),
         BackgroundColor3 = COLORS.DropdownBG
     }
+    addBtnAnim(mainBtn)
+
+    -- Label cho tiêu đề dropdown
+    if opt.Name then
+        local nameLabel = Instance.new("TextLabel", container)
+        nameLabel.BackgroundTransparency = 1
+        nameLabel.Font = Enum.Font.Gotham
+        nameLabel.Text = opt.Name
+        nameLabel.TextSize = 13
+        nameLabel.TextColor3 = COLORS.LabelText
+        nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+        nameLabel.Size = UDim2.new(0, 90, 0, 16)
+        nameLabel.Position = UDim2.new(0, 0, 0, -18)
+    end
+
+    -- Giá trị đang chọn
     local label = Instance.new("TextLabel", mainBtn)
     label.BackgroundTransparency = 1
     label.Font = Enum.Font.Gotham
-    label.Text = tostring(opt.Default or (opt.Values and opt.Values[1]) or "")
+    label.Text = tostring(selected)
     label.TextSize = 13
     label.TextColor3 = COLORS.LabelText
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Size = UDim2.new(1, -32, 1, 0)
     label.Position = UDim2.new(0, 8, 0, 0)
 
+    -- Mũi tên
     local arrow = Instance.new("ImageLabel", mainBtn)
     arrow.Image = "rbxassetid://6034818371"
     arrow.BackgroundTransparency = 1
@@ -942,9 +966,7 @@ function KevinzHub:MakeWindow(opt)
     arrow.Position = UDim2.new(1, -22, 0.5, -8)
     arrow.ImageColor3 = COLORS.LabelText
 
-    local selected = opt.Default
-    local callback = opt.Callback
-
+    -- Danh sách lựa chọn
     local menu = makeRoundedFrame{
         Name = "DropdownMenu", Parent = container,
         Size = UDim2.new(1, 0, 0, 0),
@@ -959,16 +981,22 @@ function KevinzHub:MakeWindow(opt)
     local list = Instance.new("UIListLayout", menu)
     list.SortOrder = Enum.SortOrder.LayoutOrder
     list.Padding = UDim.new(0, 2)
-    local function updateDropdownItems(values)
+
+    -- Hàm cập nhật lại danh sách lựa chọn
+    local function updateDropdownItems(newVals)
+        values = newVals or values
+        -- Xoá cũ
         for _,c in pairs(menu:GetChildren()) do
             if c:IsA("Frame") then c:Destroy() end
         end
-        for idx, v in ipairs(values or opt.Values or {}) do
+        -- Tạo mới các lựa chọn
+        for idx, v in ipairs(values) do
             local item = makeRoundedFrame{
                 Name = tostring(v).."Item", Parent = menu,
                 Size = UDim2.new(1,0,0,26),
                 BackgroundColor3 = COLORS.DropdownBG
             }
+            addBtnAnim(item)
             local lbl = Instance.new("TextLabel", item)
             lbl.BackgroundTransparency = 1
             lbl.Font = Enum.Font.Gotham
@@ -979,6 +1007,7 @@ function KevinzHub:MakeWindow(opt)
             lbl.Size = UDim2.new(1, -8, 1, 0)
             lbl.Position = UDim2.new(0, 8, 0, 0)
             item.LayoutOrder = idx
+
             item.InputBegan:Connect(function(i)
                 if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
                     selected = v
@@ -989,35 +1018,70 @@ function KevinzHub:MakeWindow(opt)
                     playClickSound(item)
                 end
             end)
-            addBtnAnim(item)
         end
     end
-    updateDropdownItems(opt.Values or {})
+
+    updateDropdownItems(values)
+
+    local function toggleMenu(state)
+        open = (state ~= nil) and state or not open
+        menu.Visible = open
+        TweenService:Create(mainBtn, TweenInfo.new(ANIM.FadeTime, Enum.EasingStyle.Quint), {
+            BackgroundColor3 = open and COLORS.DropdownHover or COLORS.DropdownBG
+        }):Play()
+        TweenService:Create(arrow, TweenInfo.new(ANIM.FadeTime, Enum.EasingStyle.Quint), {
+            Rotation = open and 180 or 0
+        }):Play()
+    end
 
     mainBtn.InputBegan:Connect(function(i)
         if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
-            open = not open
-            menu.Visible = open
+            toggleMenu()
             playClickSound(mainBtn)
         end
     end)
     if UserInputService.TouchEnabled then
         mainBtn.TouchTap:Connect(function()
-            open = not open
-            menu.Visible = open
+            toggleMenu()
             playClickSound(mainBtn)
         end)
     end
 
-    -- THÊM method GetSelected vào container:
-    function container:GetSelected()
+    -- Ẩn menu khi click ra ngoài
+    local function dismissMenuOnClick()
+        if not open then return end
+        menu.Visible = false
+        open = false
+        TweenService:Create(mainBtn, TweenInfo.new(ANIM.FadeTime, Enum.EasingStyle.Quint), {
+            BackgroundColor3 = COLORS.DropdownBG
+        }):Play()
+        TweenService:Create(arrow, TweenInfo.new(ANIM.FadeTime, Enum.EasingStyle.Quint), {
+            Rotation = 0
+        }):Play()
+    end
+    UserInputService.InputBegan:Connect(function(input, isProcessed)
+        if open and input.UserInputType==Enum.UserInputType.MouseButton1 then
+            local mouse = UserInputService:GetMouseLocation()
+            local absPos = menu.AbsolutePosition
+            local absSize = menu.AbsoluteSize
+            -- Không nằm trong menu thì ẩn
+            if mouse.X < absPos.X or mouse.X > absPos.X+absSize.X or mouse.Y < absPos.Y or mouse.Y > absPos.Y+absSize.Y then
+                dismissMenuOnClick()
+            end
+        end
+    end)
+
+    -- Table trả về, có Instance và method
+    local dropdown = {}
+    dropdown.Container = container
+    function dropdown:GetSelected()
         return selected
     end
-    function container:UpdateValues(newVals)
+    function dropdown:UpdateValues(newVals)
         updateDropdownItems(newVals)
     end
-
-    return container
+    setmetatable(dropdown, {__index = container})
+    return dropdown
 end
 
             function Section:AddColorPicker(opt)
