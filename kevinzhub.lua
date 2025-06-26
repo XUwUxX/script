@@ -109,101 +109,28 @@ local function addBtnAnim(btn)
     end)
 end
 
--- Notification: more transparent, blurred glass look
+-- Notification: chỉ dùng notification mặc định Roblox, hỗ trợ truyền icon tùy chọn, mặc định là 11836181348
 function KevinzHub:MakeNotification(opt)
     if pcall(function() return game:GetService("StarterGui"):SetCore("SendNotification",{}) end) then
         pcall(function()
+            local iconValue = opt.Image
+            if iconValue then
+                if tostring(iconValue):find("rbxassetid://") then
+                    iconValue = tostring(iconValue)
+                else
+                    iconValue = "rbxassetid://" .. tostring(iconValue)
+                end
+            else
+                iconValue = "rbxassetid://11836181348"
+            end
             game:GetService("StarterGui"):SetCore("SendNotification",{
                 Title = opt.Name or "Kevinzhub",
                 Text = opt.Content or "",
                 Duration = opt.Time or 2.5,
-                Icon = opt.Image or "rbxassetid://77339698"
+                Icon = iconValue
             })
         end)
     end
-
-    if not _ui.notifFrame then
-        local notifFrame = Instance.new("Frame", _ui.screenGui or PlayerGui)
-        notifFrame.Name = "NotificationFrame"
-        notifFrame.AnchorPoint = Vector2.new(1,0)
-        notifFrame.Position = UDim2.new(1,-22,0,34)
-        notifFrame.Size = UDim2.new(0, 320, 0, 0)
-        notifFrame.BackgroundTransparency = 1
-        notifFrame.Visible = true
-        notifFrame.ZIndex = 200
-        local notifList = Instance.new("UIListLayout", notifFrame)
-        notifList.SortOrder = Enum.SortOrder.LayoutOrder
-        notifList.Padding = UDim.new(0,10)
-        _ui.notifFrame = notifFrame
-    end
-    local notif = makeRoundedFrame{
-        Name = "Notif",
-        Parent = _ui.notifFrame,
-        Size = UDim2.new(1,0,0,48),
-        BackgroundColor3 = COLORS.NotifBg,
-        LayoutOrder = os.clock()*1000
-    }
-    notif.BackgroundTransparency = 0.36 -- More transparent, glass effect
-    notif.ZIndex = 201
-
-    -- Blur (glass) effect
-    local blur = Instance.new("ImageLabel", notif)
-    blur.Name = "GlassBlur"
-    blur.Size = UDim2.new(1,0,1,0)
-    blur.Position = UDim2.new(0,0,0,0)
-    blur.BackgroundTransparency = 1
-    blur.Image = "rbxassetid://13378641210" -- Glass blur texture
-    blur.ImageTransparency = 0.72
-    blur.ZIndex = 200
-
-    local stroke = notif:FindFirstChildOfClass("UIStroke")
-    if stroke then stroke.Thickness = 2 stroke.Color = Color3.fromRGB(110,210,160) stroke.Transparency = 0.05 end
-
-    local icon = Instance.new("ImageLabel", notif)
-    icon.Name = "NotifIcon"
-    icon.Size = UDim2.new(0,22,0,22)
-    icon.Position = UDim2.new(0,11,0,12)
-    icon.BackgroundTransparency = 1
-    icon.Image = opt.Image or "rbxassetid://77339698"
-    icon.ZIndex = 203
-
-    local lbl = Instance.new("TextLabel", notif)
-    lbl.Name = "NotifText"
-    lbl.Position = UDim2.new(0,39,0,3)
-    lbl.Size = UDim2.new(1,-49,1,-6)
-    lbl.BackgroundTransparency = 1
-    lbl.Font = Enum.Font.GothamMedium
-    lbl.Text = (opt.Name and (opt.Name.."\n") or "") .. (opt.Content or "")
-    lbl.TextSize = 15
-    lbl.TextColor3 = Color3.fromRGB(255,255,255)
-    lbl.TextStrokeTransparency = 0.75
-    lbl.TextStrokeColor3 = Color3.fromRGB(60,80,90)
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.TextYAlignment = Enum.TextYAlignment.Center
-    lbl.ZIndex = 204
-
-    notif.Position = UDim2.new(1,48,0,0)
-    notif.BackgroundTransparency = 1
-    notif.Visible = true
-
-    TweenService:Create(notif, TweenInfo.new(ANIM.NotifFadeIn, Enum.EasingStyle.Quint), {
-        Position = UDim2.new(0,0,0,0),
-        BackgroundTransparency = 0.36
-    }):Play()
-    TweenService:Create(blur, TweenInfo.new(ANIM.NotifFadeIn, Enum.EasingStyle.Quint), {ImageTransparency = 0.72}):Play()
-    TweenService:Create(lbl, TweenInfo.new(ANIM.NotifFadeIn, Enum.EasingStyle.Quint), {TextTransparency = 0}):Play()
-    local duration = opt.Time or 2.5
-    task.spawn(function()
-        wait(duration)
-        TweenService:Create(notif, TweenInfo.new(ANIM.NotifFadeOut, Enum.EasingStyle.Quint), {
-            Position = UDim2.new(1,48,0,0),
-            BackgroundTransparency = 1
-        }):Play()
-        TweenService:Create(lbl, TweenInfo.new(ANIM.NotifFadeOut, Enum.EasingStyle.Quint), {TextTransparency = 1}):Play()
-        TweenService:Create(blur, TweenInfo.new(ANIM.NotifFadeOut, Enum.EasingStyle.Quint), {ImageTransparency = 1}):Play()
-        wait(ANIM.NotifFadeOut)
-        notif:Destroy()
-    end)
 end
 
 -- Responsive size helper
