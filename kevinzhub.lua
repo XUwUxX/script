@@ -220,10 +220,10 @@ function KevinzHub:MakeWindow(opt)
 
     local icon = Instance.new("ImageLabel", topBar)
     icon.Name = "GameIcon"
-    icon.Size = UDim2.new(0,26,0,26)
+    icon.Size = UDim2.new(0,34,0,34)
     icon.Position = UDim2.new(0,13,0.5,-13)
     icon.BackgroundTransparency = 1
-    icon.Image = "rbxassetid://4483345998"
+    icon.Image = "rbxassetid://11767069582"
 
     local titleLabel = Instance.new("TextLabel", topBar)
     titleLabel.Name = "Title"
