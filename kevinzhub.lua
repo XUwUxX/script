@@ -209,7 +209,7 @@ function KevinzHub:MakeWindow(opt)
     icon.Size = UDim2.new(0,26,0,26)
     icon.Position = UDim2.new(0,13,0.5,-13)
     icon.BackgroundTransparency = 1
-    icon.Image = "rbxassetid://4483345998"
+    icon.Image = "rbxassetid://17770659125"
 
     local titleLabel = Instance.new("TextLabel", topBar)
     titleLabel.Name = "Title"
@@ -463,7 +463,7 @@ function KevinzHub:MakeWindow(opt)
         icon.Size = UDim2.new(0,22,0,22)
         icon.Position = UDim2.new(0,10,0.5,-11)
         icon.BackgroundTransparency = 1
-        icon.Image = tabOpt.Icon or "rbxassetid://4483345998"
+        icon.Image = tabOpt.Icon or "rbxassetid://18109861079"
         icon.ImageColor3 = COLORS.TabIconTint
         local lbl = Instance.new("TextLabel", btn)
         lbl.Size = UDim2.new(1,-38,1,0)
