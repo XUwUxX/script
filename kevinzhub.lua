@@ -1,4 +1,4 @@
--- KevinzHub API Style UI Library (headshot fix, UI/UX spacing tối ưu đẹp, spacing đều tự động, không lỗi ẩn)
+-- KevinzHub API Style UI Library (optimized for both desktop & mobile, smaller window, improved drag, responsive layout)
 -- Usage: local KevinzHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/XUwUxX/script/refs/heads/main/kevinzhub.lua"))()
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -49,7 +49,7 @@ local ANIM = {
 }
 
 local CLICK_SOUND_ID = "rbxassetid://535716488"
-local KEVINZHUB_VERSION = "2"
+local KEVINZHUB_VERSION = "1.2.3" -- <-- Version NÀY LÀ CỐ ĐỊNH, CHỈ THAY ĐỔI ĐƯỢC BÊN TRONG LIB
 
 local KevinzHub = {}
 local _ui = {}
@@ -190,6 +190,19 @@ function KevinzHub:MakeNotification(opt)
     end)
 end
 
+-- Responsive size helper
+local function getWindowSize()
+    local scr = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
+    local w, h = 540, 380
+    if scr.X <= 700 or scr.Y <= 500 then -- mobile or tiny window
+        w, h = math.max(scr.X*0.94, 260), math.max(scr.Y*0.84, 260)
+        -- If mobile portrait, make window fill most of screen but not overflow
+        w = math.clamp(w, 260, scr.X-16)
+        h = math.clamp(h, 220, scr.Y-30)
+    end
+    return w, h
+end
+
 function KevinzHub:MakeWindow(opt)
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "KevinzHubUI"
@@ -203,36 +216,48 @@ function KevinzHub:MakeWindow(opt)
         Parent = screenGui,
         AnchorPoint = Vector2.new(0.5,0.5),
         Position = UDim2.fromScale(0.5,0.5),
-        Size = UDim2.new(0,720,0,540),
         BackgroundColor3 = COLORS.WindowBg,
     })
     _ui.window = window
+
+    -- Responsive window size
+    local function setWindowSize()
+        local w, h = getWindowSize()
+        window.Size = UDim2.new(0, w, 0, h)
+    end
+    setWindowSize()
+    local viewportCon; viewportCon = RunService.RenderStepped:Connect(setWindowSize)
+    screenGui.AncestryChanged:Connect(function()
+        if not screenGui.Parent and viewportCon then
+            viewportCon:Disconnect()
+        end
+    end)
 
     -- TopBar
     local topBar = makeRoundedFrame({
         Name = "TopBar",
         Parent = window,
         Position = UDim2.new(0,0,0,0),
-        Size = UDim2.new(1,0,0,38),
+        Size = UDim2.new(1,0,0,34),
         BackgroundColor3 = COLORS.TopBarBg,
     })
     topBar.ClipsDescendants = true
 
     local icon = Instance.new("ImageLabel", topBar)
     icon.Name = "GameIcon"
-    icon.Size = UDim2.new(0,26,0,26)
-    icon.Position = UDim2.new(0,13,0.5,-13)
+    icon.Size = UDim2.new(0,22,0,22)
+    icon.Position = UDim2.new(0,10,0.5,-11)
     icon.BackgroundTransparency = 1
     icon.Image = "rbxassetid://9158926514"
 
     local titleLabel = Instance.new("TextLabel", topBar)
     titleLabel.Name = "Title"
     titleLabel.AnchorPoint = Vector2.new(0, 0.5)
-    titleLabel.Position = UDim2.new(0, 50, 0.5, 0)
+    titleLabel.Position = UDim2.new(0, 40, 0.5, 0)
     titleLabel.BackgroundTransparency = 1
     titleLabel.Font = Enum.Font.GothamBold
     titleLabel.Text = opt.Name or "KevinzHub"
-    titleLabel.TextSize = 19
+    titleLabel.TextSize = 17
     titleLabel.TextColor3 = COLORS.LabelText
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
     titleLabel.TextYAlignment = Enum.TextYAlignment.Center
@@ -243,7 +268,7 @@ function KevinzHub:MakeWindow(opt)
     versionBadge.Parent = topBar
     versionBadge.BackgroundColor3 = Color3.fromRGB(40, 48, 38)
     versionBadge.BackgroundTransparency = 0.15
-    versionBadge.Size = UDim2.new(0, 0, 0, 20) -- will update width below
+    versionBadge.Size = UDim2.new(0, 0, 0, 18)
     versionBadge.AnchorPoint = Vector2.new(0, 0.5)
     versionBadge.Position = UDim2.new(0, 0, 0.5, 0)
     versionBadge.ZIndex = 2
@@ -255,7 +280,7 @@ function KevinzHub:MakeWindow(opt)
     versionLabel.BackgroundTransparency = 1
     versionLabel.Font = Enum.Font.Gotham
     versionLabel.Text = "v"..KEVINZHUB_VERSION
-    versionLabel.TextSize = 13
+    versionLabel.TextSize = 12
     versionLabel.TextColor3 = Color3.fromRGB(180, 220, 180)
     versionLabel.TextXAlignment = Enum.TextXAlignment.Center
     versionLabel.TextYAlignment = Enum.TextYAlignment.Center
@@ -263,49 +288,44 @@ function KevinzHub:MakeWindow(opt)
     versionLabel.Position = UDim2.new(0, 5, 0, 0)
     versionLabel.ZIndex = 3
 
-    -- Outline động cho badge
     local badgeOutline = Instance.new("UIStroke", versionBadge)
     badgeOutline.Color = Color3.fromRGB(90, 255, 140)
-    badgeOutline.Thickness = 1.4
+    badgeOutline.Thickness = 1.2
     badgeOutline.Transparency = 0.2
 
-    -- Anim outline: nhấp nháy màu xanh sáng (pulse)
     task.spawn(function()
         local t = 0
         while versionBadge.Parent do
             t = t + RunService.RenderStepped:Wait()
             local pulse = 0.9 + 0.35 * math.sin(t * 2.5)
             badgeOutline.Color = Color3.fromHSV(0.33, 0.3 + 0.2 * pulse, 1)
-            badgeOutline.Thickness = 1.3 + 0.6 * pulse
+            badgeOutline.Thickness = 1.1 + 0.5 * pulse
             badgeOutline.Transparency = 0.15 + 0.2 * (1-pulse)
         end
     end)
 
-    -- Function to update badge position and size based on title
     local function updateVersionBadge()
-        -- Đặt badge sát phải tên, với padding 10px
         local titleRight = titleLabel.Position.X.Offset + titleLabel.TextBounds.X
-        local badgeWidth = versionLabel.TextBounds.X + 20
-        versionBadge.Size = UDim2.new(0, badgeWidth, 0, 20)
-        versionBadge.Position = UDim2.new(0, titleRight + 10, 0.5, 0)
+        local badgeWidth = versionLabel.TextBounds.X + 18
+        versionBadge.Size = UDim2.new(0, badgeWidth, 0, 18)
+        versionBadge.Position = UDim2.new(0, titleRight + 7, 0.5, 0)
     end
-    -- Đảm bảo update khi text đổi hoặc khi UI vừa load
     titleLabel:GetPropertyChangedSignal("Text"):Connect(updateVersionBadge)
     versionLabel:GetPropertyChangedSignal("Text"):Connect(updateVersionBadge)
     RunService.RenderStepped:Connect(updateVersionBadge)
     task.defer(updateVersionBadge)
 
-    -- Nút Min/Close
+    -- Min/Close
     local btnMin = makeRoundedFrame{
         Name = "MinimizeButton", Parent = topBar,
-        Size = UDim2.new(0,32,0,32),
-        Position = UDim2.new(1,-78,0.5,-16),
+        Size = UDim2.new(0,26,0,26),
+        Position = UDim2.new(1,-56,0.5,-13),
         BackgroundColor3 = COLORS.ButtonBg
     }
     local btnClose = makeRoundedFrame{
         Name = "CloseButton", Parent = topBar,
-        Size = UDim2.new(0,32,0,32),
-        Position = UDim2.new(1,-40,0.5,-16),
+        Size = UDim2.new(0,26,0,26),
+        Position = UDim2.new(1,-26,0.5,-13),
         BackgroundColor3 = COLORS.ButtonBg
     }
     local btnMinLbl = Instance.new("TextLabel", btnMin)
@@ -313,7 +333,7 @@ function KevinzHub:MakeWindow(opt)
     btnMinLbl.BackgroundTransparency = 1
     btnMinLbl.Font = Enum.Font.GothamBold
     btnMinLbl.Text = "–"
-    btnMinLbl.TextSize = 22
+    btnMinLbl.TextSize = 18
     btnMinLbl.TextColor3 = COLORS.LabelText
     btnMinLbl.TextXAlignment = Enum.TextXAlignment.Center
     btnMinLbl.TextYAlignment = Enum.TextYAlignment.Center
@@ -322,7 +342,7 @@ function KevinzHub:MakeWindow(opt)
     btnCloseLbl.BackgroundTransparency = 1
     btnCloseLbl.Font = Enum.Font.GothamBold
     btnCloseLbl.Text = "X"
-    btnCloseLbl.TextSize = 22
+    btnCloseLbl.TextSize = 18
     btnCloseLbl.TextColor3 = COLORS.LabelText
     btnCloseLbl.TextXAlignment = Enum.TextXAlignment.Center
     btnCloseLbl.TextYAlignment = Enum.TextYAlignment.Center
@@ -339,18 +359,16 @@ function KevinzHub:MakeWindow(opt)
             window.Visible = false
             local rb = makeRoundedFrame{
                 Name = "Restore", Parent = screenGui,
-                Size = UDim2.new(0,32,0,32),
-                Position = UDim2.new(0,18,0,18),
+                Size = UDim2.new(0,26,0,26),
+                Position = UDim2.new(0,14,0,14),
                 BackgroundColor3 = COLORS.ButtonBg
             }
-            -- Sử dụng ImageLabel với asset id "1912438810" thay vì dấu "X"
             local rbl = Instance.new("ImageLabel", rb)
             rbl.Size = UDim2.fromScale(1,1)
             rbl.BackgroundTransparency = 1
             rbl.Image = "rbxassetid://1912438810"
             rbl.ImageColor3 = COLORS.LabelText
             rbl.ScaleType = Enum.ScaleType.Fit
-
             addBtnAnim(rb)
             rb.InputBegan:Connect(function(ii)
                 if ii.UserInputType==Enum.UserInputType.MouseButton1 then
@@ -360,21 +378,31 @@ function KevinzHub:MakeWindow(opt)
             end)
         end
     end)
-    -- Drag logic
+
+    -- Drag logic (entire window frame is draggable, desktop & mobile touch)
     do
-        local dragging, startPos, dragStart
-        topBar.InputBegan:Connect(function(i)
-            if i.UserInputType==Enum.UserInputType.MouseButton1 then
-                dragging=true
-                dragStart = i.Position
-                startPos = window.Position
-                i.Changed:Connect(function()
-                    if i.UserInputState==Enum.UserInputState.End then dragging=false end
-                end)
+        local dragging, dragInput, startPos, dragStart
+        local function beginDrag(i)
+            dragging=true
+            dragStart = i.Position
+            startPos = window.Position
+        end
+        local function endDrag()
+            dragging=false
+        end
+
+        -- Desktop (mouse) and mobile (touch)
+        window.InputBegan:Connect(function(i)
+            if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+                beginDrag(i)
+                dragInput = i
             end
         end)
-        topBar.InputChanged:Connect(function(i)
-            if dragging and i.UserInputType==Enum.UserInputType.MouseMovement then
+        window.InputEnded:Connect(function(i)
+            if i == dragInput then endDrag() end
+        end)
+        window.InputChanged:Connect(function(i)
+            if dragging and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
                 local delta = i.Position - dragStart
                 window.Position = UDim2.new(
                     startPos.X.Scale, startPos.X.Offset + delta.X,
@@ -385,10 +413,15 @@ function KevinzHub:MakeWindow(opt)
     end
 
     -- Sidebar + Tabs
+    -- All sizes & paddings auto-scale with window size (smaller)
+    local function getSidebarW()
+        return math.max(54, math.floor(window.AbsoluteSize.X * 0.25))
+    end
+
     local sidebarHolder = Instance.new("Frame", window)
     sidebarHolder.Name = "SidebarHolder"
-    sidebarHolder.Position = UDim2.new(0,0,0,38)
-    sidebarHolder.Size = UDim2.new(0,192,1,-38)
+    sidebarHolder.Position = UDim2.new(0,0,0,34)
+    sidebarHolder.Size = UDim2.new(0,getSidebarW(),1,-34)
     sidebarHolder.BackgroundTransparency = 1
     sidebarHolder.ClipsDescendants = true
 
@@ -400,29 +433,34 @@ function KevinzHub:MakeWindow(opt)
     sidebar.ClipsDescendants = true
 
     local pad = Instance.new("UIPadding", sidebar)
-    pad.PaddingTop, pad.PaddingLeft = UDim.new(0,10), UDim.new(0,8)
-    pad.PaddingRight, pad.PaddingBottom = UDim.new(0,8), UDim.new(0,8)
+    pad.PaddingTop, pad.PaddingLeft = UDim.new(0,8), UDim.new(0,6)
+    pad.PaddingRight, pad.PaddingBottom = UDim.new(0,6), UDim.new(0,6)
+
+    -- Auto sidebar width on resize
+    window:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+        sidebarHolder.Size = UDim2.new(0,getSidebarW(),1,-34)
+    end)
 
     -- SearchBar
     local searchBar = Instance.new("TextBox")
     searchBar.Parent = sidebar
-    searchBar.Size = UDim2.new(1,-16,0,28)
-    searchBar.Position = UDim2.new(0,8,0,4)
+    searchBar.Size = UDim2.new(1,-12,0,22)
+    searchBar.Position = UDim2.new(0,6,0,3)
     searchBar.PlaceholderText = "Tìm tab..."
     searchBar.Text = ""
     searchBar.BackgroundColor3 = COLORS.ParagraphBg
     searchBar.TextColor3 = COLORS.LabelText
     searchBar.ClearTextOnFocus = true
     searchBar.Font = Enum.Font.Gotham
-    searchBar.TextSize = 15
+    searchBar.TextSize = 13
     searchBar.BorderSizePixel = 0
     searchBar.ZIndex = 2
     local searchCorner = Instance.new("UICorner", searchBar)
-    searchCorner.CornerRadius = UDim.new(0,7)
+    searchCorner.CornerRadius = UDim.new(0,6)
 
     local list = Instance.new("UIListLayout", sidebar)
     list.SortOrder = Enum.SortOrder.LayoutOrder
-    list.Padding = UDim.new(0,8)
+    list.Padding = UDim.new(0,6)
     list.Parent = sidebar
 
     -- User Info bottom (headshot luôn hiện)
@@ -431,14 +469,14 @@ function KevinzHub:MakeWindow(opt)
         uf.Name = "UserInfo"
         uf.BackgroundTransparency=1
         uf.AnchorPoint = Vector2.new(0,1)
-        uf.Position = UDim2.new(0,8,1,-18)
-        uf.Size = UDim2.new(1,-16,0,56)
+        uf.Position = UDim2.new(0,6,1,-14)
+        uf.Size = UDim2.new(1,-12,0,40)
         uf.Parent = sidebar
 
         local thumb = ""
         local thumbReady = false
         local av = Instance.new("ImageLabel", uf)
-        av.Name="Avatar"; av.Size=UDim2.new(0,48,0,48); av.Position=UDim2.new(0,0,0,4)
+        av.Name="Avatar"; av.Size=UDim2.new(0,28,0,28); av.Position=UDim2.new(0,0,0,3)
         av.BackgroundTransparency=1; av.Image="rbxassetid://77339698"
         coroutine.wrap(function()
             local id = LocalPlayer.UserId
@@ -456,9 +494,9 @@ function KevinzHub:MakeWindow(opt)
         end)()
 
         local nm = Instance.new("TextLabel", uf)
-        nm.Name="Username"; nm.Size=UDim2.new(1,-60,1,0); nm.Position=UDim2.new(0,56,0,0)
+        nm.Name="Username"; nm.Size=UDim2.new(1,-34,1,0); nm.Position=UDim2.new(0,32,0,0)
         nm.BackgroundTransparency=1; nm.Font=Enum.Font.GothamBold; nm.Text=LocalPlayer.Name
-        nm.TextSize=15; nm.TextColor3=COLORS.LabelText; nm.TextXAlignment=Enum.TextXAlignment.Left
+        nm.TextSize=13; nm.TextColor3=COLORS.LabelText; nm.TextXAlignment=Enum.TextXAlignment.Left
         return uf
     end
     local userInfoFrame = renderUserInfo()
@@ -473,22 +511,22 @@ function KevinzHub:MakeWindow(opt)
     local scrolling = 0
     local function updateSidebarScroll()
         RunService.Heartbeat:Wait()
-        local absContent = list.AbsoluteContentSize.Y + pad.PaddingTop.Offset + pad.PaddingBottom.Offset + searchBar.Size.Y.Offset + 6
-        local visible = sidebarHolder.AbsoluteSize.Y - userInfoFrame.Size.Y.Offset - 16
+        local absContent = list.AbsoluteContentSize.Y + pad.PaddingTop.Offset + pad.PaddingBottom.Offset + searchBar.Size.Y.Offset + 4
+        local visible = sidebarHolder.AbsoluteSize.Y - userInfoFrame.Size.Y.Offset - 10
         if absContent > visible then
             sidebar.Position = UDim2.new(0,0,0,-scrolling)
         else
             sidebar.Position = UDim2.new(0,0,0,0)
             scrolling = 0
         end
-        userInfoFrame.Position = UDim2.new(0,8,1,-userInfoFrame.Size.Y.Offset-10)
+        userInfoFrame.Position = UDim2.new(0,6,1,-userInfoFrame.Size.Y.Offset-6)
     end
     list:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateSidebarScroll)
     sidebarHolder:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateSidebarScroll)
     sidebarHolder.InputChanged:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseWheel then
-            local absContent = list.AbsoluteContentSize.Y + pad.PaddingTop.Offset + pad.PaddingBottom.Offset + searchBar.Size.Y.Offset + 6
-            local visible = sidebarHolder.AbsoluteSize.Y - userInfoFrame.Size.Y.Offset - 16
+            local absContent = list.AbsoluteContentSize.Y + pad.PaddingTop.Offset + pad.PaddingBottom.Offset + searchBar.Size.Y.Offset + 4
+            local visible = sidebarHolder.AbsoluteSize.Y - userInfoFrame.Size.Y.Offset - 10
             if absContent > visible then
                 scrolling = math.clamp(scrolling - input.Position.Z * 26, 0, absContent - visible)
                 sidebar.Position = UDim2.new(0,0,0,-scrolling)
@@ -513,8 +551,8 @@ function KevinzHub:MakeWindow(opt)
             ):Play()
             tabContents[n].Visible = active
             if active then
-                tabContents[n].Position = tabContents[n].Position + UDim2.new(0,0,0,8)
-                TweenService:Create(tabContents[n], TweenInfo.new(ANIM.TabMoveTime, Enum.EasingStyle.Quint), {Position=UDim2.new(0,192,0,44)}):Play()
+                tabContents[n].Position = tabContents[n].Position + UDim2.new(0,0,0,6)
+                TweenService:Create(tabContents[n], TweenInfo.new(ANIM.TabMoveTime, Enum.EasingStyle.Quint), {Position=UDim2.new(0,getSidebarW(),0,38)}):Play()
             end
         end
     end
@@ -524,46 +562,52 @@ function KevinzHub:MakeWindow(opt)
         tabOrder = tabOrder + 1
         local btn = makeRoundedFrame{
             Name = tabOpt.Name.."Btn", Parent = sidebar,
-            Size = UDim2.new(1,-16,0,44), LayoutOrder = tabOrder,
+            Size = UDim2.new(1,-10,0,36), LayoutOrder = tabOrder,
             BackgroundColor3 = COLORS.TabInactive
         }
         local icon = Instance.new("ImageLabel", btn)
         icon.Name = "TabIcon"
-        icon.Size = UDim2.new(0,22,0,22)
-        icon.Position = UDim2.new(0,10,0.5,-11)
+        icon.Size = UDim2.new(0,18,0,18)
+        icon.Position = UDim2.new(0,7,0.5,-9)
         icon.BackgroundTransparency = 1
         icon.Image = "rbxassetid://11718192673"
         local lbl = Instance.new("TextLabel", btn)
-        lbl.Size = UDim2.new(1,-38,1,0)
-        lbl.Position = UDim2.new(0,38,0,0)
+        lbl.Size = UDim2.new(1,-30,1,0)
+        lbl.Position = UDim2.new(0,30,0,0)
         lbl.BackgroundTransparency = 1
         lbl.Font = Enum.Font.GothamBold
         lbl.Text = tabOpt.Name
-        lbl.TextSize = 15
+        lbl.TextSize = 13
         lbl.TextColor3 = COLORS.LabelText
         lbl.TextXAlignment = Enum.TextXAlignment.Left
         addBtnAnim(btn)
         local ct = makeRoundedFrame{
             Name = tabOpt.Name.."Content", Parent = window,
-            Position = UDim2.new(0,192,0,44),
-            Size = UDim2.new(1,-210,1,-62),
+            Position = UDim2.new(0,getSidebarW(),0,38),
+            Size = UDim2.new(1,-getSidebarW()-16,1,-46),
             BackgroundColor3 = COLORS.ContentBg,
             Visible = false
         }
         ct.ClipsDescendants = true
         local sectionList = Instance.new("UIListLayout", ct)
         sectionList.SortOrder = Enum.SortOrder.LayoutOrder
-        sectionList.Padding = UDim.new(0, 24)
+        sectionList.Padding = UDim.new(0, 14)
         sectionList.HorizontalAlignment = Enum.HorizontalAlignment.Center
         sectionList.VerticalAlignment = Enum.VerticalAlignment.Top
         tabs[tabOpt.Name], tabContents[tabOpt.Name] = btn, ct
         btn.InputBegan:Connect(function(i)
-            if i.UserInputType==Enum.UserInputType.MouseButton1 then
+            if (i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch) then
                 playClickSound(btn)
                 selectTab(tabOpt.Name)
             end
         end)
         if tabOrder == 1 then selectTab(tabOpt.Name) end
+
+        window:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+            -- Auto content resize
+            ct.Position = UDim2.new(0,getSidebarW(),0,38)
+            ct.Size = UDim2.new(1,-getSidebarW()-16,1,-46)
+        end)
 
         local Tab = {}
         local sectionOrder = 0
@@ -571,24 +615,24 @@ function KevinzHub:MakeWindow(opt)
             sectionOrder = sectionOrder + 1
             local secFrame = makeRoundedFrame{
                 Name = secOpt.Name.."Section", Parent = ct,
-                Size = UDim2.new(1,-32,0,0),
+                Size = UDim2.new(1,-20,0,0),
                 BackgroundColor3 = COLORS.SectionBg,
                 LayoutOrder = sectionOrder
             }
             secFrame.AutomaticSize = Enum.AutomaticSize.Y
             local itemsList = Instance.new("UIListLayout", secFrame)
             itemsList.SortOrder = Enum.SortOrder.LayoutOrder
-            itemsList.Padding = UDim.new(0, 12)
+            itemsList.Padding = UDim.new(0, 8)
             itemsList.HorizontalAlignment = Enum.HorizontalAlignment.Left
             itemsList.VerticalAlignment = Enum.VerticalAlignment.Top
 
             local secLbl = Instance.new("TextLabel", secFrame)
-            secLbl.Size = UDim2.new(1,-14,0,25)
-            secLbl.Position = UDim2.new(0,7,0,6)
+            secLbl.Size = UDim2.new(1,-9,0,20)
+            secLbl.Position = UDim2.new(0,5,0,4)
             secLbl.BackgroundTransparency = 1
             secLbl.Font = Enum.Font.GothamBold
             secLbl.Text = secOpt.Name
-            secLbl.TextSize = 15
+            secLbl.TextSize = 13
             secLbl.TextColor3 = COLORS.LabelText
             secLbl.TextXAlignment = Enum.TextXAlignment.Left
             secLbl.LayoutOrder = 0
@@ -598,7 +642,7 @@ function KevinzHub:MakeWindow(opt)
             function Section:AddButton(btnOpt)
                 local btn = makeRoundedFrame{
                     Name = btnOpt.Name.."Btn", Parent = secFrame,
-                    Size = UDim2.new(0,145,0,32),
+                    Size = UDim2.new(0,110,0,26),
                     BackgroundColor3 = COLORS.ButtonBg,
                     LayoutOrder = itemOrder
                 }
@@ -607,12 +651,12 @@ function KevinzHub:MakeWindow(opt)
                 lbl.BackgroundTransparency = 1
                 lbl.Font = Enum.Font.GothamBold
                 lbl.Text = btnOpt.Name
-                lbl.TextSize = 15
+                lbl.TextSize = 13
                 lbl.TextColor3 = COLORS.LabelText
                 lbl.TextXAlignment = Enum.TextXAlignment.Center
                 addBtnAnim(btn)
                 btn.InputBegan:Connect(function(i)
-                    if i.UserInputType==Enum.UserInputType.MouseButton1 then
+                    if (i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch) then
                         playClickSound(btn)
                         if btnOpt.Callback then btnOpt.Callback() end
                     end
@@ -621,15 +665,14 @@ function KevinzHub:MakeWindow(opt)
             end
 
             function Section:AddSlider(slOpt)
-                local sliderW, sliderH = 166, 13
-                local labelHeight = 18
-                local textboxW = (slOpt.WithTextbox and 54) or 0
-                local gap = slOpt.WithTextbox and 12 or 0
-                local labelYOffset = 7
+                local sliderW, sliderH = 110, 10
+                local labelHeight = 14
+                local textboxW = (slOpt.WithTextbox and 36) or 0
+                local gap = slOpt.WithTextbox and 7 or 0
 
                 local container = Instance.new("Frame", secFrame)
                 container.Name = "SliderContainer"
-                container.Size = UDim2.new(1,0,0,sliderH+labelHeight+11)
+                container.Size = UDim2.new(1,0,0,sliderH+labelHeight+7)
                 container.BackgroundTransparency = 1
                 container.LayoutOrder = itemOrder
 
@@ -640,13 +683,13 @@ function KevinzHub:MakeWindow(opt)
                 lbl.BackgroundTransparency = 1
                 lbl.Font = Enum.Font.Gotham
                 lbl.Text = slOpt.Name
-                lbl.TextSize = 14
+                lbl.TextSize = 12
                 lbl.TextColor3 = COLORS.LabelText
                 lbl.TextXAlignment = Enum.TextXAlignment.Left
 
                 local sliderBg = makeRoundedFrame{
                     Name = slOpt.Name.."Slider", Parent = container,
-                    Position = UDim2.new(0,0,0,labelHeight+2),
+                    Position = UDim2.new(0,0,0,labelHeight+1),
                     Size = UDim2.new(0,sliderW,0,sliderH),
                     BackgroundColor3 = COLORS.SliderTrack
                 }
@@ -658,12 +701,12 @@ function KevinzHub:MakeWindow(opt)
                 }
                 local sliderKnob = Instance.new("Frame", sliderBg)
                 sliderKnob.Name = "SliderKnob"
-                sliderKnob.Size = UDim2.new(0,18,0,18)
-                sliderKnob.Position = UDim2.new(0,0,0,-2)
+                sliderKnob.Size = UDim2.new(0,12,0,12)
+                sliderKnob.Position = UDim2.new(0,0,0,-1)
                 sliderKnob.BackgroundColor3 = COLORS.SliderKnob
                 sliderKnob.BorderSizePixel = 0
                 local corner = Instance.new("UICorner", sliderKnob)
-                corner.CornerRadius = UDim.new(0, 6)
+                corner.CornerRadius = UDim.new(0, 5)
                 local val = slOpt.Default or slOpt.Min or 0
 
                 local function setSlider(v,updateTextbox)
@@ -671,7 +714,7 @@ function KevinzHub:MakeWindow(opt)
                     val = v
                     local percent = (v-slOpt.Min)/(slOpt.Max-slOpt.Min)
                     sliderFill.Size = UDim2.new(0, percent*sliderBg.Size.X.Offset, 1, 0)
-                    sliderKnob.Position = UDim2.new(0, percent*sliderBg.Size.X.Offset-9, 0, -2)
+                    sliderKnob.Position = UDim2.new(0, percent*sliderBg.Size.X.Offset-6, 0, -1)
                     if updateTextbox and slOpt.WithTextbox and textbox then
                         textbox.Text = tostring(math.floor(v))
                     end
@@ -680,7 +723,7 @@ function KevinzHub:MakeWindow(opt)
                 setSlider(val,true)
                 local draggingSlider = false
                 sliderKnob.InputBegan:Connect(function(i)
-                    if i.UserInputType == Enum.UserInputType.MouseButton1 then
+                    if (i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch) then
                         draggingSlider = true
                         playClickSound(sliderKnob)
                     end
@@ -691,14 +734,14 @@ function KevinzHub:MakeWindow(opt)
                     end
                 end)
                 sliderBg.InputChanged:Connect(function(i)
-                    if draggingSlider and i.UserInputType == Enum.UserInputType.MouseMovement then
+                    if draggingSlider and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
                         local x = math.clamp(i.Position.X - sliderBg.AbsolutePosition.X, 0, sliderBg.AbsoluteSize.X)
                         local v = math.floor(slOpt.Min + (x/sliderBg.AbsoluteSize.X)*(slOpt.Max-slOpt.Min))
                         setSlider(v,true)
                     end
                 end)
                 sliderBg.InputBegan:Connect(function(i)
-                    if i.UserInputType == Enum.UserInputType.MouseButton1 then
+                    if (i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch) then
                         local x = math.clamp(i.Position.X - sliderBg.AbsolutePosition.X, 0, sliderBg.AbsoluteSize.X)
                         local v = math.floor(slOpt.Min + (x/sliderBg.AbsoluteSize.X)*(slOpt.Max-slOpt.Min))
                         setSlider(v,true)
@@ -709,19 +752,19 @@ function KevinzHub:MakeWindow(opt)
                 local textbox
                 if slOpt.WithTextbox then
                     textbox = Instance.new("TextBox", container)
-                    textbox.Size = UDim2.new(0,textboxW,0,labelHeight+11)
+                    textbox.Size = UDim2.new(0,textboxW,0,labelHeight+7)
                     textbox.Position = UDim2.new(0,sliderW+gap,0,labelHeight)
                     textbox.BackgroundColor3 = COLORS.TextboxBg
                     textbox.TextColor3 = COLORS.LabelText
                     textbox.Font = Enum.Font.Gotham
-                    textbox.TextSize = 14
+                    textbox.TextSize = 12
                     textbox.Text = tostring(val)
                     textbox.ClearTextOnFocus = true
                     textbox.PlaceholderText = ""
                     textbox.TextXAlignment = Enum.TextXAlignment.Center
                     textbox.BorderSizePixel = 0
                     local corner = Instance.new("UICorner", textbox)
-                    corner.CornerRadius = UDim.new(0,6)
+                    corner.CornerRadius = UDim.new(0,5)
                     textbox.FocusLost:Connect(function(enter)
                         if enter then
                             setSlider(textbox.Text,false)
@@ -734,7 +777,7 @@ function KevinzHub:MakeWindow(opt)
             end
 
             function Section:AddToggle(opt)
-                local toggleW, toggleH = 48, 24
+                local toggleW, toggleH = 32, 16
 
                 local container = Instance.new("Frame", secFrame)
                 container.Name = "ToggleContainer"
@@ -750,27 +793,27 @@ function KevinzHub:MakeWindow(opt)
                 }
                 local knob = makeRoundedFrame{
                     Name = "Knob", Parent = toggleBg,
-                    Position = UDim2.new(0,3,0,3),
-                    Size = UDim2.new(0,18,0,18),
+                    Position = UDim2.new(0,2,0,2),
+                    Size = UDim2.new(0,12,0,12),
                     BackgroundColor3 = COLORS.ToggleOff
                 }
                 local on = opt.Default or false
                 local function updateAppearance(animated)
-                    local targetX = on and (toggleBg.Size.X.Offset - knob.Size.X.Offset - 3) or 3
+                    local targetX = on and (toggleBg.Size.X.Offset - knob.Size.X.Offset - 2) or 2
                     if animated then
-                        TweenService:Create(knob, TweenInfo.new(ANIM.TweenTime, Enum.EasingStyle.Quint), {Position=UDim2.new(0,targetX,0,3)}):Play()
+                        TweenService:Create(knob, TweenInfo.new(ANIM.TweenTime, Enum.EasingStyle.Quint), {Position=UDim2.new(0,targetX,0,2)}):Play()
                         TweenService:Create(toggleBg, TweenInfo.new(ANIM.TweenTime, Enum.EasingStyle.Quint),
                             {BackgroundColor3 = on and COLORS.ToggleOn or COLORS.ToggleBg}
                         ):Play()
                     else
-                        knob.Position = UDim2.new(0,targetX,0,3)
+                        knob.Position = UDim2.new(0,targetX,0,2)
                         toggleBg.BackgroundColor3 = on and COLORS.ToggleOn or COLORS.ToggleBg
                     end
                     knob.BackgroundColor3 = on and COLORS.ToggleKnobOn or COLORS.ToggleOff
                 end
                 updateAppearance(false)
                 toggleBg.InputBegan:Connect(function(i)
-                    if i.UserInputType==Enum.UserInputType.MouseButton1 then
+                    if (i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch) then
                         on = not on
                         updateAppearance(true)
                         playClickSound(toggleBg)
@@ -779,12 +822,12 @@ function KevinzHub:MakeWindow(opt)
                 end)
                 local toggleLbl = Instance.new("TextLabel", container)
                 toggleLbl.Name = "ToggleLabel"
-                toggleLbl.Position = UDim2.new(0,toggleW+14,0,0)
-                toggleLbl.Size = UDim2.new(0,180,0,toggleH)
+                toggleLbl.Position = UDim2.new(0,toggleW+8,0,0)
+                toggleLbl.Size = UDim2.new(0,120,0,toggleH)
                 toggleLbl.BackgroundTransparency = 1
                 toggleLbl.Font = Enum.Font.Gotham
                 toggleLbl.Text = opt.Name
-                toggleLbl.TextSize = 15
+                toggleLbl.TextSize = 13
                 toggleLbl.TextColor3 = COLORS.LabelText
                 toggleLbl.TextXAlignment = Enum.TextXAlignment.Left
 
