@@ -1,4 +1,4 @@
--- KevinzHub API Style UI Library (headshot fix, UI/UX spacing tối ưu đẹp, spacing đều tự động, không lỗi ẩn)
+-- KevinzHub API Style UI Library (headshot fix, UI/UX spacing tối ưu đẹp, spacing đều tự động, không lỗi ẩn, hiệu ứng chiều sâu alpha thấp, kiểm tra đa màn hình, bo góc đẹp)
 -- Usage: local KevinzHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/XUwUxX/script/refs/heads/main/kevinzhub.lua"))()
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -9,34 +9,60 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 local COLORS = {
     WindowBg      = Color3.fromRGB(22,22,26),
+    WindowBgAlpha = 0.87, -- alpha thấp cho hiệu ứng chiều sâu
     TopBarBg      = Color3.fromRGB(27,28,32),
+    TopBarBgAlpha = 0.93,
     SidebarBg     = Color3.fromRGB(28,29,34),
+    SidebarBgAlpha= 0.85,
     ContentBg     = Color3.fromRGB(25,27,32),
+    ContentBgAlpha= 0.85,
     Outline       = Color3.fromRGB(45,45,60),
+    OutlineAlpha  = 0.16,
     LabelText     = Color3.fromRGB(230,230,240),
     ParagraphBg   = Color3.fromRGB(37,38,44),
+    ParagraphBgAlpha = 0.62,
     ParagraphText = Color3.fromRGB(200,200,210),
     ButtonBg      = Color3.fromRGB(48,49,60),
+    ButtonBgAlpha = 0.82,
     ButtonHover   = Color3.fromRGB(60,70,100),
+    ButtonHoverAlpha = 0.76,
     ButtonPress   = Color3.fromRGB(40,45,80),
+    ButtonPressAlpha = 0.90,
     ToggleBg      = Color3.fromRGB(46,47,56),
+    ToggleBgAlpha = 0.86,
     ToggleOn      = Color3.fromRGB(0,180,80),
+    ToggleOnAlpha = 0.94,
     ToggleOff     = Color3.fromRGB(70,70,80),
+    ToggleOffAlpha= 0.5,
     ToggleKnobOn  = Color3.fromRGB(35,36,40),
+    ToggleKnobOnAlpha = 0.67,
     SliderTrack   = Color3.fromRGB(60,60,70),
+    SliderTrackAlpha = 0.44,
     SliderFill    = Color3.fromRGB(0,180,80),
+    SliderFillAlpha = 0.72,
     SliderKnob    = Color3.fromRGB(122,122,135),
+    SliderKnobAlpha = 0.88,
     DropdownBG    = Color3.fromRGB(45,45,54),
+    DropdownAlpha = 0.72,
     DropdownHover = Color3.fromRGB(50,60,80),
+    DropdownHoverAlpha = 0.8,
     DropdownPress = Color3.fromRGB(40,45,80),
+    DropdownPressAlpha = 0.88,
     TabActive     = Color3.fromRGB(0,180,80),
+    TabActiveAlpha= 0.85,
     TabInactive   = Color3.fromRGB(48,49,60),
+    TabInactiveAlpha = 0.67,
     TabIconTint   = Color3.fromRGB(180,180,210),
     TabIconActive = Color3.fromRGB(0,180,80),
     NotifBg       = Color3.fromRGB(30,32,38),
+    NotifBgAlpha  = 0.93,
     NotifText     = Color3.fromRGB(240,240,255),
     TextboxBg     = Color3.fromRGB(66,68,79),
-    SectionBg     = Color3.fromRGB(32,33,40)
+    TextboxBgAlpha = 0.82,
+    SectionBg     = Color3.fromRGB(32,33,40),
+    SectionBgAlpha = 0.76,
+    Shadow        = Color3.fromRGB(0,0,0),
+    ShadowAlpha   = 0.22
 }
 
 local ANIM = {
@@ -51,16 +77,41 @@ local ANIM = {
 local KevinzHub = {}
 local _ui = {}
 
--- Utility
+-- Utility: Add shadow effect for depth
+local function addShadow(parent, transparency, radius)
+    local shadow = Instance.new("ImageLabel")
+    shadow.Name = "Shadow"
+    shadow.Image = "rbxassetid://1316045217" -- smooth shadow asset
+    shadow.BackgroundTransparency = 1
+    shadow.Size = UDim2.new(1, radius*2, 1, radius*2)
+    shadow.Position = UDim2.new(0, -radius, 0, -radius)
+    shadow.ZIndex = 0
+    shadow.ImageColor3 = COLORS.Shadow
+    shadow.ImageTransparency = transparency or COLORS.ShadowAlpha
+    shadow.ScaleType = Enum.ScaleType.Slice
+    shadow.SliceCenter = Rect.new(10,10,118,118)
+    shadow.Parent = parent
+    return shadow
+end
+
+-- Utility: Create rounded frame with alpha and shadow
 local function makeRoundedFrame(props)
     local f = Instance.new("Frame")
     for k,v in pairs(props) do f[k] = v end
     f.BorderSizePixel = 0
+    if props.BackgroundColor3 and props.__Alpha then
+        f.BackgroundColor3 = props.BackgroundColor3
+        f.BackgroundTransparency = 1 - props.__Alpha
+    end
     local uc = Instance.new("UICorner", f)
-    uc.CornerRadius = UDim.new(0,8)
+    uc.CornerRadius = UDim.new(0, 12) -- Bo góc mạnh đẹp
     local stroke = Instance.new("UIStroke", f)
     stroke.Color = COLORS.Outline
     stroke.Thickness = 1.15
+    stroke.Transparency = 1 - (COLORS.OutlineAlpha or 0.12)
+    if props.__Shadow then
+        addShadow(f, props.__ShadowTransparency or COLORS.ShadowAlpha, props.__ShadowRadius or 16)
+    end
     return f
 end
 
@@ -73,30 +124,34 @@ local function addBtnAnim(btn)
     highlight.ZIndex = 99
     highlight.Parent = btn
     local corner = Instance.new("UICorner", highlight)
-    corner.CornerRadius = UDim.new(0,8)
+    corner.CornerRadius = UDim.new(0,12)
     btn.MouseEnter:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(ANIM.FadeTime, Enum.EasingStyle.Quint), {BackgroundColor3=COLORS.ButtonHover}):Play()
+        TweenService:Create(btn, TweenInfo.new(ANIM.FadeTime, Enum.EasingStyle.Quint),
+            {BackgroundColor3=COLORS.ButtonHover, BackgroundTransparency=1-COLORS.ButtonHoverAlpha}):Play()
         TweenService:Create(highlight, TweenInfo.new(ANIM.FadeTime, Enum.EasingStyle.Quint), {BackgroundTransparency=0.92}):Play()
     end)
     btn.MouseLeave:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(ANIM.FadeTime, Enum.EasingStyle.Quint), {BackgroundColor3=COLORS.ButtonBg}):Play()
+        TweenService:Create(btn, TweenInfo.new(ANIM.FadeTime, Enum.EasingStyle.Quint),
+            {BackgroundColor3=COLORS.ButtonBg, BackgroundTransparency=1-COLORS.ButtonBgAlpha}):Play()
         TweenService:Create(highlight, TweenInfo.new(ANIM.FadeTime, Enum.EasingStyle.Quint), {BackgroundTransparency=1}):Play()
     end)
     btn.InputBegan:Connect(function(i)
         if i.UserInputType==Enum.UserInputType.MouseButton1 then
-            TweenService:Create(btn, TweenInfo.new(ANIM.PressTime, Enum.EasingStyle.Quint), {BackgroundColor3=COLORS.ButtonPress}):Play()
+            TweenService:Create(btn, TweenInfo.new(ANIM.PressTime, Enum.EasingStyle.Quint),
+                {BackgroundColor3=COLORS.ButtonPress, BackgroundTransparency=1-COLORS.ButtonPressAlpha}):Play()
             TweenService:Create(highlight, TweenInfo.new(ANIM.PressTime, Enum.EasingStyle.Quint), {BackgroundTransparency=0.8}):Play()
         end
     end)
     btn.InputEnded:Connect(function(i)
         if i.UserInputType==Enum.UserInputType.MouseButton1 then
-            TweenService:Create(btn, TweenInfo.new(ANIM.PressTime, Enum.EasingStyle.Quint), {BackgroundColor3=COLORS.ButtonHover}):Play()
+            TweenService:Create(btn, TweenInfo.new(ANIM.PressTime, Enum.EasingStyle.Quint),
+                {BackgroundColor3=COLORS.ButtonHover, BackgroundTransparency=1-COLORS.ButtonHoverAlpha}):Play()
             TweenService:Create(highlight, TweenInfo.new(ANIM.PressTime, Enum.EasingStyle.Quint), {BackgroundTransparency=0.92}):Play()
         end
     end)
 end
 
--- Notification API
+-- Notification API (giữ nguyên, chỉ thêm hiệu ứng alpha, bo góc, shadow)
 function KevinzHub:MakeNotification(opt)
     if pcall(function() return game:GetService("StarterGui"):SetCore("SendNotification",{}) end) then
         pcall(function()
@@ -128,6 +183,8 @@ function KevinzHub:MakeNotification(opt)
         Parent = _ui.notifFrame,
         Size = UDim2.new(1,0,0,54),
         BackgroundColor3 = COLORS.NotifBg,
+        __Alpha = COLORS.NotifBgAlpha,
+        __Shadow = true, __ShadowRadius = 18,
         LayoutOrder = os.clock()*1000
     }
     notif.BackgroundTransparency = 1
@@ -184,15 +241,31 @@ function KevinzHub:MakeWindow(opt)
     screenGui.Parent = PlayerGui
     _ui.screenGui = screenGui
 
+    -- Đảm bảo đa độ phân giải: window size tỉ lệ với màn hình
+    local function getWindowSize()
+        local res = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280,720)
+        local w, h = math.clamp(res.X * 0.55, 560, 820), math.clamp(res.Y * 0.72, 430, 680)
+        return UDim2.new(0, w, 0, h)
+    end
+
     local window = makeRoundedFrame({
         Name = "MainWindow",
         Parent = screenGui,
         AnchorPoint = Vector2.new(0.5,0.5),
         Position = UDim2.fromScale(0.5,0.5),
-        Size = UDim2.new(0,720,0,540),
+        Size = getWindowSize(),
         BackgroundColor3 = COLORS.WindowBg,
+        __Alpha = COLORS.WindowBgAlpha,
+        __Shadow = true
     })
     _ui.window = window
+
+    -- Tự động resize khi thay đổi độ phân giải
+    if workspace.CurrentCamera then
+        workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+            window.Size = getWindowSize()
+        end)
+    end
 
     -- TopBar
     local topBar = makeRoundedFrame({
@@ -201,6 +274,7 @@ function KevinzHub:MakeWindow(opt)
         Position = UDim2.new(0,0,0,0),
         Size = UDim2.new(1,0,0,38),
         BackgroundColor3 = COLORS.TopBarBg,
+        __Alpha = COLORS.TopBarBgAlpha
     })
     topBar.ClipsDescendants = true
 
@@ -227,13 +301,15 @@ function KevinzHub:MakeWindow(opt)
         Name = "MinimizeButton", Parent = topBar,
         Size = UDim2.new(0,32,0,32),
         Position = UDim2.new(1,-78,0.5,-16),
-        BackgroundColor3 = COLORS.ButtonBg
+        BackgroundColor3 = COLORS.ButtonBg,
+        __Alpha = COLORS.ButtonBgAlpha
     }
     local btnClose = makeRoundedFrame{
         Name = "CloseButton", Parent = topBar,
         Size = UDim2.new(0,32,0,32),
         Position = UDim2.new(1,-40,0.5,-16),
-        BackgroundColor3 = COLORS.ButtonBg
+        BackgroundColor3 = COLORS.ButtonBg,
+        __Alpha = COLORS.ButtonBgAlpha
     }
     local btnMinLbl = Instance.new("TextLabel", btnMin)
     btnMinLbl.Size = UDim2.fromScale(1,1)
@@ -266,7 +342,8 @@ function KevinzHub:MakeWindow(opt)
                 Name = "Restore", Parent = screenGui,
                 Size = UDim2.new(0,32,0,32),
                 Position = UDim2.new(0,18,0,18),
-                BackgroundColor3 = COLORS.ButtonBg
+                BackgroundColor3 = COLORS.ButtonBg,
+                __Alpha = COLORS.ButtonBgAlpha
             }
             local rbl = Instance.new("TextLabel", rb)
             rbl.Size = UDim2.fromScale(1,1)
@@ -285,7 +362,8 @@ function KevinzHub:MakeWindow(opt)
             end)
         end
     end)
-    -- Drag logic
+    -- Drag logic giữ nguyên
+
     do
         local dragging, startPos, dragStart
         topBar.InputBegan:Connect(function(i)
@@ -320,7 +398,9 @@ function KevinzHub:MakeWindow(opt)
     local sidebar = makeRoundedFrame{
         Name = "Sidebar", Parent = sidebarHolder,
         Position = UDim2.new(0,0,0,0), Size = UDim2.new(1,0,1,0),
-        BackgroundColor3 = COLORS.SidebarBg
+        BackgroundColor3 = COLORS.SidebarBg,
+        __Alpha = COLORS.SidebarBgAlpha,
+        __Shadow = true, __ShadowRadius = 13, __ShadowTransparency = 0.2
     }
     sidebar.ClipsDescendants = true
 
@@ -336,6 +416,7 @@ function KevinzHub:MakeWindow(opt)
     searchBar.PlaceholderText = "Tìm tab..."
     searchBar.Text = ""
     searchBar.BackgroundColor3 = COLORS.ParagraphBg
+    searchBar.BackgroundTransparency = 1 - COLORS.ParagraphBgAlpha
     searchBar.TextColor3 = COLORS.LabelText
     searchBar.ClearTextOnFocus = true
     searchBar.Font = Enum.Font.Gotham
@@ -343,14 +424,14 @@ function KevinzHub:MakeWindow(opt)
     searchBar.BorderSizePixel = 0
     searchBar.ZIndex = 2
     local searchCorner = Instance.new("UICorner", searchBar)
-    searchCorner.CornerRadius = UDim.new(0,7)
+    searchCorner.CornerRadius = UDim.new(0,10)
 
     local list = Instance.new("UIListLayout", sidebar)
     list.SortOrder = Enum.SortOrder.LayoutOrder
     list.Padding = UDim.new(0,8)
     list.Parent = sidebar
 
-    -- User Info bottom (headshot luôn hiện)
+    -- User Info bottom (headshot luôn hiện) giữ nguyên
     local function renderUserInfo()
         local uf = Instance.new("Frame")
         uf.Name = "UserInfo"
@@ -360,9 +441,6 @@ function KevinzHub:MakeWindow(opt)
         uf.Size = UDim2.new(1,-16,0,56)
         uf.Parent = sidebar
 
-        local thumb = ""
-        local thumbReady = false
-        -- Gọi bất đồng bộ, nhưng fallback luôn là logo Roblox
         local av = Instance.new("ImageLabel", uf)
         av.Name="Avatar"; av.Size=UDim2.new(0,48,0,48); av.Position=UDim2.new(0,0,0,4)
         av.BackgroundTransparency=1; av.Image="rbxassetid://77339698"
@@ -372,13 +450,11 @@ function KevinzHub:MakeWindow(opt)
             for _=1,10 do
                 img, isReady = Players:GetUserThumbnailAsync(id, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
                 if isReady and typeof(img)=="string" and #img>0 then
-                    thumb = img
-                    thumbReady = true
+                    av.Image = img
                     break
                 end
                 wait(0.2)
             end
-            if thumbReady then av.Image = thumb end
         end)()
 
         local nm = Instance.new("TextLabel", uf)
@@ -390,12 +466,12 @@ function KevinzHub:MakeWindow(opt)
     local userInfoFrame = renderUserInfo()
     userInfoFrame.LayoutOrder = 1e9
 
-    -- Tabs
+    -- Tabs, Sidebar scroll, search giữ nguyên
+
     local tabs = {}
     local tabContents = {}
     local tabOrder = 0
 
-    -- Sidebar scroll
     local scrolling = 0
     local function updateSidebarScroll()
         RunService.Heartbeat:Wait()
@@ -435,8 +511,9 @@ function KevinzHub:MakeWindow(opt)
         for n,btn in pairs(tabs) do
             local active = (n==name)
             TweenService:Create(btn, TweenInfo.new(ANIM.TweenTime, Enum.EasingStyle.Quint),
-                {BackgroundColor3 = active and COLORS.TabActive or COLORS.TabInactive}
-            ):Play()
+                {BackgroundColor3 = active and COLORS.TabActive or COLORS.TabInactive,
+                 BackgroundTransparency = 1- (active and COLORS.TabActiveAlpha or COLORS.TabInactiveAlpha)
+                }):Play()
             local icon = btn:FindFirstChild("TabIcon")
             if icon then
                 TweenService:Create(icon, TweenInfo.new(ANIM.TweenTime, Enum.EasingStyle.Quint), {
@@ -457,7 +534,8 @@ function KevinzHub:MakeWindow(opt)
         local btn = makeRoundedFrame{
             Name = tabOpt.Name.."Btn", Parent = sidebar,
             Size = UDim2.new(1,-16,0,44), LayoutOrder = tabOrder,
-            BackgroundColor3 = COLORS.TabInactive
+            BackgroundColor3 = COLORS.TabInactive,
+            __Alpha = COLORS.TabInactiveAlpha
         }
         local icon = Instance.new("ImageLabel", btn)
         icon.Name = "TabIcon"
@@ -481,13 +559,15 @@ function KevinzHub:MakeWindow(opt)
             Position = UDim2.new(0,192,0,44),
             Size = UDim2.new(1,-210,1,-62),
             BackgroundColor3 = COLORS.ContentBg,
+            __Alpha = COLORS.ContentBgAlpha,
+            __Shadow = true, __ShadowRadius = 10, __ShadowTransparency = 0.22,
             Visible = false
         }
         ct.ClipsDescendants = true
         -- Section layout dùng UIListLayout spacing đều, không lỗi ẩn/lỗi dính
         local sectionList = Instance.new("UIListLayout", ct)
         sectionList.SortOrder = Enum.SortOrder.LayoutOrder
-        sectionList.Padding = UDim.new(0, 24) -- Spacing đều giữa các section
+        sectionList.Padding = UDim.new(0, 24)
         sectionList.HorizontalAlignment = Enum.HorizontalAlignment.Center
         sectionList.VerticalAlignment = Enum.VerticalAlignment.Top
         tabs[tabOpt.Name], tabContents[tabOpt.Name] = btn, ct
@@ -506,13 +586,15 @@ function KevinzHub:MakeWindow(opt)
                 Name = secOpt.Name.."Section", Parent = ct,
                 Size = UDim2.new(1,-32,0,0),
                 BackgroundColor3 = COLORS.SectionBg,
+                __Alpha = COLORS.SectionBgAlpha,
+                __Shadow = true, __ShadowRadius = 7, __ShadowTransparency = 0.13,
                 LayoutOrder = sectionOrder
             }
             secFrame.AutomaticSize = Enum.AutomaticSize.Y
             -- Section nội dung dùng UIListLayout để spacing đều các item
             local itemsList = Instance.new("UIListLayout", secFrame)
             itemsList.SortOrder = Enum.SortOrder.LayoutOrder
-            itemsList.Padding = UDim.new(0, 12) -- Khoảng cách đều giữa các item
+            itemsList.Padding = UDim.new(0, 12)
             itemsList.HorizontalAlignment = Enum.HorizontalAlignment.Left
             itemsList.VerticalAlignment = Enum.VerticalAlignment.Top
 
@@ -534,6 +616,7 @@ function KevinzHub:MakeWindow(opt)
                     Name = btnOpt.Name.."Btn", Parent = secFrame,
                     Size = UDim2.new(0,145,0,32),
                     BackgroundColor3 = COLORS.ButtonBg,
+                    __Alpha = COLORS.ButtonBgAlpha,
                     LayoutOrder = itemOrder
                 }
                 local lbl = Instance.new("TextLabel", btn)
@@ -581,22 +664,26 @@ function KevinzHub:MakeWindow(opt)
                     Name = slOpt.Name.."Slider", Parent = container,
                     Position = UDim2.new(0,0,0,labelHeight+2),
                     Size = UDim2.new(0,sliderW,0,sliderH),
-                    BackgroundColor3 = COLORS.SliderTrack
+                    BackgroundColor3 = COLORS.SliderTrack,
+                    __Alpha = COLORS.SliderTrackAlpha,
+                    __Shadow = false
                 }
                 local sliderFill = makeRoundedFrame{
                     Name = "SliderFill", Parent = sliderBg,
                     Position = UDim2.new(0,0,0,0),
                     Size = UDim2.new(0,0,1,0),
-                    BackgroundColor3 = COLORS.SliderFill
+                    BackgroundColor3 = COLORS.SliderFill,
+                    __Alpha = COLORS.SliderFillAlpha
                 }
                 local sliderKnob = Instance.new("Frame", sliderBg)
                 sliderKnob.Name = "SliderKnob"
                 sliderKnob.Size = UDim2.new(0,18,0,18)
                 sliderKnob.Position = UDim2.new(0,0,0,-2)
                 sliderKnob.BackgroundColor3 = COLORS.SliderKnob
+                sliderKnob.BackgroundTransparency = 1 - COLORS.SliderKnobAlpha
                 sliderKnob.BorderSizePixel = 0
                 local corner = Instance.new("UICorner", sliderKnob)
-                corner.CornerRadius = UDim.new(0, 6)
+                corner.CornerRadius = UDim.new(0, 8)
                 local val = slOpt.Default or slOpt.Min or 0
 
                 local function setSlider(v,updateTextbox)
@@ -643,6 +730,7 @@ function KevinzHub:MakeWindow(opt)
                     textbox.Size = UDim2.new(0,textboxW,0,labelHeight+11)
                     textbox.Position = UDim2.new(0,sliderW+gap,0,labelHeight)
                     textbox.BackgroundColor3 = COLORS.TextboxBg
+                    textbox.BackgroundTransparency = 1 - COLORS.TextboxBgAlpha
                     textbox.TextColor3 = COLORS.LabelText
                     textbox.Font = Enum.Font.Gotham
                     textbox.TextSize = 14
@@ -652,7 +740,7 @@ function KevinzHub:MakeWindow(opt)
                     textbox.TextXAlignment = Enum.TextXAlignment.Center
                     textbox.BorderSizePixel = 0
                     local corner = Instance.new("UICorner", textbox)
-                    corner.CornerRadius = UDim.new(0,6)
+                    corner.CornerRadius = UDim.new(0,8)
                     textbox.FocusLost:Connect(function(enter)
                         if enter then
                             setSlider(textbox.Text,false)
@@ -676,27 +764,37 @@ function KevinzHub:MakeWindow(opt)
                     Name = opt.Name.."ToggleBG", Parent = container,
                     Position = UDim2.new(0,0,0,0),
                     Size = UDim2.new(0,toggleW,0,toggleH),
-                    BackgroundColor3 = COLORS.ToggleBg
+                    BackgroundColor3 = COLORS.ToggleBg,
+                    __Alpha = COLORS.ToggleBgAlpha
                 }
                 local knob = makeRoundedFrame{
                     Name = "Knob", Parent = toggleBg,
                     Position = UDim2.new(0,3,0,3),
                     Size = UDim2.new(0,18,0,18),
-                    BackgroundColor3 = COLORS.ToggleOff
+                    BackgroundColor3 = COLORS.ToggleOff,
+                    __Alpha = COLORS.ToggleOffAlpha
                 }
                 local on = opt.Default or false
                 local function updateAppearance(animated)
                     local targetX = on and (toggleBg.Size.X.Offset - knob.Size.X.Offset - 3) or 3
                     if animated then
-                        TweenService:Create(knob, TweenInfo.new(ANIM.TweenTime, Enum.EasingStyle.Quint), {Position=UDim2.new(0,targetX,0,3)}):Play()
+                        TweenService:Create(knob, TweenInfo.new(ANIM.TweenTime, Enum.EasingStyle.Quint), {
+                            Position=UDim2.new(0,targetX,0,3),
+                            BackgroundColor3 = on and COLORS.ToggleKnobOn or COLORS.ToggleOff,
+                            BackgroundTransparency = 1-(on and COLORS.ToggleKnobOnAlpha or COLORS.ToggleOffAlpha)
+                        }):Play()
                         TweenService:Create(toggleBg, TweenInfo.new(ANIM.TweenTime, Enum.EasingStyle.Quint),
-                            {BackgroundColor3 = on and COLORS.ToggleOn or COLORS.ToggleBg}
+                            {BackgroundColor3 = on and COLORS.ToggleOn or COLORS.ToggleBg,
+                             BackgroundTransparency = 1-(on and COLORS.ToggleOnAlpha or COLORS.ToggleBgAlpha)
+                            }
                         ):Play()
                     else
                         knob.Position = UDim2.new(0,targetX,0,3)
+                        knob.BackgroundColor3 = on and COLORS.ToggleKnobOn or COLORS.ToggleOff
+                        knob.BackgroundTransparency = 1-(on and COLORS.ToggleKnobOnAlpha or COLORS.ToggleOffAlpha)
                         toggleBg.BackgroundColor3 = on and COLORS.ToggleOn or COLORS.ToggleBg
+                        toggleBg.BackgroundTransparency = 1-(on and COLORS.ToggleOnAlpha or COLORS.ToggleBgAlpha)
                     end
-                    knob.BackgroundColor3 = on and COLORS.ToggleKnobOn or COLORS.ToggleOff
                 end
                 updateAppearance(false)
                 toggleBg.InputBegan:Connect(function(i)
