@@ -865,452 +865,460 @@ function KevinzHub:MakeWindow(opt)
 
                 itemOrder = itemOrder + 1
             end
-    function Section:AddLabel(opt)
-        local labelFrame = Instance.new("Frame", secFrame)
-        labelFrame.Name = "LabelContainer"
-        labelFrame.BackgroundTransparency = 1
-        labelFrame.Size = UDim2.new(1, 0, 0, 22)
-        labelFrame.LayoutOrder = itemOrder
-        local lbl = Instance.new("TextLabel", labelFrame)
-        lbl.BackgroundTransparency = 1
-        lbl.Font = Enum.Font.GothamBold
-        lbl.Text = typeof(opt)=="table" and (opt.Text or opt) or tostring(opt)
-        lbl.TextSize = 13
-        lbl.TextColor3 = COLORS.LabelText
-        lbl.TextXAlignment = Enum.TextXAlignment.Left
-        lbl.TextYAlignment = Enum.TextYAlignment.Center
-        lbl.Size = UDim2.new(1, 0, 1, 0)
-        itemOrder = itemOrder + 1
-        return labelFrame
-    end
 
-    function Section:AddParagraph(opt)
-        local paraFrame = makeRoundedFrame({
-            Parent = secFrame,
-            Name = "Paragraph",
-            BackgroundColor3 = COLORS.ParagraphBg,
-            Size = UDim2.new(1, -10, 0, 48),
-            LayoutOrder = itemOrder
-        })
-        local lbl = Instance.new("TextLabel", paraFrame)
-        lbl.BackgroundTransparency = 1
-        lbl.Font = Enum.Font.Gotham
-        lbl.Text = typeof(opt)=="table" and (opt.Text or opt) or tostring(opt)
-        lbl.TextSize = 12
-        lbl.TextColor3 = COLORS.ParagraphText
-        lbl.TextWrapped = true
-        lbl.TextYAlignment = Enum.TextYAlignment.Top
-        lbl.TextXAlignment = Enum.TextXAlignment.Left
-        lbl.Size = UDim2.new(1, -8, 1, -8)
-        lbl.Position = UDim2.new(0, 4, 0, 4)
-        paraFrame.AutomaticSize = Enum.AutomaticSize.Y
-        itemOrder = itemOrder + 1
-        return paraFrame
-    end
-
-    function Section:AddDropdown(opt)
-        local open = false
-        local container = Instance.new("Frame", secFrame)
-        container.Name = (opt.Name or "Dropdown").."Dropdown"
-        container.Size = UDim2.new(0, 150, 0, 32)
-        container.BackgroundTransparency = 1
-        container.LayoutOrder = itemOrder
-
-        local mainBtn = makeRoundedFrame{
-            Name = "DropdownMain", Parent = container,
-            Size = UDim2.new(1,0,0,28),
-            BackgroundColor3 = COLORS.DropdownBG
-        }
-        local label = Instance.new("TextLabel", mainBtn)
-        label.BackgroundTransparency = 1
-        label.Font = Enum.Font.Gotham
-        label.Text = opt.Name or "Dropdown"
-        label.TextSize = 13
-        label.TextColor3 = COLORS.LabelText
-        label.TextXAlignment = Enum.TextXAlignment.Left
-        label.Size = UDim2.new(1, -32, 1, 0)
-        label.Position = UDim2.new(0, 8, 0, 0)
-
-        local arrow = Instance.new("ImageLabel", mainBtn)
-        arrow.Image = "rbxassetid://6034818371"
-        arrow.BackgroundTransparency = 1
-        arrow.Size = UDim2.new(0,16,0,16)
-        arrow.Position = UDim2.new(1, -22, 0.5, -8)
-        arrow.ImageColor3 = COLORS.LabelText
-
-        local selected = opt.Default
-        local callback = opt.Callback
-
-        local menu = makeRoundedFrame{
-            Name = "DropdownMenu", Parent = container,
-            Size = UDim2.new(1, 0, 0, 0),
-            BackgroundColor3 = COLORS.DropdownBG,
-            Visible = false
-        }
-        menu.Position = UDim2.new(0,0,1,2)
-        menu.ZIndex = 10
-        menu.ClipsDescendants = true
-        menu.AutomaticSize = Enum.AutomaticSize.Y
-
-        local list = Instance.new("UIListLayout", menu)
-        list.SortOrder = Enum.SortOrder.LayoutOrder
-        list.Padding = UDim.new(0, 2)
-        local function updateDropdownItems(values)
-            for _,c in pairs(menu:GetChildren()) do
-                if c:IsA("Frame") then c:Destroy() end
-            end
-            for idx, v in ipairs(values or opt.Values or {}) do
-                local item = makeRoundedFrame{
-                    Name = tostring(v).."Item", Parent = menu,
-                    Size = UDim2.new(1,0,0,26),
-                    BackgroundColor3 = COLORS.DropdownBG
-                }
-                local lbl = Instance.new("TextLabel", item)
+            -- BẮT ĐẦU CÁC HÀM MỚI ADDITIONAL
+            function Section:AddLabel(opt)
+                local labelFrame = Instance.new("Frame", secFrame)
+                labelFrame.Name = "LabelContainer"
+                labelFrame.BackgroundTransparency = 1
+                labelFrame.Size = UDim2.new(1, 0, 0, 22)
+                labelFrame.LayoutOrder = itemOrder
+                itemOrder = itemOrder + 1
+                local lbl = Instance.new("TextLabel", labelFrame)
                 lbl.BackgroundTransparency = 1
-                lbl.Font = Enum.Font.Gotham
-                lbl.Text = tostring(v)
+                lbl.Font = Enum.Font.GothamBold
+                lbl.Text = typeof(opt)=="table" and (opt.Text or opt) or tostring(opt)
                 lbl.TextSize = 13
                 lbl.TextColor3 = COLORS.LabelText
                 lbl.TextXAlignment = Enum.TextXAlignment.Left
-                lbl.Size = UDim2.new(1, -8, 1, 0)
-                lbl.Position = UDim2.new(0, 8, 0, 0)
-                item.LayoutOrder = idx
-                item.InputBegan:Connect(function(i)
-                    if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
-                        selected = v
-                        label.Text = tostring(v)
-                        menu.Visible = false
-                        open = false
-                        if callback then callback(selected) end
-                        playClickSound(item)
+                lbl.TextYAlignment = Enum.TextYAlignment.Center
+                lbl.Size = UDim2.new(1, 0, 1, 0)
+                return labelFrame
+            end
+
+            function Section:AddParagraph(opt)
+                local paraFrame = makeRoundedFrame({
+                    Parent = secFrame,
+                    Name = "Paragraph",
+                    BackgroundColor3 = COLORS.ParagraphBg,
+                    Size = UDim2.new(1, -10, 0, 48),
+                    LayoutOrder = itemOrder
+                })
+                paraFrame.LayoutOrder = itemOrder
+                itemOrder = itemOrder + 1
+                local lbl = Instance.new("TextLabel", paraFrame)
+                lbl.BackgroundTransparency = 1
+                lbl.Font = Enum.Font.Gotham
+                lbl.Text = typeof(opt)=="table" and (opt.Text or opt) or tostring(opt)
+                lbl.TextSize = 12
+                lbl.TextColor3 = COLORS.ParagraphText
+                lbl.TextWrapped = true
+                lbl.TextYAlignment = Enum.TextYAlignment.Top
+                lbl.TextXAlignment = Enum.TextXAlignment.Left
+                lbl.Size = UDim2.new(1, -8, 1, -8)
+                lbl.Position = UDim2.new(0, 4, 0, 4)
+                paraFrame.AutomaticSize = Enum.AutomaticSize.Y
+                return paraFrame
+            end
+
+            function Section:AddDropdown(opt)
+                local open = false
+                local container = Instance.new("Frame", secFrame)
+                container.Name = (opt.Name or "Dropdown").."Dropdown"
+                container.Size = UDim2.new(0, 150, 0, 32)
+                container.BackgroundTransparency = 1
+                container.LayoutOrder = itemOrder
+                itemOrder = itemOrder + 1
+
+                local mainBtn = makeRoundedFrame{
+                    Name = "DropdownMain", Parent = container,
+                    Size = UDim2.new(1,0,0,28),
+                    BackgroundColor3 = COLORS.DropdownBG
+                }
+                local label = Instance.new("TextLabel", mainBtn)
+                label.BackgroundTransparency = 1
+                label.Font = Enum.Font.Gotham
+                label.Text = tostring(opt.Default or (opt.Values and opt.Values[1]) or "")
+                label.TextSize = 13
+                label.TextColor3 = COLORS.LabelText
+                label.TextXAlignment = Enum.TextXAlignment.Left
+                label.Size = UDim2.new(1, -32, 1, 0)
+                label.Position = UDim2.new(0, 8, 0, 0)
+
+                local arrow = Instance.new("ImageLabel", mainBtn)
+                arrow.Image = "rbxassetid://6034818371"
+                arrow.BackgroundTransparency = 1
+                arrow.Size = UDim2.new(0,16,0,16)
+                arrow.Position = UDim2.new(1, -22, 0.5, -8)
+                arrow.ImageColor3 = COLORS.LabelText
+
+                local selected = opt.Default
+                local callback = opt.Callback
+
+                local menu = makeRoundedFrame{
+                    Name = "DropdownMenu", Parent = container,
+                    Size = UDim2.new(1, 0, 0, 0),
+                    BackgroundColor3 = COLORS.DropdownBG,
+                    Visible = false
+                }
+                menu.Position = UDim2.new(0,0,1,2)
+                menu.ZIndex = 10
+                menu.ClipsDescendants = true
+                menu.AutomaticSize = Enum.AutomaticSize.Y
+
+                local list = Instance.new("UIListLayout", menu)
+                list.SortOrder = Enum.SortOrder.LayoutOrder
+                list.Padding = UDim.new(0, 2)
+                local function updateDropdownItems(values)
+                    for _,c in pairs(menu:GetChildren()) do
+                        if c:IsA("Frame") then c:Destroy() end
                     end
-                end)
-                addBtnAnim(item)
-            end
-        end
-        updateDropdownItems(opt.Values or {})
-
-        mainBtn.InputBegan:Connect(function(i)
-            if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
-                open = not open
-                menu.Visible = open
-                playClickSound(mainBtn)
-            end
-        end)
-        if UserInputService.TouchEnabled then
-            mainBtn.TouchTap:Connect(function()
-                open = not open
-                menu.Visible = open
-                playClickSound(mainBtn)
-            end)
-        end
-
-        function container:GetSelected()
-            return selected
-        end
-        function container:UpdateValues(newVals)
-            updateDropdownItems(newVals)
-        end
-
-        itemOrder = itemOrder + 1
-        return container
-    end
-
-    function Section:AddColorPicker(opt)
-        local container = Instance.new("Frame", secFrame)
-        container.Name = "ColorPickerContainer"
-        container.Size = UDim2.new(0, 150, 0, 36)
-        container.BackgroundTransparency = 1
-        container.LayoutOrder = itemOrder
-
-        local label = Instance.new("TextLabel", container)
-        label.BackgroundTransparency = 1
-        label.Font = Enum.Font.Gotham
-        label.Text = opt.Name or "Color"
-        label.TextSize = 13
-        label.TextColor3 = COLORS.LabelText
-        label.TextXAlignment = Enum.TextXAlignment.Left
-        label.Size = UDim2.new(0.65, 0, 1, 0)
-        label.Position = UDim2.new(0, 0, 0, 0)
-
-        local colorBtn = makeRoundedFrame{
-            Name = "ColorButton", Parent = container,
-            Size = UDim2.new(0,36,0,28),
-            Position = UDim2.new(1,-40,0.5,-14),
-            BackgroundColor3 = opt.Default or Color3.new(1,1,1)
-        }
-        addBtnAnim(colorBtn)
-        local curColor = opt.Default or Color3.new(1,1,1)
-        local callback = opt.Callback
-
-        colorBtn.InputBegan:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-                local picker = Instance.new("Color3Value")
-                picker.Value = curColor
-                picker.Changed:Connect(function(val)
-                    colorBtn.BackgroundColor3 = val
-                    curColor = val
-                    if callback then callback(val) end
-                end)
-            end
-        end)
-        itemOrder = itemOrder + 1
-        return container
-    end
-
-    function Section:AddImage(opt)
-        local container = Instance.new("Frame", secFrame)
-        container.Name = "ImageContainer"
-        container.BackgroundTransparency = 1
-        container.Size = UDim2.new(0, opt.Width or 80, 0, opt.Height or 80)
-        container.LayoutOrder = itemOrder
-        local img = Instance.new("ImageLabel", container)
-        img.Name = "Image"
-        img.Size = UDim2.new(1, 0, 1, 0)
-        img.BackgroundTransparency = 1
-        img.Image = opt.Image or "rbxassetid://77339698"
-        img.ImageColor3 = opt.ImageColor3 or Color3.new(1,1,1)
-        img.ScaleType = Enum.ScaleType.Fit
-        itemOrder = itemOrder + 1
-        return container
-    end
-
-    function Section:AddKeybind(opt)
-        local container = Instance.new("Frame", secFrame)
-        container.Name = "KeybindContainer"
-        container.Size = UDim2.new(0, 130, 0, 26)
-        container.BackgroundTransparency = 1
-        container.LayoutOrder = itemOrder
-        local label = Instance.new("TextLabel", container)
-        label.BackgroundTransparency = 1
-        label.Font = Enum.Font.Gotham
-        label.Text = opt.Name or "Keybind"
-        label.TextSize = 13
-        label.TextColor3 = COLORS.LabelText
-        label.TextXAlignment = Enum.TextXAlignment.Left
-        label.Size = UDim2.new(0.6, 0, 1, 0)
-
-        local btn = makeRoundedFrame{
-            Name = "KeybindBtn", Parent = container,
-            Size = UDim2.new(0,54,1,0),
-            Position = UDim2.new(1,-56,0,0),
-            BackgroundColor3 = COLORS.ButtonBg
-        }
-        local btnLbl = Instance.new("TextLabel", btn)
-        btnLbl.BackgroundTransparency = 1
-        btnLbl.Font = Enum.Font.Gotham
-        btnLbl.Text = "[None]"
-        btnLbl.TextSize = 12
-        btnLbl.TextColor3 = COLORS.LabelText
-        btnLbl.TextXAlignment = Enum.TextXAlignment.Center
-        btnLbl.Size = UDim2.fromScale(1,1)
-        local binding = false
-        local key = opt.Default
-        local callback = opt.Callback
-
-        btn.InputBegan:Connect(function(i)
-            if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
-                binding = true
-                btnLbl.Text = "[...]"
-                playClickSound(btn)
-            end
-        end)
-        UserInputService.InputBegan:Connect(function(i,gp)
-            if binding and not gp then
-                binding = false
-                key = i.KeyCode
-                btnLbl.Text = "["..(key.Name or tostring(key)).."]"
-                if callback then callback(key) end
-            elseif not binding and key and i.KeyCode==key and not gp then
-                if callback then callback(key, true) end
-            end
-        end)
-        itemOrder = itemOrder + 1
-        return container
-    end
-
-    function Section:AddListbox(opt)
-        local container = Instance.new("Frame", secFrame)
-        container.Name = "ListboxContainer"
-        container.Size = UDim2.new(0, opt.Width or 140, 0, opt.Height or 84)
-        container.BackgroundColor3 = COLORS.ParagraphBg
-        container.LayoutOrder = itemOrder
-        local list = Instance.new("UIListLayout", container)
-        list.SortOrder = Enum.SortOrder.LayoutOrder
-        list.Padding = UDim.new(0,2)
-        for i,v in ipairs(opt.Items or {}) do
-            local it = Instance.new("TextLabel", container)
-            it.BackgroundTransparency = 1
-            it.Font = Enum.Font.Gotham
-            it.Text = tostring(v)
-            it.TextSize = 12
-            it.TextColor3 = COLORS.ParagraphText
-            it.TextXAlignment = Enum.TextXAlignment.Left
-            it.LayoutOrder = i
-            it.Size = UDim2.new(1,0,0,20)
-        end
-        itemOrder = itemOrder + 1
-        return container
-    end
-
-    function Section:AddTable(opt)
-        local rows = opt.Rows or {}
-        local cols = opt.Columns or {}
-        local container = Instance.new("Frame", secFrame)
-        container.Name = "TableContainer"
-        container.Size = UDim2.new(0, opt.Width or 200, 0, 24 + #rows*24)
-        container.BackgroundColor3 = COLORS.ParagraphBg
-        container.LayoutOrder = itemOrder
-        local head = Instance.new("Frame", container)
-        head.Name = "Header"
-        head.Size = UDim2.new(1,0,0,24)
-        head.BackgroundTransparency = 1
-        for i,c in ipairs(cols) do
-            local col = Instance.new("TextLabel", head)
-            col.BackgroundTransparency = 1
-            col.Font = Enum.Font.GothamBold
-            col.Text = tostring(c)
-            col.TextSize = 12
-            col.TextColor3 = COLORS.LabelText
-            col.TextXAlignment = Enum.TextXAlignment.Left
-            col.Size = UDim2.new(1/#cols, -4, 1, 0)
-            col.Position = UDim2.new((i-1)/#cols, 2, 0, 0)
-        end
-        for r, row in ipairs(rows) do
-            local rowFrame = Instance.new("Frame", container)
-            rowFrame.Name = "Row"..r
-            rowFrame.Size = UDim2.new(1,0,0,22)
-            rowFrame.Position = UDim2.new(0,0,0,24*r)
-            rowFrame.BackgroundTransparency = 1
-            for i,c in ipairs(cols) do
-                local cell = Instance.new("TextLabel", rowFrame)
-                cell.BackgroundTransparency = 1
-                cell.Font = Enum.Font.Gotham
-                cell.Text = tostring(row[i] or "")
-                cell.TextSize = 12
-                cell.TextColor3 = COLORS.ParagraphText
-                cell.TextXAlignment = Enum.TextXAlignment.Left
-                cell.Size = UDim2.new(1/#cols, -4, 1, 0)
-                cell.Position = UDim2.new((i-1)/#cols, 2, 0, 0)
-                cell.TextWrapped = true
-            end
-        end
-        itemOrder = itemOrder + 1
-        return container
-    end
-
-    function Section:AddRadio(opt)
-        local values = opt.Values or {}
-        local default = opt.Default or 1
-        local callback = opt.Callback
-        local container = Instance.new("Frame", secFrame)
-        container.Name = "RadioContainer"
-        container.Size = UDim2.new(0, 145, 0, 18 + #values*26)
-        container.BackgroundTransparency = 1
-        container.LayoutOrder = itemOrder
-        local sel = default
-        for i, v in ipairs(values) do
-            local btn = makeRoundedFrame{
-                Parent = container, Name = "Radio"..i,
-                Size = UDim2.new(0,18,0,18),
-                BackgroundColor3 = COLORS.ButtonBg,
-                Position = UDim2.new(0, 0, 0, 20+(i-1)*26)
-            }
-            addBtnAnim(btn)
-            local dot = Instance.new("Frame", btn)
-            dot.Name = "Dot"
-            dot.Size = UDim2.new(0.6,0,0.6,0)
-            dot.Position = UDim2.new(0.2,0,0.2,0)
-            dot.BackgroundColor3 = COLORS.TabActive
-            dot.BackgroundTransparency = (i==sel) and 0 or 1
-            dot.BorderSizePixel = 0
-            local lbl = Instance.new("TextLabel", container)
-            lbl.BackgroundTransparency = 1
-            lbl.Font = Enum.Font.Gotham
-            lbl.Text = tostring(v)
-            lbl.TextSize = 13
-            lbl.TextColor3 = COLORS.LabelText
-            lbl.TextXAlignment = Enum.TextXAlignment.Left
-            lbl.Position = UDim2.new(0, 24, 0, 20+(i-1)*26)
-            lbl.Size = UDim2.new(1, -26, 0, 18)
-            btn.InputBegan:Connect(function(ev)
-                if ev.UserInputType == Enum.UserInputType.MouseButton1 or ev.UserInputType == Enum.UserInputType.Touch then
-                    sel = i
-                    for j,child in ipairs(container:GetChildren()) do
-                        if child:IsA("Frame") and child:FindFirstChild("Dot") then
-                            child.Dot.BackgroundTransparency = (j-1)==sel and 0 or 1
-                        end
+                    for idx, v in ipairs(values or opt.Values or {}) do
+                        local item = makeRoundedFrame{
+                            Name = tostring(v).."Item", Parent = menu,
+                            Size = UDim2.new(1,0,0,26),
+                            BackgroundColor3 = COLORS.DropdownBG
+                        }
+                        local lbl = Instance.new("TextLabel", item)
+                        lbl.BackgroundTransparency = 1
+                        lbl.Font = Enum.Font.Gotham
+                        lbl.Text = tostring(v)
+                        lbl.TextSize = 13
+                        lbl.TextColor3 = COLORS.LabelText
+                        lbl.TextXAlignment = Enum.TextXAlignment.Left
+                        lbl.Size = UDim2.new(1, -8, 1, 0)
+                        lbl.Position = UDim2.new(0, 8, 0, 0)
+                        item.LayoutOrder = idx
+                        item.InputBegan:Connect(function(i)
+                            if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+                                selected = v
+                                label.Text = tostring(v)
+                                menu.Visible = false
+                                open = false
+                                if callback then callback(selected) end
+                                playClickSound(item)
+                            end
+                        end)
+                        addBtnAnim(item)
                     end
-                    if callback then callback(i, v) end
-                    playClickSound(btn)
                 end
-            end)
-        end
-        itemOrder = itemOrder + 1
-        return container
-    end
+                updateDropdownItems(opt.Values or {})
 
-    function Section:AddProgressbar(opt)
-        local width = opt.Width or 120
-        local height = opt.Height or 12
-        local value = opt.Value or 0
-        local min, max = opt.Min or 0, opt.Max or 100
-        local container = Instance.new("Frame", secFrame)
-        container.Name = "ProgressbarContainer"
-        container.Size = UDim2.new(0, width, 0, height+12)
-        container.BackgroundTransparency = 1
-        container.LayoutOrder = itemOrder
-        local bg = makeRoundedFrame{
-            Parent=container, Size=UDim2.new(1,0,0,height), Position=UDim2.new(0,0,0,6),
-            BackgroundColor3 = COLORS.SliderTrack
-        }
-        local fill = makeRoundedFrame{
-            Parent=bg, Size=UDim2.new((value-min)/(max-min),0,1,0), Position=UDim2.new(0,0,0,0),
-            BackgroundColor3 = COLORS.TabActive
-        }
-        fill.Name = "Fill"
-        local percentLbl = Instance.new("TextLabel", container)
-        percentLbl.BackgroundTransparency = 1
-        percentLbl.Font = Enum.Font.Gotham
-        percentLbl.Text = string.format("%d%%", (value-min)*100/(max-min))
-        percentLbl.TextSize = 11
-        percentLbl.TextColor3 = COLORS.LabelText
-        percentLbl.Size = UDim2.new(1,0,0,10)
-        percentLbl.Position = UDim2.new(0,0,0,0)
-        function container:SetValue(v)
-            v = math.clamp(v, min, max)
-            fill.Size = UDim2.new((v-min)/(max-min),0,1,0)
-            percentLbl.Text = string.format("%d%%", (v-min)*100/(max-min))
-        end
-        itemOrder = itemOrder + 1
-        return container
-    end
+                mainBtn.InputBegan:Connect(function(i)
+                    if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+                        open = not open
+                        menu.Visible = open
+                        playClickSound(mainBtn)
+                    end
+                end)
+                if UserInputService.TouchEnabled then
+                    mainBtn.TouchTap:Connect(function()
+                        open = not open
+                        menu.Visible = open
+                        playClickSound(mainBtn)
+                    end)
+                end
 
-    function Section:UpdateLabel(labelFrame, newText)
-        if labelFrame and labelFrame:IsA("Frame") then
-            local lbl = labelFrame:FindFirstChildWhichIsA("TextLabel")
-            if lbl then lbl.Text = newText end
-        end
-    end
+                function container:GetSelected()
+                    return selected
+                end
+                function container:UpdateValues(newVals)
+                    updateDropdownItems(newVals)
+                end
 
-    function Section:UpdateDropdown(dropdownFrame, newValues)
-        if dropdownFrame and typeof(dropdownFrame.UpdateValues)=="function" then
-            dropdownFrame:UpdateValues(newValues)
-        end
-    end
+                return container
+            end
 
-    function Section:UpdateImage(imgFrame, newUrl)
-        if imgFrame and imgFrame:IsA("Frame") then
-            local img = imgFrame:FindFirstChild("Image")
-            if img then img.Image = newUrl end
-        end
-    end
+            function Section:AddColorPicker(opt)
+                local container = Instance.new("Frame", secFrame)
+                container.Name = "ColorPickerContainer"
+                container.Size = UDim2.new(0, 150, 0, 36)
+                container.BackgroundTransparency = 1
+                container.LayoutOrder = itemOrder
+                itemOrder = itemOrder + 1
 
-    function Section:SetVisible(item, vis)
-        if typeof(item)=="Instance" then
-            item.Visible = (vis==nil and true) or vis
-        end
-    end
+                local label = Instance.new("TextLabel", container)
+                label.BackgroundTransparency = 1
+                label.Font = Enum.Font.Gotham
+                label.Text = opt.Name or "Color"
+                label.TextSize = 13
+                label.TextColor3 = COLORS.LabelText
+                label.TextXAlignment = Enum.TextXAlignment.Left
+                label.Size = UDim2.new(0.65, 0, 1, 0)
+                label.Position = UDim2.new(0, 0, 0, 0)
+
+                local colorBtn = makeRoundedFrame{
+                    Name = "ColorButton", Parent = container,
+                    Size = UDim2.new(0,36,0,28),
+                    Position = UDim2.new(1,-40,0.5,-14),
+                    BackgroundColor3 = opt.Default or Color3.new(1,1,1)
+                }
+                addBtnAnim(colorBtn)
+                local curColor = opt.Default or Color3.new(1,1,1)
+                local callback = opt.Callback
+
+                colorBtn.InputBegan:Connect(function(i)
+                    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+                        -- Đơn giản chỉ đổi màu, có thể thay bằng popup ColorPicker nâng cao nếu cần
+                        local nextColor = Color3.fromRGB(
+                            math.random(0,255),
+                            math.random(0,255),
+                            math.random(0,255)
+                        )
+                        colorBtn.BackgroundColor3 = nextColor
+                        curColor = nextColor
+                        if callback then callback(nextColor) end
+                        playClickSound(colorBtn)
+                    end
+                end)
+                return container
+            end
+
+            function Section:AddImage(opt)
+                local container = Instance.new("Frame", secFrame)
+                container.Name = "ImageContainer"
+                container.BackgroundTransparency = 1
+                container.Size = UDim2.new(0, opt.Width or 80, 0, opt.Height or 80)
+                container.LayoutOrder = itemOrder
+                itemOrder = itemOrder + 1
+                local img = Instance.new("ImageLabel", container)
+                img.Name = "Image"
+                img.Size = UDim2.new(1, 0, 1, 0)
+                img.BackgroundTransparency = 1
+                img.Image = opt.Image or "rbxassetid://77339698"
+                img.ImageColor3 = opt.ImageColor3 or Color3.new(1,1,1)
+                img.ScaleType = Enum.ScaleType.Fit
+                return container
+            end
+
+            function Section:AddKeybind(opt)
+                local container = Instance.new("Frame", secFrame)
+                container.Name = "KeybindContainer"
+                container.Size = UDim2.new(0, 130, 0, 26)
+                container.BackgroundTransparency = 1
+                container.LayoutOrder = itemOrder
+                itemOrder = itemOrder + 1
+                local label = Instance.new("TextLabel", container)
+                label.BackgroundTransparency = 1
+                label.Font = Enum.Font.Gotham
+                label.Text = opt.Name or "Keybind"
+                label.TextSize = 13
+                label.TextColor3 = COLORS.LabelText
+                label.TextXAlignment = Enum.TextXAlignment.Left
+                label.Size = UDim2.new(0.6, 0, 1, 0)
+
+                local btn = makeRoundedFrame{
+                    Name = "KeybindBtn", Parent = container,
+                    Size = UDim2.new(0,54,1,0),
+                    Position = UDim2.new(1,-56,0,0),
+                    BackgroundColor3 = COLORS.ButtonBg
+                }
+                local btnLbl = Instance.new("TextLabel", btn)
+                btnLbl.BackgroundTransparency = 1
+                btnLbl.Font = Enum.Font.Gotham
+                btnLbl.Text = "[None]"
+                btnLbl.TextSize = 12
+                btnLbl.TextColor3 = COLORS.LabelText
+                btnLbl.TextXAlignment = Enum.TextXAlignment.Center
+                btnLbl.Size = UDim2.fromScale(1,1)
+                local binding = false
+                local key = opt.Default
+                local callback = opt.Callback
+
+                btn.InputBegan:Connect(function(i)
+                    if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+                        binding = true
+                        btnLbl.Text = "[...]"
+                        playClickSound(btn)
+                    end
+                end)
+                UserInputService.InputBegan:Connect(function(i,gp)
+                    if binding and not gp then
+                        binding = false
+                        key = i.KeyCode
+                        btnLbl.Text = "["..(key.Name or tostring(key)).."]"
+                        if callback then callback(key) end
+                    elseif not binding and key and i.KeyCode==key and not gp then
+                        if callback then callback(key, true) end
+                    end
+                end)
+                return container
+            end
+
+            function Section:AddListbox(opt)
+                local container = Instance.new("Frame", secFrame)
+                container.Name = "ListboxContainer"
+                container.Size = UDim2.new(0, opt.Width or 140, 0, opt.Height or 84)
+                container.BackgroundColor3 = COLORS.ParagraphBg
+                container.LayoutOrder = itemOrder
+                itemOrder = itemOrder + 1
+                local list = Instance.new("UIListLayout", container)
+                list.SortOrder = Enum.SortOrder.LayoutOrder
+                list.Padding = UDim.new(0,2)
+                for i,v in ipairs(opt.Items or {}) do
+                    local it = Instance.new("TextLabel", container)
+                    it.BackgroundTransparency = 1
+                    it.Font = Enum.Font.Gotham
+                    it.Text = tostring(v)
+                    it.TextSize = 12
+                    it.TextColor3 = COLORS.ParagraphText
+                    it.TextXAlignment = Enum.TextXAlignment.Left
+                    it.LayoutOrder = i
+                    it.Size = UDim2.new(1,0,0,20)
+                end
+                return container
+            end
+
+            function Section:AddTable(opt)
+                local rows = opt.Rows or {}
+                local cols = opt.Columns or {}
+                local container = Instance.new("Frame", secFrame)
+                container.Name = "TableContainer"
+                container.Size = UDim2.new(0, opt.Width or 200, 0, 24 + #rows*24)
+                container.BackgroundColor3 = COLORS.ParagraphBg
+                container.LayoutOrder = itemOrder
+                itemOrder = itemOrder + 1
+                local head = Instance.new("Frame", container)
+                head.Name = "Header"
+                head.Size = UDim2.new(1,0,0,24)
+                head.BackgroundTransparency = 1
+                for i,c in ipairs(cols) do
+                    local col = Instance.new("TextLabel", head)
+                    col.BackgroundTransparency = 1
+                    col.Font = Enum.Font.GothamBold
+                    col.Text = tostring(c)
+                    col.TextSize = 12
+                    col.TextColor3 = COLORS.LabelText
+                    col.TextXAlignment = Enum.TextXAlignment.Left
+                    col.Size = UDim2.new(1/#cols, -4, 1, 0)
+                    col.Position = UDim2.new((i-1)/#cols, 2, 0, 0)
+                end
+                for r, row in ipairs(rows) do
+                    local rowFrame = Instance.new("Frame", container)
+                    rowFrame.Name = "Row"..r
+                    rowFrame.Size = UDim2.new(1,0,0,22)
+                    rowFrame.Position = UDim2.new(0,0,0,24*r)
+                    rowFrame.BackgroundTransparency = 1
+                    for i,c in ipairs(cols) do
+                        local cell = Instance.new("TextLabel", rowFrame)
+                        cell.BackgroundTransparency = 1
+                        cell.Font = Enum.Font.Gotham
+                        cell.Text = tostring(row[i] or "")
+                        cell.TextSize = 12
+                        cell.TextColor3 = COLORS.ParagraphText
+                        cell.TextXAlignment = Enum.TextXAlignment.Left
+                        cell.Size = UDim2.new(1/#cols, -4, 1, 0)
+                        cell.Position = UDim2.new((i-1)/#cols, 2, 0, 0)
+                        cell.TextWrapped = true
+                    end
+                end
+                return container
+            end
+
+            function Section:AddRadio(opt)
+                local values = opt.Values or {}
+                local default = opt.Default or 1
+                local callback = opt.Callback
+                local container = Instance.new("Frame", secFrame)
+                container.Name = "RadioContainer"
+                container.Size = UDim2.new(0, 145, 0, 18 + #values*26)
+                container.BackgroundTransparency = 1
+                container.LayoutOrder = itemOrder
+                itemOrder = itemOrder + 1
+                local sel = default
+                for i, v in ipairs(values) do
+                    local btn = makeRoundedFrame{
+                        Parent = container, Name = "Radio"..i,
+                        Size = UDim2.new(0,18,0,18),
+                        BackgroundColor3 = COLORS.ButtonBg,
+                        Position = UDim2.new(0, 0, 0, 20+(i-1)*26)
+                    }
+                    addBtnAnim(btn)
+                    local dot = Instance.new("Frame", btn)
+                    dot.Name = "Dot"
+                    dot.Size = UDim2.new(0.6,0,0.6,0)
+                    dot.Position = UDim2.new(0.2,0,0.2,0)
+                    dot.BackgroundColor3 = COLORS.TabActive
+                    dot.BackgroundTransparency = (i==sel) and 0 or 1
+                    dot.BorderSizePixel = 0
+                    local lbl = Instance.new("TextLabel", container)
+                    lbl.BackgroundTransparency = 1
+                    lbl.Font = Enum.Font.Gotham
+                    lbl.Text = tostring(v)
+                    lbl.TextSize = 13
+                    lbl.TextColor3 = COLORS.LabelText
+                    lbl.TextXAlignment = Enum.TextXAlignment.Left
+                    lbl.Position = UDim2.new(0, 24, 0, 20+(i-1)*26)
+                    lbl.Size = UDim2.new(1, -26, 0, 18)
+                    btn.InputBegan:Connect(function(ev)
+                        if ev.UserInputType == Enum.UserInputType.MouseButton1 or ev.UserInputType == Enum.UserInputType.Touch then
+                            sel = i
+                            for j,child in ipairs(container:GetChildren()) do
+                                if child:IsA("Frame") and child:FindFirstChild("Dot") then
+                                    child.Dot.BackgroundTransparency = (j-1)==sel and 0 or 1
+                                end
+                            end
+                            if callback then callback(i, v) end
+                            playClickSound(btn)
+                        end
+                    end)
+                end
+                return container
+            end
+
+            function Section:AddProgressbar(opt)
+                local width = opt.Width or 120
+                local height = opt.Height or 12
+                local value = opt.Value or 0
+                local min, max = opt.Min or 0, opt.Max or 100
+                local container = Instance.new("Frame", secFrame)
+                container.Name = "ProgressbarContainer"
+                container.Size = UDim2.new(0, width, 0, height+12)
+                container.BackgroundTransparency = 1
+                container.LayoutOrder = itemOrder
+                itemOrder = itemOrder + 1
+                local bg = makeRoundedFrame{
+                    Parent=container, Size=UDim2.new(1,0,0,height), Position=UDim2.new(0,0,0,6),
+                    BackgroundColor3 = COLORS.SliderTrack
+                }
+                local fill = makeRoundedFrame{
+                    Parent=bg, Size=UDim2.new((value-min)/(max-min),0,1,0), Position=UDim2.new(0,0,0,0),
+                    BackgroundColor3 = COLORS.TabActive
+                }
+                fill.Name = "Fill"
+                local percentLbl = Instance.new("TextLabel", container)
+                percentLbl.BackgroundTransparency = 1
+                percentLbl.Font = Enum.Font.Gotham
+                percentLbl.Text = string.format("%d%%", (value-min)*100/(max-min))
+                percentLbl.TextSize = 11
+                percentLbl.TextColor3 = COLORS.LabelText
+                percentLbl.Size = UDim2.new(1,0,0,10)
+                percentLbl.Position = UDim2.new(0,0,0,0)
+                function container:SetValue(v)
+                    v = math.clamp(v, min, max)
+                    fill.Size = UDim2.new((v-min)/(max-min),0,1,0)
+                    percentLbl.Text = string.format("%d%%", (v-min)*100/(max-min))
+                end
+                return container
+            end
+
+            function Section:UpdateLabel(labelFrame, newText)
+                if labelFrame and labelFrame:IsA("Frame") then
+                    local lbl = labelFrame:FindFirstChildWhichIsA("TextLabel")
+                    if lbl then lbl.Text = newText end
+                end
+            end
+
+            function Section:UpdateDropdown(dropdownFrame, newValues)
+                if dropdownFrame and typeof(dropdownFrame.UpdateValues)=="function" then
+                    dropdownFrame:UpdateValues(newValues)
+                end
+            end
+
+            function Section:UpdateImage(imgFrame, newUrl)
+                if imgFrame and imgFrame:IsA("Frame") then
+                    local img = imgFrame:FindFirstChild("Image")
+                    if img then img.Image = newUrl end
+                end
+            end
+
+            function Section:SetVisible(item, vis)
+                if typeof(item)=="Instance" then
+                    item.Visible = (vis==nil and true) or vis
+                end
+            end
+            -- KẾT THÚC CÁC HÀM MỚI ADDITIONAL
+
             return Section
         end
         return Tab
