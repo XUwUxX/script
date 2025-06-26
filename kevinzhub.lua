@@ -1,6 +1,5 @@
--- KevinzHub API Style UI Library (headshot fix, UI/UX spacing tối ưu đẹp)
+-- KevinzHub API Style UI Library (headshot fix, UI/UX spacing tối ưu đẹp, spacing đều tự động, không lỗi ẩn)
 -- Usage: local KevinzHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/XUwUxX/script/refs/heads/main/kevinzhub.lua"))()
-
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
@@ -485,6 +484,12 @@ function KevinzHub:MakeWindow(opt)
             Visible = false
         }
         ct.ClipsDescendants = true
+        -- Section layout dùng UIListLayout spacing đều, không lỗi ẩn/lỗi dính
+        local sectionList = Instance.new("UIListLayout", ct)
+        sectionList.SortOrder = Enum.SortOrder.LayoutOrder
+        sectionList.Padding = UDim.new(0, 24) -- Spacing đều giữa các section
+        sectionList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+        sectionList.VerticalAlignment = Enum.VerticalAlignment.Top
         tabs[tabOpt.Name], tabContents[tabOpt.Name] = btn, ct
         btn.InputBegan:Connect(function(i)
             if i.UserInputType==Enum.UserInputType.MouseButton1 then
@@ -500,10 +505,17 @@ function KevinzHub:MakeWindow(opt)
             local secFrame = makeRoundedFrame{
                 Name = secOpt.Name.."Section", Parent = ct,
                 Size = UDim2.new(1,-32,0,0),
-                Position = UDim2.new(0,16,0,20 + (sectionOrder-1)*132),
                 BackgroundColor3 = COLORS.SectionBg,
+                LayoutOrder = sectionOrder
             }
             secFrame.AutomaticSize = Enum.AutomaticSize.Y
+            -- Section nội dung dùng UIListLayout để spacing đều các item
+            local itemsList = Instance.new("UIListLayout", secFrame)
+            itemsList.SortOrder = Enum.SortOrder.LayoutOrder
+            itemsList.Padding = UDim.new(0, 12) -- Khoảng cách đều giữa các item
+            itemsList.HorizontalAlignment = Enum.HorizontalAlignment.Left
+            itemsList.VerticalAlignment = Enum.VerticalAlignment.Top
+
             local secLbl = Instance.new("TextLabel", secFrame)
             secLbl.Size = UDim2.new(1,-14,0,25)
             secLbl.Position = UDim2.new(0,7,0,6)
@@ -513,15 +525,16 @@ function KevinzHub:MakeWindow(opt)
             secLbl.TextSize = 15
             secLbl.TextColor3 = COLORS.LabelText
             secLbl.TextXAlignment = Enum.TextXAlignment.Left
+            secLbl.LayoutOrder = 0
 
             local Section = {}
-            local itemY = 36
+            local itemOrder = 1
             function Section:AddButton(btnOpt)
                 local btn = makeRoundedFrame{
                     Name = btnOpt.Name.."Btn", Parent = secFrame,
                     Size = UDim2.new(0,145,0,32),
-                    Position = UDim2.new(0,12,0,itemY),
-                    BackgroundColor3 = COLORS.ButtonBg
+                    BackgroundColor3 = COLORS.ButtonBg,
+                    LayoutOrder = itemOrder
                 }
                 local lbl = Instance.new("TextLabel", btn)
                 lbl.Size = UDim2.fromScale(1,1)
@@ -537,19 +550,26 @@ function KevinzHub:MakeWindow(opt)
                         if btnOpt.Callback then btnOpt.Callback() end
                     end
                 end)
-                itemY = itemY + 40
+                itemOrder = itemOrder + 1
             end
+
             function Section:AddSlider(slOpt)
+                local sliderW, sliderH = 166, 13
                 local labelHeight = 18
-                local sliderW = 166
                 local textboxW = (slOpt.WithTextbox and 54) or 0
                 local gap = slOpt.WithTextbox and 12 or 0
                 local labelYOffset = 7
 
-                local lbl = Instance.new("TextLabel", secFrame)
+                local container = Instance.new("Frame", secFrame)
+                container.Name = "SliderContainer"
+                container.Size = UDim2.new(1,0,0,sliderH+labelHeight+11)
+                container.BackgroundTransparency = 1
+                container.LayoutOrder = itemOrder
+
+                local lbl = Instance.new("TextLabel", container)
                 lbl.Name = "SliderLabel"
-                lbl.Size = UDim2.new(0,sliderW+textboxW+gap,0,labelHeight)
-                lbl.Position = UDim2.new(0,12,0,itemY-labelHeight-labelYOffset)
+                lbl.Size = UDim2.new(1,0,0,labelHeight)
+                lbl.Position = UDim2.new(0,0,0,0)
                 lbl.BackgroundTransparency = 1
                 lbl.Font = Enum.Font.Gotham
                 lbl.Text = slOpt.Name
@@ -558,9 +578,9 @@ function KevinzHub:MakeWindow(opt)
                 lbl.TextXAlignment = Enum.TextXAlignment.Left
 
                 local sliderBg = makeRoundedFrame{
-                    Name = slOpt.Name.."Slider", Parent = secFrame,
-                    Position = UDim2.new(0,12,0,itemY),
-                    Size = UDim2.new(0,sliderW,0,13),
+                    Name = slOpt.Name.."Slider", Parent = container,
+                    Position = UDim2.new(0,0,0,labelHeight+2),
+                    Size = UDim2.new(0,sliderW,0,sliderH),
                     BackgroundColor3 = COLORS.SliderTrack
                 }
                 local sliderFill = makeRoundedFrame{
@@ -619,9 +639,9 @@ function KevinzHub:MakeWindow(opt)
 
                 local textbox
                 if slOpt.WithTextbox then
-                    textbox = Instance.new("TextBox", secFrame)
+                    textbox = Instance.new("TextBox", container)
                     textbox.Size = UDim2.new(0,textboxW,0,labelHeight+11)
-                    textbox.Position = UDim2.new(0,12+sliderW+gap,0,itemY-2)
+                    textbox.Position = UDim2.new(0,sliderW+gap,0,labelHeight)
                     textbox.BackgroundColor3 = COLORS.TextboxBg
                     textbox.TextColor3 = COLORS.LabelText
                     textbox.Font = Enum.Font.Gotham
@@ -640,14 +660,21 @@ function KevinzHub:MakeWindow(opt)
                     end)
                 end
 
-                itemY = itemY + labelHeight+24
+                itemOrder = itemOrder + 1
             end
 
             function Section:AddToggle(opt)
                 local toggleW, toggleH = 48, 24
+
+                local container = Instance.new("Frame", secFrame)
+                container.Name = "ToggleContainer"
+                container.Size = UDim2.new(1,0,0,toggleH)
+                container.BackgroundTransparency = 1
+                container.LayoutOrder = itemOrder
+
                 local toggleBg = makeRoundedFrame{
-                    Name = opt.Name.."ToggleBG", Parent = secFrame,
-                    Position = UDim2.new(0,12,0,itemY),
+                    Name = opt.Name.."ToggleBG", Parent = container,
+                    Position = UDim2.new(0,0,0,0),
                     Size = UDim2.new(0,toggleW,0,toggleH),
                     BackgroundColor3 = COLORS.ToggleBg
                 }
@@ -679,9 +706,9 @@ function KevinzHub:MakeWindow(opt)
                         if opt.Callback then opt.Callback(on) end
                     end
                 end)
-                local toggleLbl = Instance.new("TextLabel", secFrame)
+                local toggleLbl = Instance.new("TextLabel", container)
                 toggleLbl.Name = "ToggleLabel"
-                toggleLbl.Position = UDim2.new(0,12+toggleW+14,0,itemY)
+                toggleLbl.Position = UDim2.new(0,toggleW+14,0,0)
                 toggleLbl.Size = UDim2.new(0,180,0,toggleH)
                 toggleLbl.BackgroundTransparency = 1
                 toggleLbl.Font = Enum.Font.Gotham
@@ -690,7 +717,7 @@ function KevinzHub:MakeWindow(opt)
                 toggleLbl.TextColor3 = COLORS.LabelText
                 toggleLbl.TextXAlignment = Enum.TextXAlignment.Left
 
-                itemY = itemY + toggleH + 12
+                itemOrder = itemOrder + 1
             end
 
             return Section
