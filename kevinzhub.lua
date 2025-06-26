@@ -237,19 +237,65 @@ function KevinzHub:MakeWindow(opt)
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
     titleLabel.TextYAlignment = Enum.TextYAlignment.Center
 
-    -- Version label (luôn lấy từ KEVINZHUB_VERSION, không lấy từ opt.Version)
-    local versionLabel = Instance.new("TextLabel", topBar)
+    -- VERSION BADGE: auto position, dynamic outline
+    local versionBadge = Instance.new("Frame")
+    versionBadge.Name = "VersionBadge"
+    versionBadge.Parent = topBar
+    versionBadge.BackgroundColor3 = Color3.fromRGB(40, 48, 38)
+    versionBadge.BackgroundTransparency = 0.15
+    versionBadge.Size = UDim2.new(0, 0, 0, 20) -- will update width below
+    versionBadge.AnchorPoint = Vector2.new(0, 0.5)
+    versionBadge.Position = UDim2.new(0, 0, 0.5, 0)
+    versionBadge.ZIndex = 2
+    local badgeCorner = Instance.new("UICorner", versionBadge)
+    badgeCorner.CornerRadius = UDim.new(0, 8)
+
+    local versionLabel = Instance.new("TextLabel", versionBadge)
     versionLabel.Name = "Version"
-    versionLabel.AnchorPoint = Vector2.new(0, 0.5)
-    versionLabel.Position = UDim2.new(0, 170, 0.5, 0) -- Căn lại nếu cần cho đẹp
     versionLabel.BackgroundTransparency = 1
     versionLabel.Font = Enum.Font.Gotham
     versionLabel.Text = "v"..KEVINZHUB_VERSION
     versionLabel.TextSize = 13
-    versionLabel.TextColor3 = Color3.fromRGB(180, 200, 180)
-    versionLabel.TextXAlignment = Enum.TextXAlignment.Left
+    versionLabel.TextColor3 = Color3.fromRGB(180, 220, 180)
+    versionLabel.TextXAlignment = Enum.TextXAlignment.Center
     versionLabel.TextYAlignment = Enum.TextYAlignment.Center
+    versionLabel.Size = UDim2.new(1, -10, 1, 0)
+    versionLabel.Position = UDim2.new(0, 5, 0, 0)
+    versionLabel.ZIndex = 3
 
+    -- Outline động cho badge
+    local badgeOutline = Instance.new("UIStroke", versionBadge)
+    badgeOutline.Color = Color3.fromRGB(90, 255, 140)
+    badgeOutline.Thickness = 1.4
+    badgeOutline.Transparency = 0.2
+
+    -- Anim outline: nhấp nháy màu xanh sáng (pulse)
+    task.spawn(function()
+        local t = 0
+        while versionBadge.Parent do
+            t = t + RunService.RenderStepped:Wait()
+            local pulse = 0.9 + 0.35 * math.sin(t * 2.5)
+            badgeOutline.Color = Color3.fromHSV(0.33, 0.3 + 0.2 * pulse, 1)
+            badgeOutline.Thickness = 1.3 + 0.6 * pulse
+            badgeOutline.Transparency = 0.15 + 0.2 * (1-pulse)
+        end
+    end)
+
+    -- Function to update badge position and size based on title
+    local function updateVersionBadge()
+        -- Đặt badge sát phải tên, với padding 10px
+        local titleRight = titleLabel.Position.X.Offset + titleLabel.TextBounds.X
+        local badgeWidth = versionLabel.TextBounds.X + 20
+        versionBadge.Size = UDim2.new(0, badgeWidth, 0, 20)
+        versionBadge.Position = UDim2.new(0, titleRight + 10, 0.5, 0)
+    end
+    -- Đảm bảo update khi text đổi hoặc khi UI vừa load
+    titleLabel:GetPropertyChangedSignal("Text"):Connect(updateVersionBadge)
+    versionLabel:GetPropertyChangedSignal("Text"):Connect(updateVersionBadge)
+    RunService.RenderStepped:Connect(updateVersionBadge)
+    task.defer(updateVersionBadge)
+
+    -- Nút Min/Close
     local btnMin = makeRoundedFrame{
         Name = "MinimizeButton", Parent = topBar,
         Size = UDim2.new(0,32,0,32),
