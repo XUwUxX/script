@@ -1,6 +1,5 @@
--- KevinzHub API Style UI Library (textbox bg 66,68,79, fix UserThumbnail headshot)
+-- KevinzHub API Style UI Library (headshot fix, UI/UX spacing tối ưu đẹp)
 -- Usage: local KevinzHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/XUwUxX/script/refs/heads/main/kevinzhub.lua"))()
--- API: MakeNotification, MakeWindow, Tab:AddSection, Section:AddButton, Section:AddSlider, Section:AddToggle, etc.
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -37,16 +36,17 @@ local COLORS = {
     TabIconActive = Color3.fromRGB(0,180,80),
     NotifBg       = Color3.fromRGB(30,32,38),
     NotifText     = Color3.fromRGB(240,240,255),
-    TextboxBg     = Color3.fromRGB(66,68,79), -- Đổi thành (66,68,79)
+    TextboxBg     = Color3.fromRGB(66,68,79),
+    SectionBg     = Color3.fromRGB(32,33,40)
 }
 
 local ANIM = {
-    FadeTime     = 0.19,
-    TweenTime    = 0.21,
-    TabMoveTime  = 0.16,
-    PressTime    = 0.08,
-    NotifFadeIn  = 0.25,
-    NotifFadeOut = 0.35,
+    FadeTime     = 0.17,
+    TweenTime    = 0.19,
+    TabMoveTime  = 0.13,
+    PressTime    = 0.07,
+    NotifFadeIn  = 0.22,
+    NotifFadeOut = 0.32,
 }
 
 local KevinzHub = {}
@@ -61,7 +61,7 @@ local function makeRoundedFrame(props)
     uc.CornerRadius = UDim.new(0,8)
     local stroke = Instance.new("UIStroke", f)
     stroke.Color = COLORS.Outline
-    stroke.Thickness = 1.3
+    stroke.Thickness = 1.15
     return f
 end
 
@@ -77,7 +77,7 @@ local function addBtnAnim(btn)
     corner.CornerRadius = UDim.new(0,8)
     btn.MouseEnter:Connect(function()
         TweenService:Create(btn, TweenInfo.new(ANIM.FadeTime, Enum.EasingStyle.Quint), {BackgroundColor3=COLORS.ButtonHover}):Play()
-        TweenService:Create(highlight, TweenInfo.new(ANIM.FadeTime, Enum.EasingStyle.Quint), {BackgroundTransparency=0.93}):Play()
+        TweenService:Create(highlight, TweenInfo.new(ANIM.FadeTime, Enum.EasingStyle.Quint), {BackgroundTransparency=0.92}):Play()
     end)
     btn.MouseLeave:Connect(function()
         TweenService:Create(btn, TweenInfo.new(ANIM.FadeTime, Enum.EasingStyle.Quint), {BackgroundColor3=COLORS.ButtonBg}):Play()
@@ -92,33 +92,29 @@ local function addBtnAnim(btn)
     btn.InputEnded:Connect(function(i)
         if i.UserInputType==Enum.UserInputType.MouseButton1 then
             TweenService:Create(btn, TweenInfo.new(ANIM.PressTime, Enum.EasingStyle.Quint), {BackgroundColor3=COLORS.ButtonHover}):Play()
-            TweenService:Create(highlight, TweenInfo.new(ANIM.PressTime, Enum.EasingStyle.Quint), {BackgroundTransparency=0.93}):Play()
+            TweenService:Create(highlight, TweenInfo.new(ANIM.PressTime, Enum.EasingStyle.Quint), {BackgroundTransparency=0.92}):Play()
         end
     end)
 end
 
--- Notification API (roblox StarterGui:SetCore fallback if possible)
+-- Notification API
 function KevinzHub:MakeNotification(opt)
-    -- opt = {Name, Content, Image, Time}
-    local isCoreNotif = false
     if pcall(function() return game:GetService("StarterGui"):SetCore("SendNotification",{}) end) then
-        isCoreNotif = true
         pcall(function()
             game:GetService("StarterGui"):SetCore("SendNotification",{
                 Title = opt.Name or "Kevinzhub",
                 Text = opt.Content or "",
                 Duration = opt.Time or 2.5,
-                Icon = opt.Image or "rbxassetid://6655732457"
+                Icon = opt.Image or "rbxassetid://77339698"
             })
         end)
     end
 
-    -- Custom notification (UI)
     if not _ui.notifFrame then
         local notifFrame = Instance.new("Frame", _ui.screenGui or PlayerGui)
         notifFrame.Name = "NotificationFrame"
         notifFrame.AnchorPoint = Vector2.new(1,0)
-        notifFrame.Position = UDim2.new(1,-32,0,50)
+        notifFrame.Position = UDim2.new(1,-30,0,52)
         notifFrame.Size = UDim2.new(0, 340, 0, 0)
         notifFrame.BackgroundTransparency = 1
         notifFrame.Visible = true
@@ -131,7 +127,7 @@ function KevinzHub:MakeNotification(opt)
     local notif = makeRoundedFrame{
         Name = "Notif",
         Parent = _ui.notifFrame,
-        Size = UDim2.new(1,0,0,56),
+        Size = UDim2.new(1,0,0,54),
         BackgroundColor3 = COLORS.NotifBg,
         LayoutOrder = os.clock()*1000
     }
@@ -142,15 +138,15 @@ function KevinzHub:MakeNotification(opt)
 
     local icon = Instance.new("ImageLabel", notif)
     icon.Name = "NotifIcon"
-    icon.Size = UDim2.new(0,28,0,28)
-    icon.Position = UDim2.new(0,12,0,14)
+    icon.Size = UDim2.new(0,24,0,24)
+    icon.Position = UDim2.new(0,14,0,15)
     icon.BackgroundTransparency = 1
-    icon.Image = opt.Image or "rbxassetid://6655732457"
+    icon.Image = opt.Image or "rbxassetid://77339698"
 
     local lbl = Instance.new("TextLabel", notif)
     lbl.Name = "NotifText"
-    lbl.Position = UDim2.new(0,50,0,2)
-    lbl.Size = UDim2.new(1,-70,1,-4)
+    lbl.Position = UDim2.new(0,48,0,3)
+    lbl.Size = UDim2.new(1,-60,1,-6)
     lbl.BackgroundTransparency = 1
     lbl.Font = Enum.Font.GothamMedium
     lbl.Text = (opt.Name and (opt.Name.."\n") or "") .. (opt.Content or "")
@@ -181,7 +177,6 @@ function KevinzHub:MakeNotification(opt)
     end)
 end
 
--- Main Window API
 function KevinzHub:MakeWindow(opt)
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "KevinzHubUI"
@@ -195,7 +190,7 @@ function KevinzHub:MakeWindow(opt)
         Parent = screenGui,
         AnchorPoint = Vector2.new(0.5,0.5),
         Position = UDim2.fromScale(0.5,0.5),
-        Size = UDim2.new(0,700,0,530),
+        Size = UDim2.new(0,720,0,540),
         BackgroundColor3 = COLORS.WindowBg,
     })
     _ui.window = window
@@ -319,7 +314,7 @@ function KevinzHub:MakeWindow(opt)
     local sidebarHolder = Instance.new("Frame", window)
     sidebarHolder.Name = "SidebarHolder"
     sidebarHolder.Position = UDim2.new(0,0,0,38)
-    sidebarHolder.Size = UDim2.new(0,186,1,-38)
+    sidebarHolder.Size = UDim2.new(0,192,1,-38)
     sidebarHolder.BackgroundTransparency = 1
     sidebarHolder.ClipsDescendants = true
 
@@ -356,29 +351,36 @@ function KevinzHub:MakeWindow(opt)
     list.Padding = UDim.new(0,8)
     list.Parent = sidebar
 
-    -- User Info (bottom, luôn hiện, headshot fix)
+    -- User Info bottom (headshot luôn hiện)
     local function renderUserInfo()
         local uf = Instance.new("Frame")
         uf.Name = "UserInfo"
         uf.BackgroundTransparency=1
         uf.AnchorPoint = Vector2.new(0,1)
-        uf.Position = UDim2.new(0,8,1,-12)
-        uf.Size = UDim2.new(1,-16,0,50)
+        uf.Position = UDim2.new(0,8,1,-18)
+        uf.Size = UDim2.new(1,-16,0,56)
         uf.Parent = sidebar
 
         local thumb = ""
-        -- Sửa: dùng hàm đồng bộ, luôn trả về thumbnail
-        local success, result = pcall(function()
-            return Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
-        end)
-        if success and typeof(result) == "string" and #result > 0 then
-            thumb = result
-        else
-            thumb = "rbxassetid://77339698" -- fallback: Roblox logo
-        end
+        local thumbReady = false
+        -- Gọi bất đồng bộ, nhưng fallback luôn là logo Roblox
         local av = Instance.new("ImageLabel", uf)
-        av.Name="Avatar"; av.Size=UDim2.new(0,48,0,48); av.Position=UDim2.new(0,0,0,0)
-        av.BackgroundTransparency=1; av.Image=thumb
+        av.Name="Avatar"; av.Size=UDim2.new(0,48,0,48); av.Position=UDim2.new(0,0,0,4)
+        av.BackgroundTransparency=1; av.Image="rbxassetid://77339698"
+        coroutine.wrap(function()
+            local id = LocalPlayer.UserId
+            local img, isReady
+            for _=1,10 do
+                img, isReady = Players:GetUserThumbnailAsync(id, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
+                if isReady and typeof(img)=="string" and #img>0 then
+                    thumb = img
+                    thumbReady = true
+                    break
+                end
+                wait(0.2)
+            end
+            if thumbReady then av.Image = thumb end
+        end)()
 
         local nm = Instance.new("TextLabel", uf)
         nm.Name="Username"; nm.Size=UDim2.new(1,-60,1,0); nm.Position=UDim2.new(0,56,0,0)
@@ -394,7 +396,7 @@ function KevinzHub:MakeWindow(opt)
     local tabContents = {}
     local tabOrder = 0
 
-    -- Dynamic sidebar scroll
+    -- Sidebar scroll
     local scrolling = 0
     local function updateSidebarScroll()
         RunService.Heartbeat:Wait()
@@ -406,7 +408,7 @@ function KevinzHub:MakeWindow(opt)
             sidebar.Position = UDim2.new(0,0,0,0)
             scrolling = 0
         end
-        userInfoFrame.Position = UDim2.new(0,8,1,-userInfoFrame.Size.Y.Offset-8)
+        userInfoFrame.Position = UDim2.new(0,8,1,-userInfoFrame.Size.Y.Offset-10)
     end
     list:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateSidebarScroll)
     sidebarHolder:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateSidebarScroll)
@@ -422,7 +424,6 @@ function KevinzHub:MakeWindow(opt)
     end)
     updateSidebarScroll()
 
-    -- Tab filter logic
     searchBar:GetPropertyChangedSignal("Text"):Connect(function()
         local query = searchBar.Text:lower()
         for tabName, tabBtn in pairs(tabs) do
@@ -446,7 +447,7 @@ function KevinzHub:MakeWindow(opt)
             tabContents[n].Visible = active
             if active then
                 tabContents[n].Position = tabContents[n].Position + UDim2.new(0,0,0,8)
-                TweenService:Create(tabContents[n], TweenInfo.new(ANIM.TabMoveTime, Enum.EasingStyle.Quint), {Position=UDim2.new(0,186,0,46)}):Play()
+                TweenService:Create(tabContents[n], TweenInfo.new(ANIM.TabMoveTime, Enum.EasingStyle.Quint), {Position=UDim2.new(0,192,0,44)}):Play()
             end
         end
     end
@@ -478,8 +479,8 @@ function KevinzHub:MakeWindow(opt)
         addBtnAnim(btn)
         local ct = makeRoundedFrame{
             Name = tabOpt.Name.."Content", Parent = window,
-            Position = UDim2.new(0,186,0,46),
-            Size = UDim2.new(1,-200,1,-60),
+            Position = UDim2.new(0,192,0,44),
+            Size = UDim2.new(1,-210,1,-62),
             BackgroundColor3 = COLORS.ContentBg,
             Visible = false
         }
@@ -492,35 +493,34 @@ function KevinzHub:MakeWindow(opt)
         end)
         if tabOrder == 1 then selectTab(tabOpt.Name) end
 
-        -- Section API
         local Tab = {}
         local sectionOrder = 0
         function Tab:AddSection(secOpt)
             sectionOrder = sectionOrder + 1
             local secFrame = makeRoundedFrame{
                 Name = secOpt.Name.."Section", Parent = ct,
-                Size = UDim2.new(1,-28,0,0),
-                Position = UDim2.new(0,14,0,16 + (sectionOrder-1)*120),
-                BackgroundColor3 = COLORS.ParagraphBg,
+                Size = UDim2.new(1,-32,0,0),
+                Position = UDim2.new(0,16,0,20 + (sectionOrder-1)*132),
+                BackgroundColor3 = COLORS.SectionBg,
             }
             secFrame.AutomaticSize = Enum.AutomaticSize.Y
             local secLbl = Instance.new("TextLabel", secFrame)
-            secLbl.Size = UDim2.new(1,0,0,28)
-            secLbl.Position = UDim2.new(0,0,0,0)
+            secLbl.Size = UDim2.new(1,-14,0,25)
+            secLbl.Position = UDim2.new(0,7,0,6)
             secLbl.BackgroundTransparency = 1
             secLbl.Font = Enum.Font.GothamBold
             secLbl.Text = secOpt.Name
-            secLbl.TextSize = 16
+            secLbl.TextSize = 15
             secLbl.TextColor3 = COLORS.LabelText
             secLbl.TextXAlignment = Enum.TextXAlignment.Left
 
             local Section = {}
-            local itemY = 34
+            local itemY = 36
             function Section:AddButton(btnOpt)
                 local btn = makeRoundedFrame{
                     Name = btnOpt.Name.."Btn", Parent = secFrame,
-                    Size = UDim2.new(0,140,0,32),
-                    Position = UDim2.new(0,10,0,itemY),
+                    Size = UDim2.new(0,145,0,32),
+                    Position = UDim2.new(0,12,0,itemY),
                     BackgroundColor3 = COLORS.ButtonBg
                 }
                 local lbl = Instance.new("TextLabel", btn)
@@ -540,17 +540,16 @@ function KevinzHub:MakeWindow(opt)
                 itemY = itemY + 40
             end
             function Section:AddSlider(slOpt)
-                -- Support WithTextbox: true
                 local labelHeight = 18
-                local sliderW = 160
+                local sliderW = 166
                 local textboxW = (slOpt.WithTextbox and 54) or 0
-                local gap = slOpt.WithTextbox and 10 or 0
+                local gap = slOpt.WithTextbox and 12 or 0
+                local labelYOffset = 7
 
-                local labelYOffset = 6
                 local lbl = Instance.new("TextLabel", secFrame)
                 lbl.Name = "SliderLabel"
                 lbl.Size = UDim2.new(0,sliderW+textboxW+gap,0,labelHeight)
-                lbl.Position = UDim2.new(0,10,0,itemY-labelHeight-labelYOffset) -- label cao hơn
+                lbl.Position = UDim2.new(0,12,0,itemY-labelHeight-labelYOffset)
                 lbl.BackgroundTransparency = 1
                 lbl.Font = Enum.Font.Gotham
                 lbl.Text = slOpt.Name
@@ -560,8 +559,8 @@ function KevinzHub:MakeWindow(opt)
 
                 local sliderBg = makeRoundedFrame{
                     Name = slOpt.Name.."Slider", Parent = secFrame,
-                    Position = UDim2.new(0,10,0,itemY),
-                    Size = UDim2.new(0,sliderW,0,12),
+                    Position = UDim2.new(0,12,0,itemY),
+                    Size = UDim2.new(0,sliderW,0,13),
                     BackgroundColor3 = COLORS.SliderTrack
                 }
                 local sliderFill = makeRoundedFrame{
@@ -573,7 +572,7 @@ function KevinzHub:MakeWindow(opt)
                 local sliderKnob = Instance.new("Frame", sliderBg)
                 sliderKnob.Name = "SliderKnob"
                 sliderKnob.Size = UDim2.new(0,18,0,18)
-                sliderKnob.Position = UDim2.new(0,0,0,-3)
+                sliderKnob.Position = UDim2.new(0,0,0,-2)
                 sliderKnob.BackgroundColor3 = COLORS.SliderKnob
                 sliderKnob.BorderSizePixel = 0
                 local corner = Instance.new("UICorner", sliderKnob)
@@ -585,7 +584,7 @@ function KevinzHub:MakeWindow(opt)
                     val = v
                     local percent = (v-slOpt.Min)/(slOpt.Max-slOpt.Min)
                     sliderFill.Size = UDim2.new(0, percent*sliderBg.Size.X.Offset, 1, 0)
-                    sliderKnob.Position = UDim2.new(0, percent*sliderBg.Size.X.Offset-9, 0, -3)
+                    sliderKnob.Position = UDim2.new(0, percent*sliderBg.Size.X.Offset-9, 0, -2)
                     if updateTextbox and slOpt.WithTextbox and textbox then
                         textbox.Text = tostring(math.floor(v))
                     end
@@ -618,13 +617,12 @@ function KevinzHub:MakeWindow(opt)
                     end
                 end)
 
-                -- TextBox support
                 local textbox
                 if slOpt.WithTextbox then
                     textbox = Instance.new("TextBox", secFrame)
-                    textbox.Size = UDim2.new(0,textboxW,0,labelHeight+10)
-                    textbox.Position = UDim2.new(0,10+sliderW+gap,0,itemY-3)
-                    textbox.BackgroundColor3 = COLORS.TextboxBg -- Đổi thành (66,68,79)
+                    textbox.Size = UDim2.new(0,textboxW,0,labelHeight+11)
+                    textbox.Position = UDim2.new(0,12+sliderW+gap,0,itemY-2)
+                    textbox.BackgroundColor3 = COLORS.TextboxBg
                     textbox.TextColor3 = COLORS.LabelText
                     textbox.Font = Enum.Font.Gotham
                     textbox.TextSize = 14
@@ -642,14 +640,14 @@ function KevinzHub:MakeWindow(opt)
                     end)
                 end
 
-                itemY = itemY + labelHeight+22
+                itemY = itemY + labelHeight+24
             end
 
             function Section:AddToggle(opt)
                 local toggleW, toggleH = 48, 24
                 local toggleBg = makeRoundedFrame{
                     Name = opt.Name.."ToggleBG", Parent = secFrame,
-                    Position = UDim2.new(0,10,0,itemY),
+                    Position = UDim2.new(0,12,0,itemY),
                     Size = UDim2.new(0,toggleW,0,toggleH),
                     BackgroundColor3 = COLORS.ToggleBg
                 }
@@ -683,7 +681,7 @@ function KevinzHub:MakeWindow(opt)
                 end)
                 local toggleLbl = Instance.new("TextLabel", secFrame)
                 toggleLbl.Name = "ToggleLabel"
-                toggleLbl.Position = UDim2.new(0,10+toggleW+12,0,itemY)
+                toggleLbl.Position = UDim2.new(0,12+toggleW+14,0,itemY)
                 toggleLbl.Size = UDim2.new(0,180,0,toggleH)
                 toggleLbl.BackgroundTransparency = 1
                 toggleLbl.Font = Enum.Font.Gotham
@@ -692,7 +690,7 @@ function KevinzHub:MakeWindow(opt)
                 toggleLbl.TextColor3 = COLORS.LabelText
                 toggleLbl.TextXAlignment = Enum.TextXAlignment.Left
 
-                itemY = itemY + toggleH + 10
+                itemY = itemY + toggleH + 12
             end
 
             return Section
