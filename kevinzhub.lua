@@ -49,6 +49,7 @@ local ANIM = {
 }
 
 local CLICK_SOUND_ID = "rbxassetid://535716488"
+local KEVINZHUB_VERSION = "1.2.3" -- <-- Version NÀY LÀ CỐ ĐỊNH, CHỈ THAY ĐỔI ĐƯỢC BÊN TRONG LIB
 
 local KevinzHub = {}
 local _ui = {}
@@ -222,7 +223,7 @@ function KevinzHub:MakeWindow(opt)
     icon.Size = UDim2.new(0,26,0,26)
     icon.Position = UDim2.new(0,13,0.5,-13)
     icon.BackgroundTransparency = 1
-    icon.Image = "rbxassetid://9158926514" -- logo KevinzHub
+    icon.Image = "rbxassetid://9158926514"
 
     local titleLabel = Instance.new("TextLabel", topBar)
     titleLabel.Name = "Title"
@@ -236,58 +237,18 @@ function KevinzHub:MakeWindow(opt)
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
     titleLabel.TextYAlignment = Enum.TextYAlignment.Center
 
-    -- Version Rectangle with Shiny Glow & Shadow
-    local versionFrame = Instance.new("Frame")
-    versionFrame.Name = "VersionFrame"
-    versionFrame.Parent = topBar
-    versionFrame.BackgroundColor3 = Color3.fromRGB(255, 235, 80)
-    versionFrame.Position = UDim2.new(0, titleLabel.Position.X.Offset + 0, 0.5, -11)
-    versionFrame.Size = UDim2.new(0, 38, 0, 22)
-    versionFrame.AnchorPoint = Vector2.new(0, 0)
-    versionFrame.BorderSizePixel = 0
-    versionFrame.BackgroundTransparency = 0
-    versionFrame.ZIndex = titleLabel.ZIndex
-
-    local versionCorner = Instance.new("UICorner", versionFrame)
-    versionCorner.CornerRadius = UDim.new(0, 6)
-
-    local versionStroke = Instance.new("UIStroke", versionFrame)
-    versionStroke.Thickness = 2.2
-    versionStroke.Color = Color3.fromRGB(255, 255, 140)
-    versionStroke.Transparency = 0.2
-
-    local versionGlow = Instance.new("UIStroke", versionFrame)
-    versionGlow.Thickness = 7
-    versionGlow.Color = Color3.fromRGB(255, 255, 120)
-    versionGlow.Transparency = 0.7
-    versionGlow.ApplyStrokeMode = Enum.ApplyStrokeMode.Outer
-
-    -- Shadow/Chiều sâu cho versionFrame
-    local versionShadow = Instance.new("ImageLabel", versionFrame)
-    versionShadow.Name = "Shadow"
-    versionShadow.BackgroundTransparency = 1
-    versionShadow.Image = "rbxassetid://13160452133"
-    versionShadow.Size = UDim2.new(1, 14, 1, 14)
-    versionShadow.Position = UDim2.new(0, -7, 0, -7)
-    versionShadow.ZIndex = versionFrame.ZIndex - 1
-    versionShadow.ImageColor3 = Color3.fromRGB(220, 180, 25)
-    versionShadow.ImageTransparency = 0.36
-
-    local versionLabel = Instance.new("TextLabel", versionFrame)
-    versionLabel.Size = UDim2.new(1, 0, 1, 0)
+    -- Version label (luôn lấy từ KEVINZHUB_VERSION, không lấy từ opt.Version)
+    local versionLabel = Instance.new("TextLabel", topBar)
+    versionLabel.Name = "Version"
+    versionLabel.AnchorPoint = Vector2.new(0, 0.5)
+    versionLabel.Position = UDim2.new(0, 170, 0.5, 0) -- Căn lại nếu cần cho đẹp
     versionLabel.BackgroundTransparency = 1
-    versionLabel.Text = "v1"
-    versionLabel.Font = Enum.Font.GothamBold
-    versionLabel.TextColor3 = Color3.fromRGB(255, 255, 200)
-    versionLabel.TextStrokeTransparency = 0.3
-    versionLabel.TextSize = 15
-    versionLabel.TextXAlignment = Enum.TextXAlignment.Center
+    versionLabel.Font = Enum.Font.Gotham
+    versionLabel.Text = "v"..KEVINZHUB_VERSION
+    versionLabel.TextSize = 13
+    versionLabel.TextColor3 = Color3.fromRGB(180, 200, 180)
+    versionLabel.TextXAlignment = Enum.TextXAlignment.Left
     versionLabel.TextYAlignment = Enum.TextYAlignment.Center
-
-    task.defer(function()
-        RunService.RenderStepped:Wait()
-        versionFrame.Position = UDim2.new(0, titleLabel.Position.X.Offset + titleLabel.TextBounds.X + 9, 0.5, -11)
-    end)
 
     local btnMin = makeRoundedFrame{
         Name = "MinimizeButton", Parent = topBar,
@@ -336,7 +297,7 @@ function KevinzHub:MakeWindow(opt)
                 Position = UDim2.new(0,18,0,18),
                 BackgroundColor3 = COLORS.ButtonBg
             }
-            -- Restore icon là image
+            -- Sử dụng ImageLabel với asset id "1912438810" thay vì dấu "X"
             local rbl = Instance.new("ImageLabel", rb)
             rbl.Size = UDim2.fromScale(1,1)
             rbl.BackgroundTransparency = 1
