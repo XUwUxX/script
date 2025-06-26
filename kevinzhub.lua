@@ -145,6 +145,50 @@ local function getWindowSize()
     return w, h
 end
 
+-- AddTextbox method for Section
+local function addTextboxToSection(secFrame, itemOrder, opt)
+    local container = Instance.new("Frame", secFrame)
+    container.Name = (opt.Name or "Textbox").."Container"
+    container.Size = UDim2.new(1, 0, 0, 36)
+    container.BackgroundTransparency = 1
+    container.LayoutOrder = itemOrder
+
+    local lbl = Instance.new("TextLabel", container)
+    lbl.Name = "TextboxLabel"
+    lbl.Size = UDim2.new(0, 90, 1, 0)
+    lbl.Position = UDim2.new(0, 0, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Font = Enum.Font.Gotham
+    lbl.Text = opt.Name or "Textbox"
+    lbl.TextSize = 13
+    lbl.TextColor3 = COLORS.LabelText
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    local textbox = Instance.new("TextBox", container)
+    textbox.Name = "Textbox"
+    textbox.Size = UDim2.new(0, 120, 0, 28)
+    textbox.Position = UDim2.new(0, 100, 0.5, -14)
+    textbox.BackgroundColor3 = COLORS.TextboxBg
+    textbox.TextColor3 = COLORS.LabelText
+    textbox.Font = Enum.Font.Gotham
+    textbox.TextSize = 13
+    textbox.Text = opt.Default or ""
+    textbox.ClearTextOnFocus = true
+    textbox.PlaceholderText = opt.PlaceholderText or ""
+    textbox.TextXAlignment = Enum.TextXAlignment.Left
+    textbox.BorderSizePixel = 0
+    local corner = Instance.new("UICorner", textbox)
+    corner.CornerRadius = UDim.new(0, 6)
+
+    textbox.FocusLost:Connect(function(enter)
+        if enter and opt.Callback then
+            playClickSound(textbox)
+            opt.Callback(textbox.Text)
+        end
+    end)
+    return container
+end
+
 function KevinzHub:MakeWindow(opt)
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "KevinzHubUI"
@@ -253,7 +297,6 @@ function KevinzHub:MakeWindow(opt)
     RunService.RenderStepped:Connect(updateVersionBadge)
     task.defer(updateVersionBadge)
 
-    -- Min/Close (mobile: TouchTap & InputBegan)
     local function buttonInput(btn, callback)
         btn.InputBegan:Connect(function(i)
             if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
@@ -298,10 +341,8 @@ function KevinzHub:MakeWindow(opt)
     btnCloseLbl.TextXAlignment = Enum.TextXAlignment.Center
     btnCloseLbl.TextYAlignment = Enum.TextYAlignment.Center
     addBtnAnim(btnClose); addBtnAnim(btnMin)
-    buttonInput(btnClose, function()
-        playClickSound(btnClose)
-        KevinzHub:Destroy()
-    end)
+
+    -- Minimize window and show dragable restore button
     buttonInput(btnMin, function()
         playClickSound(btnMin)
         window.Visible = false
@@ -318,10 +359,39 @@ function KevinzHub:MakeWindow(opt)
         rbl.ImageColor3 = COLORS.LabelText
         rbl.ScaleType = Enum.ScaleType.Fit
         addBtnAnim(rb)
+        
+        -- Make restore button draggable
+        local dragging, dragInput, startPos, dragStart
+        rb.InputBegan:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                dragStart = i.Position
+                startPos = rb.Position
+                dragInput = i
+            end
+        end)
+        rb.InputEnded:Connect(function(i)
+            if i == dragInput then dragging = false end
+        end)
+        rb.InputChanged:Connect(function(i)
+            if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+                local delta = i.Position - dragStart
+                rb.Position = UDim2.new(
+                    startPos.X.Scale, startPos.X.Offset + delta.X,
+                    startPos.Y.Scale, startPos.Y.Offset + delta.Y
+                )
+            end
+        end)
+
         buttonInput(rb, function()
             playClickSound(rb)
-            window.Visible=true; rb:Destroy()
+            window.Visible = true
+            rb:Destroy()
         end)
+    end)
+    buttonInput(btnClose, function()
+        playClickSound(btnClose)
+        KevinzHub:Destroy()
     end)
 
     -- Drag logic (all window, both mouse & touch)
@@ -591,6 +661,11 @@ function KevinzHub:MakeWindow(opt)
                 if UserInputService.TouchEnabled then
                     btn.TouchTap:Connect(btnCallback)
                 end
+                itemOrder = itemOrder + 1
+            end
+
+            function Section:AddTextbox(opt)
+                addTextboxToSection(secFrame, itemOrder, opt)
                 itemOrder = itemOrder + 1
             end
 
