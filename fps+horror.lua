@@ -29,7 +29,7 @@ end)
 
 -- 1b. Haunted / dark atmosphere
 pcall(function()
-    Lighting.Brightness       = 0.1
+    Lighting.Brightness       = 2
     Lighting.Ambient          = Color3.fromRGB(10, 10, 15)
     Lighting.OutdoorAmbient   = Color3.fromRGB(5, 5, 10)
     Lighting.FogColor         = Color3.fromRGB(15, 15, 20)
