@@ -1,13 +1,14 @@
 -- LocalScript (đặt trong StarterPlayerScripts)
-local Players          = game:GetService("Players")
-local Debris           = game:GetService("Debris")
-local player           = Players.LocalPlayer
-local camera           = workspace.CurrentCamera
+local Players  = game:GetService("Players")
+local Debris   = game:GetService("Debris")
 
--- Khi character load xong, tạo GUI
+local player   = Players.LocalPlayer
+local camera   = workspace.CurrentCamera
+
+-- Hàm tạo GUI
 local function makeGUI()
-    -- dọn nếu GUI cũ còn sót
-    local old = player:FindFirstChild("PlayerGui"):FindFirstChild("SelfFlingGUI")
+    -- Xoá GUI cũ nếu có
+    local old = player.PlayerGui:FindFirstChild("SelfFlingGUI")
     if old then old:Destroy() end
 
     -- ScreenGui
@@ -15,100 +16,149 @@ local function makeGUI()
     screenGui.Name   = "SelfFlingGUI"
     screenGui.Parent = player.PlayerGui
 
-    -- Frame
-    local frame = Instance.new("Frame", screenGui)
-    frame.Size              = UDim2.new(0, 200, 0, 140)
-    frame.Position          = UDim2.new(0.8, 0, 0.3, 0)
-    frame.BackgroundColor3  = Color3.fromRGB(30, 30, 30)
-    frame.BackgroundTransparency = 0.2
-    frame.BorderSizePixel   = 0
+    -- Main Frame
+    local frame = Instance.new("Frame")
+    frame.Name               = "Container"
+    frame.Size               = UDim2.new(0, 240, 0, 180)
+    frame.Position           = UDim2.new(0.75, 0, 0.25, 0)
+    frame.BackgroundColor3   = Color3.fromRGB(20, 20, 20)
+    frame.BorderSizePixel    = 0
+    frame.Active             = true
+    frame.Draggable          = true
+    frame.Parent             = screenGui
 
-    -- GIẢN LƯỢC drag bằng Draggable
-    frame.Active    = true
-    frame.Draggable = true
+    -- Bo góc + Stroke
+    local uiCorner = Instance.new("UICorner", frame)
+    uiCorner.CornerRadius    = UDim.new(0, 12)
+    Instance.new("UIStroke", frame).Thickness = 1
 
-    -- Move & Close không còn cần logic drag/close
+    -- Title
+    local title = Instance.new("TextLabel", frame)
+    title.Text               = "🚀 Self‑Fling"
+    title.Font               = Enum.Font.GothamBold
+    title.TextSize           = 18
+    title.TextColor3         = Color3.fromRGB(235,235,235)
+    title.BackgroundTransparency = 1
+    title.Size               = UDim2.new(1, 0, 0, 36)
+
+    -- Close Button
     local btnClose = Instance.new("TextButton", frame)
-    btnClose.Text           = "Close"
-    btnClose.Size           = UDim2.new(0, 80, 0, 25)
-    btnClose.Position       = UDim2.new(0.55, 0, 0, 5)
-    btnClose.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    btnClose.TextColor3       = Color3.new(1,1,1)
-    btnClose.BorderSizePixel  = 0
-    btnClose.MouseButton1Click:Connect(function()
-        screenGui:Destroy()
-    end)
+    btnClose.Text             = "✕"
+    btnClose.Font             = Enum.Font.GothamBold
+    btnClose.TextSize         = 18
+    btnClose.Size             = UDim2.new(0, 36, 0, 36)
+    btnClose.Position         = UDim2.new(1, -40, 0, 0)
+    btnClose.BackgroundTransparency = 1
+    btnClose.TextColor3       = Color3.fromRGB(180,180,180)
+    btnClose.Parent           = frame
+    btnClose.MouseButton1Click:Connect(function() screenGui:Destroy() end)
 
-    -- Fling button
-    local btnFling = Instance.new("TextButton", frame)
-    btnFling.Text            = "Fling!"
-    btnFling.Size            = UDim2.new(1, -10, 0, 40)
-    btnFling.Position        = UDim2.new(0, 5, 0, 40)
-    btnFling.BackgroundColor3= Color3.fromRGB(100, 0, 0)
-    btnFling.TextColor3      = Color3.new(1,1,1)
-    btnFling.BorderSizePixel = 0
+    -- Content Holder
+    local content = Instance.new("Frame", frame)
+    content.Size               = UDim2.new(1, -20, 1, -56)
+    content.Position           = UDim2.new(0, 10, 0, 46)
+    content.BackgroundTransparency = 1
+    Instance.new("UIListLayout", content).Padding = UDim.new(0, 12)
 
-    -- Strength textbox
-    local txtStrength = Instance.new("TextBox", frame)
-    txtStrength.PlaceholderText = "Strength"
+    -- Strength Box
+    local txtStrength = Instance.new("TextBox", content)
+    txtStrength.Name            = "StrengthBox"
+    txtStrength.PlaceholderText = "200"
     txtStrength.Text            = "200"
-    txtStrength.Size            = UDim2.new(1, -10, 0, 25)
-    txtStrength.Position        = UDim2.new(0, 5, 0, 90)
-    txtStrength.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    txtStrength.TextColor3       = Color3.new(1,1,1)
-    txtStrength.BorderSizePixel  = 0
+    txtStrength.Font            = Enum.Font.Gotham
+    txtStrength.TextSize        = 16
+    txtStrength.TextColor3      = Color3.fromRGB(230,230,230)
+    txtStrength.BackgroundColor3 = Color3.fromRGB(30,30,30)
+    txtStrength.Size            = UDim2.new(1, 0, 0, 32)
     txtStrength.ClearTextOnFocus = false
+    local tbCorner = Instance.new("UICorner", txtStrength)
+    tbCorner.CornerRadius       = UDim.new(0, 8)
+    Instance.new("UIStroke", txtStrength).Thickness = 1
 
-    -- Xử lý Self‑Fling
+    -- Fling Button
+    local btnFling = Instance.new("TextButton", content)
+    btnFling.Name            = "FlingButton"
+    btnFling.Text            = "FLING!"
+    btnFling.Font            = Enum.Font.GothamBold
+    btnFling.TextSize        = 18
+    btnFling.TextColor3      = Color3.fromRGB(255,255,255)
+    btnFling.BackgroundColor3 = Color3.fromRGB(180,30,30)
+    btnFling.AutoButtonColor = false
+    btnFling.Size            = UDim2.new(1, 0, 0, 40)
+    local fbCorner = Instance.new("UICorner", btnFling)
+    fbCorner.CornerRadius     = UDim.new(0, 8)
+    local fbStroke = Instance.new("UIStroke", btnFling)
+    fbStroke.Thickness        = 1
+    fbStroke.Color            = Color3.fromRGB(120,0,0)
+    local fbGrad   = Instance.new("UIGradient", btnFling)
+    fbGrad.Color               = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(200,50,50)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(150,20,20)),
+    })
+
+    -- Lưu giá trị gốc để revert
+    local defaultText  = btnFling.Text
+    local defaultColor = btnFling.BackgroundColor3
+
+    -- Fling logic với hiệu ứng nút
     btnFling.MouseButton1Click:Connect(function()
+        -- Đổi icon + màu xanh
+        btnFling.Text            = "🚀"
+        btnFling.BackgroundColor3 = Color3.fromRGB(50,200,50)
+
+        -- Self‑fling
         local char = player.Character
-        if not char then return end
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        local humanoid = char:FindFirstChildOfClass("Humanoid")
-        if not hrp or not humanoid then return end
+        if char then
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hrp and hum then
+                hum.PlatformStand = true
 
-        -- bật ragdoll
-        humanoid.PlatformStand = true
+                local strength    = tonumber(txtStrength.Text) or 200
+                local horizFactor = 0.4
+                local upForce     = strength
+                local duration    = 0.3
 
-        -- đọc strength
-        local strength = tonumber(txtStrength.Text) or 200
-        local horizFactor = 0.4  -- tỉ lệ lực ngang
-        local upForce     = strength
+                local sign          = (math.random()<0.5 and -1) or 1
+                local horizontalDir = camera.CFrame.RightVector * strength * horizFactor * sign
+                local verticalDir   = Vector3.new(0, upForce, 0)
+                local flingVector   = horizontalDir + verticalDir
 
-        -- lực ngang: trái/phải ngẫu nhiên
-        local sign = (math.random() < 0.5) and -1 or 1
-        local horizontalDir = camera.CFrame.RightVector * strength * horizFactor * sign
-        local verticalDir   = Vector3.new(0, upForce, 0)
-        local flingVector   = horizontalDir + verticalDir
+                local bv = Instance.new("BodyVelocity")
+                bv.MaxForce = Vector3.new(1e5,1e5,1e5)
+                bv.Velocity = flingVector
+                bv.Parent   = hrp
 
-        -- BodyVelocity
-        local bv = Instance.new("BodyVelocity")
-        bv.MaxForce = Vector3.new(1e5,1e5,1e5)
-        bv.Velocity = flingVector
-        bv.Parent   = hrp
+                local bav = Instance.new("BodyAngularVelocity")
+                bav.MaxTorque       = Vector3.new(1e5,1e5,1e5)
+                bav.AngularVelocity = Vector3.new(
+                    math.random(-8,8),
+                    math.random(-8,8),
+                    math.random(-8,8)
+                )
+                bav.Parent = hrp
 
-        -- BodyAngularVelocity để xoay tít
-        local bav = Instance.new("BodyAngularVelocity")
-        bav.MaxTorque       = Vector3.new(1e5,1e5,1e5)
-        bav.AngularVelocity = Vector3.new(
-            math.random(-10,10),
-            math.random(-10,10),
-            math.random(-10,10)
-        )
-        bav.Parent = hrp
-
-        -- dọn dẹp và trả humanoid về bình thường
-        delay(0.3, function()
-            bv:Destroy()
-            bav:Destroy()
-            if humanoid and humanoid.Parent then
-                humanoid.PlatformStand = false
+                -- Sau khi xong, revert lại nút và reset trạng thái
+                delay(duration, function()
+                    bv:Destroy()
+                    bav:Destroy()
+                    if hum and hum.Parent then hum.PlatformStand = false end
+                    btnFling.Text            = defaultText
+                    btnFling.BackgroundColor3 = defaultColor
+                end)
+            else
+                -- nếu thiếu HRP/Humanoid thì vẫn revert nút
+                btnFling.Text            = defaultText
+                btnFling.BackgroundColor3 = defaultColor
             end
-        end)
+        else
+            btnFling.Text            = defaultText
+            btnFling.BackgroundColor3 = defaultColor
+        end
     end)
 end
 
--- Khi respawn hoặc lần đầu, gọi makeGUI
+-- Gọi khi respawn / lần đầu
 player.CharacterAdded:Connect(makeGUI)
 if player.Character then
     makeGUI()
