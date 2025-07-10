@@ -1,234 +1,82 @@
--- StarterPlayerScripts/AutoPerfAndFix.lua
-local CollectionService = game:GetService("CollectionService")
-local Lighting          = game:GetService("Lighting")
-local Workspace         = game:GetService("Workspace")
-local RunService        = game:GetService("RunService")
-local UserInput         = game:GetService("UserInputService")
+-- LocalScript (đặt trong ScreenGui của bạn)
 local Players           = game:GetService("Players")
-local LogService        = game:GetService("LogService")
-local SoundService      = game:GetService("SoundService")
+local UserInputService = game:GetService("UserInputService")
+local Debris            = game:GetService("Debris")
 
-local player = Players.LocalPlayer
+local player  = Players.LocalPlayer
+local camera  = workspace.CurrentCamera
 
--- Tag names
-local TAG_EFFECT   = "__OptEff"
-local TAG_OBJ      = "__OptObj"
-local TAG_COLLIDER = "__OptColl"
+-- Tạo UI (nếu bạn đã có sẵn thì skip phần này và bind vào các nút có trong GUI của bạn)
+local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+screenGui.Name = "SelfFlingGUI"
 
--- 0. Clear console log (if supported)
-pcall(function() LogService:Clear() end)
+local frame = Instance.new("Frame", screenGui)
+frame.Size = UDim2.new(0,200,0,140)
+frame.Position = UDim2.new(0.8,0,0.3,0)
+frame.BackgroundTransparency = 0.5
 
--- 1. Disable global shadows, fog and environment scales
-pcall(function()
-    Lighting.GlobalShadows            = false
-    Lighting.FogStart                 = 0
-    Lighting.FogEnd                   = 0
-    Lighting.EnvironmentDiffuseScale  = 0
-    Lighting.EnvironmentSpecularScale = 0
-end)
+local btnMove = Instance.new("TextButton", frame)
+btnMove.Text = "Move"; btnMove.Size = UDim2.new(0,80,0,25)
+btnMove.Position = UDim2.new(0.05,0,0,5)
 
--- 1b. Haunted / dark atmosphere
-pcall(function()
-    Lighting.Brightness       = 2
-    Lighting.Ambient          = Color3.fromRGB(10, 10, 15)
-    Lighting.OutdoorAmbient   = Color3.fromRGB(5, 5, 10)
-    Lighting.FogColor         = Color3.fromRGB(15, 15, 20)
-    Lighting.FogStart         = 2
-    Lighting.FogEnd           = 100
-    Lighting.GlobalShadows    = true
-    -- Add haunted skybox
-    local sky = Instance.new("Sky")
-    sky.Name   = "__HauntedSky"
-    local skyId = "rbxassetid://393891820"
-    sky.SkyboxBk = skyId
-    sky.SkyboxDn = skyId
-    sky.SkyboxFt = skyId
-    sky.SkyboxLf = skyId
-    sky.SkyboxRt = skyId
-    sky.SkyboxUp = skyId
-    sky.Parent = Lighting
-end)
+local btnClose = Instance.new("TextButton", frame)
+btnClose.Text = "Close"; btnClose.Size = UDim2.new(0,80,0,25)
+btnClose.Position = UDim2.new(0.55,0,0,5)
 
--- 2. Disable water waves on Terrain
-pcall(function()
-    local t = Workspace:FindFirstChildOfClass("Terrain")
-    if t then
-        t.WaterWaveSize  = 0
-        t.WaterWaveSpeed = 0
-    end
-end)
+local btnFling = Instance.new("TextButton", frame)
+btnFling.Text = "Fling!"; btnFling.Size = UDim2.new(1,-10,0,40)
+btnFling.Position = UDim2.new(0,5,0,40)
 
--- 3. Mute all sounds
-pcall(function() SoundService.Volume = 0 end)
+local txtStrength = Instance.new("TextBox", frame)
+txtStrength.PlaceholderText = "Strength"
+txtStrength.Text = "200"
+txtStrength.Size = UDim2.new(1,-10,0,25)
+txtStrength.Position = UDim2.new(0,5,0,90)
+txtStrength.ClearTextOnFocus = false
 
--- 4. Reduce mesh draw distance
-pcall(function() settings().Rendering.MeshPartDrawDistance = 0 end)
-
--- 5. Degrade high‑quality meshes & appearances
-local function degradeHighQuality(v)
-    if CollectionService:HasTag(v, TAG_OBJ) then return end
-    if v:IsA("SpecialMesh") then
-        pcall(function()
-            v.Scale    = Vector3.new(0.1, 0.1, 0.1)
-            v.MeshType = Enum.MeshType.Brick
-        end)
-        CollectionService:AddTag(v, TAG_OBJ)
-    elseif v:IsA("SurfaceAppearance") then
-        pcall(function()
-            v.ColorMap  = nil
-            v.NormalMap = nil
-        end)
-        CollectionService:AddTag(v, TAG_OBJ)
-    elseif v:IsA("UnionOperation") then
-        pcall(function()
-            v.Material    = Enum.Material.Plastic
-            v.Reflectance = 0
-        end)
-        CollectionService:AddTag(v, TAG_OBJ)
-    end
-end
-
--- 6. Disable post‑processing effects
-local disableFX = {
-    "BlurEffect", "SunRaysEffect", "ColorCorrectionEffect",
-    "BloomEffect", "DepthOfFieldEffect"
-}
-local function optimizeEffect(e)
-    if CollectionService:HasTag(e, TAG_EFFECT) then return end
-    for _, cls in ipairs(disableFX) do
-        if e:IsA(cls) then
-            e.Enabled = false
-            CollectionService:AddTag(e, TAG_EFFECT)
-            return
+-- Cho phép kéo Frame
+btnMove.MouseButton1Down:Connect(function()
+    local startMouse = UserInputService:GetMouseLocation()
+    local startPos   = frame.Position
+    local conn
+    conn = UserInputService.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = UserInputService:GetMouseLocation() - startMouse
+            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
+                                       startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         end
-    end
-end
-
--- 7. Optimize parts, decals, particles (skip RenderFidelity)
-local function optimizeObj(v)
-    if CollectionService:HasTag(v, TAG_OBJ) then return end
-
-    -- skip SolidModel entirely
-    if v.ClassName == "SolidModel" then
-        CollectionService:AddTag(v, TAG_OBJ)
-        return
-    end
-
-    local ok
-    if v:IsA("MeshPart") then
-        ok = pcall(function()
-            v.CastShadow   = false
-            v.CanQuery     = false
-            v.CanCollide   = false
-        end)
-    elseif v:IsA("BasePart") then
-        ok = pcall(function()
-            v.Material    = Enum.Material.Plastic
-            v.Reflectance = 0
-            v.CastShadow  = false
-            v.CanQuery    = false
-        end)
-    elseif v:IsA("Decal") or v:IsA("Texture") then
-        ok = pcall(function() v.Transparency = 1 end)
-    elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
-        ok = pcall(function() v.Enabled = false end)
-    end
-
-    if ok then
-        CollectionService:AddTag(v, TAG_OBJ)
-    end
-end
-
--- 8. Set initial QualityLevel and hook attribute for toggling
-pcall(function()
-    settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
-end)
-player:GetAttributeChangedSignal("AutoPerfEnabled"):Connect(function()
-    local on = player:GetAttribute("AutoPerfEnabled")
-    pcall(function()
-        settings().Rendering.QualityLevel = on and Enum.QualityLevel.Level01 or Enum.QualityLevel.Automatic
     end)
+    UserInputService.InputEnded:Wait()
+    conn:Disconnect()
 end)
 
--- 9. Apply optimizations on existing and new descendants
-for _, e in ipairs(Lighting:GetDescendants()) do
-    optimizeEffect(e)
-end
-Lighting.DescendantAdded:Connect(optimizeEffect)
-
-for _, v in ipairs(Workspace:GetDescendants()) do
-    optimizeObj(v)
-    degradeHighQuality(v)
-end
-Workspace.DescendantAdded:Connect(function(v)
-    optimizeObj(v)
-    degradeHighQuality(v)
+-- Close GUI
+btnClose.MouseButton1Click:Connect(function()
+    screenGui:Destroy()
 end)
 
--- 10. Focus‑based rendering/FPS cap
-local function hasFocus()
-    local ok, res = pcall(function() return UserInput:IsWindowFocused() end)
-    return ok and res or true
-end
-local function disableRender()
-    RunService:Set3dRenderingEnabled(false)
-    pcall(setfpscap, 10)
-end
-local function enableRender()
-    RunService:Set3dRenderingEnabled(true)
-    pcall(setfpscap, 0)
-end
+-- Self‑fling khi bấm nút
+btnFling.MouseButton1Click:Connect(function()
+    local char = player.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
 
-UserInput.WindowFocusReleased:Connect(disableRender)
-UserInput.WindowFocused:Connect(enableRender)
-if hasFocus() then enableRender() else disableRender() end
+    -- Lấy strength từ textbox, fallback = 200
+    local strength = tonumber(txtStrength.Text) or 200
+    local upForce   = strength * 0.5      -- lực nâng thêm
+    local duration  = 0.2                 -- duy trì BodyVelocity (giây)
 
--- 11. Prevent thin‑object clipping with hidden colliders
-local RAY_LENGTH = 5
-local function protectThin(item)
-    if not (item:IsA("BasePart") and item.Size.Y < 0.5) then return end
-    if CollectionService:HasTag(item, TAG_COLLIDER) then return end
-    CollectionService:AddTag(item, TAG_COLLIDER)
+    -- Tính vector đẩy theo hướng camera + nâng lên
+    local dir   = camera.CFrame.LookVector
+    local force = dir * strength + Vector3.new(0, upForce, 0)
 
-    local collider = Instance.new("Part")
-    collider.Name         = "__Collider"
-    collider.Size         = Vector3.new(item.Size.X, 0.3, item.Size.Z)
-    collider.Transparency = 1
-    collider.CanCollide   = true
-    collider.CanTouch     = false
-    collider.Massless     = true
-    collider.Anchored     = false
-    collider.CFrame       = item.CFrame
-    collider.Parent       = Workspace
-    collider:SetNetworkOwner(nil)
+    -- Gắn BodyVelocity
+    local bv = Instance.new("BodyVelocity")
+    bv.MaxForce = Vector3.new(1e5,1e5,1e5)
+    bv.Velocity = force
+    bv.Parent   = hrp
 
-    local weld = Instance.new("WeldConstraint", collider)
-    weld.Part0, weld.Part1 = collider, item
-
-    item.AncestryChanged:Connect(function(_, parent)
-        if not parent then collider:Destroy() end
-    end)
-
-    local lastTime, lastVel = 0, Vector3.new()
-    item:GetPropertyChangedSignal("AssemblyLinearVelocity"):Connect(function()
-        local now = time()
-        if now - lastTime < 0.2 then return end
-        lastTime = now
-
-        local vel = item.AssemblyLinearVelocity
-        if lastVel.Magnitude > 2 and vel.Magnitude < 0.5 then
-            local result = Workspace:Raycast(
-                item.Position,
-                Vector3.new(0, -(RAY_LENGTH + item.Size.Y / 2), 0)
-            )
-            if result and result.Position then
-                item.CFrame = CFrame.new(result.Position + Vector3.new(0, item.Size.Y / 2, 0))
-                item.AssemblyLinearVelocity = Vector3.zero
-            end
-        end
-        lastVel = vel
-    end)
-end
-
-for _, v in ipairs(Workspace:GetDescendants()) do protectThin(v) end
-Workspace.DescendantAdded:Connect(protectThin)
+    -- Tự hủy sau duration
+    Debris:AddItem(bv, duration)
+end)
