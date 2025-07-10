@@ -1,168 +1,179 @@
--- StarterPlayerScripts/AutoPerfAndFireEffect.lua
-
 local Players = game:GetService("Players")
-local Lighting = game:GetService("Lighting")
-local Workspace = game:GetService("Workspace")
-local CollectionService = game:GetService("CollectionService")
 local RunService = game:GetService("RunService")
-local UserInput = game:GetService("UserInputService")
-local SoundService = game:GetService("SoundService")
+local Workspace = game:GetService("Workspace")
+local StarterGui = game:GetService("StarterGui")
 
 local player = Players.LocalPlayer
+local camera = Workspace.CurrentCamera
+local mouse = player:GetMouse()
 
--- 1. Cài đặt ánh sáng hoàng hôn sáng vừa đủ
-pcall(function()
-    Lighting.GlobalShadows = true
-    Lighting.Brightness = 2
-    Lighting.ClockTime = 18.5
-    Lighting.EnvironmentDiffuseScale = 0.2
-    Lighting.EnvironmentSpecularScale = 0.2
-    Lighting.FogStart = 100
-    Lighting.FogEnd = 1000
-    Lighting.FogColor = Color3.fromRGB(255, 170, 127)
-    Lighting.Ambient = Color3.fromRGB(255, 150, 120)
-    Lighting.OutdoorAmbient = Color3.fromRGB(255, 120, 90)
+local MAX_DIST = 120
+local BULLET_SPEED = 850
+local OVERPREDICT = 1.85
+local ALPHA = 0.55
+local MIN_SMOOTH = 0.2
+local MAX_SMOOTH = 0.8
+local ANGLE_SNAP = 3
+local VEL_Y_THRESHOLD = 1.5
+local CLOSE_DIST = 8
+local CROSSHAIR_WEIGHT = 0.6
+local FOV_LIMIT_DEG = 60
+local SWITCH_DELAY = 0.1
 
-    -- Xoá Sky cũ và Atmosphere nếu có
-    for _, v in ipairs(Lighting:GetChildren()) do
-        if v:IsA("Sky") or v:IsA("Atmosphere") then
-            v:Destroy()
-        end
-    end
+local aimEnabled = false
+local emaVel = Vector3.new()
+local velInitialized = false
+local lastTime = tick()
+local lastTarget = nil
+local lastSwitchTime = 0
 
-    -- Tạo Sky hoàng hôn với texture đầy đủ
-    local sky = Instance.new("Sky")
-    sky.SkyboxBk = "rbxassetid://159454299"
-    sky.SkyboxDn = "rbxassetid://159454296"
-    sky.SkyboxFt = "rbxassetid://159454293"
-    sky.SkyboxLf = "rbxassetid://159454286"
-    sky.SkyboxRt = "rbxassetid://159454300"
-    sky.SkyboxUp = "rbxassetid://159454288"
-    sky.Parent = Lighting
+-- 🔴 Vòng tròn đỏ chỉ mục tiêu
+local aimDot = Instance.new("Part")
+aimDot.Anchored = true
+aimDot.CanCollide = false
+aimDot.Size = Vector3.new(0.1, 0.1, 0.1)
+aimDot.Transparency = 1
+aimDot.Name = "__AimDot"
+aimDot.Parent = Workspace
 
-    -- Tạo Atmosphere để làm mềm hoàng hôn nhưng không làm tối skybox
-    local atmos = Instance.new("Atmosphere")
-    atmos.Haze = 0.3
-    atmos.Color = Color3.fromRGB(255,180,150)
-    atmos.Parent = Lighting
+local bb = Instance.new("BillboardGui", aimDot)
+bb.Size = UDim2.new(0, 12, 0, 12)
+bb.AlwaysOnTop = true
+bb.Name = "AimIndicator"
+bb.Enabled = false
+
+local frame = Instance.new("Frame", bb)
+frame.Size = UDim2.new(1, 0, 1, 0)
+frame.BackgroundTransparency = 1
+frame.BorderSizePixel = 0
+frame.AnchorPoint = Vector2.new(0.5, 0.5)
+frame.Position = UDim2.new(0.5, 0, 0.5, 0)
+
+Instance.new("UICorner", frame).CornerRadius = UDim.new(1, 0)
+local stroke = Instance.new("UIStroke", frame)
+stroke.Color = Color3.fromRGB(255, 0, 0)
+stroke.Thickness = 1.8
+
+StarterGui:SetCore("SendNotification", {
+	Title = "Ultra Aimlock",
+	Text = "Loaded for "..player.Name,
+	Duration = 4,
+})
+
+-- Chuột phải bật/tắt
+mouse.Button2Down:Connect(function()
+	aimEnabled = true
+	bb.Enabled = true
+end)
+mouse.Button2Up:Connect(function()
+	aimEnabled = false
+	bb.Enabled = false
 end)
 
--- 2. Tắt sóng nước
-pcall(function()
-    local terrain = Workspace:FindFirstChildOfClass("Terrain")
-    if terrain then
-        terrain.WaterWaveSize = 0
-        terrain.WaterWaveSpeed = 0
-    end
+-- Cập nhật vận tốc (EMA)
+local function updateEMAVel(part)
+	local now = tick()
+	local dt = now - lastTime
+	lastTime = now
+
+	local v = part.AssemblyLinearVelocity
+	if dt > 0.5 then emaVel = v return end
+	if not velInitialized then emaVel = v velInitialized = true
+	else emaVel = emaVel * (1 - ALPHA) + v * ALPHA end
+end
+
+-- Dự đoán vị trí đạn sẽ đến
+local function getPredictedPos(part)
+	updateEMAVel(part)
+
+	local camPos = camera.CFrame.Position
+	local dist = (part.Position - camPos).Magnitude
+
+	if dist < CLOSE_DIST then
+		return part.Position -- Không dự đoán khi gần
+	end
+
+	local travel = (dist / BULLET_SPEED) * OVERPREDICT
+	local horiz = Vector3.new(emaVel.X, 0, emaVel.Z)
+	local base = part.Position + horiz * travel
+
+	local jumping = math.abs(emaVel.Y) > VEL_Y_THRESHOLD
+	local lowCeil = Workspace:Raycast(part.Position, Vector3.new(0, 5, 0)) ~= nil
+
+	local y = (jumping or lowCeil or dist < 10)
+		and part.Position.Y
+		or (part.Position.Y + emaVel.Y * travel)
+
+	return Vector3.new(base.X, y, base.Z)
+end
+
+-- Tìm mục tiêu tốt nhất
+local function getSmartTarget()
+	local myHRP = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	if not myHRP then return end
+
+	local best, bestScore = nil, math.huge
+	for _, pl in ipairs(Players:GetPlayers()) do
+		if pl ~= player and pl.Character then
+			local part = pl.Character:FindFirstChild("LowerTorso") or pl.Character:FindFirstChild("HumanoidRootPart")
+			local hum = pl.Character:FindFirstChildOfClass("Humanoid")
+			if part and hum and hum.Health > 0 then
+				local dist = (part.Position - myHRP.Position).Magnitude
+				if dist <= MAX_DIST then
+					local screenPos, onScreen = camera:WorldToViewportPoint(part.Position)
+					if onScreen then
+						local dx = math.abs(screenPos.X - camera.ViewportSize.X / 2)
+						local dy = math.abs(screenPos.Y - camera.ViewportSize.Y / 2)
+						local fovDist = math.sqrt(dx^2 + dy^2)
+						local score = dist * (1 - CROSSHAIR_WEIGHT) + fovDist * CROSSHAIR_WEIGHT
+						if score < bestScore then
+							best, bestScore = part, score
+						end
+					end
+				end
+			end
+		end
+	end
+	return best
+end
+
+-- Lấy độ mượt
+local function getSmooth(dist)
+	if dist < CLOSE_DIST then return 0 end
+	local speedXZ = Vector3.new(emaVel.X, 0, emaVel.Z).Magnitude
+	if math.abs(emaVel.Y) > VEL_Y_THRESHOLD then return MIN_SMOOTH end
+	return speedXZ > 20 and MIN_SMOOTH or MAX_SMOOTH
+end
+
+-- Aim mỗi frame
+RunService.RenderStepped:Connect(function()
+	if not aimEnabled then return end
+
+	local now = tick()
+	local target = lastTarget
+	if not target or now - lastSwitchTime > SWITCH_DELAY then
+		target = getSmartTarget()
+		lastTarget = target
+		lastSwitchTime = now
+	end
+	if not target then return end
+
+	local pred = getPredictedPos(target)
+	local camPos = camera.CFrame.Position
+	local wantDir = (pred - camPos).Unit
+	local curDir = camera.CFrame.LookVector
+
+	aimDot.Position = pred
+
+	local angle = math.deg(math.acos(math.clamp(curDir:Dot(wantDir), -1, 1)))
+	local dist = (target.Position - camPos).Magnitude
+	if angle > FOV_LIMIT_DEG then return end
+
+	if angle < ANGLE_SNAP or dist < CLOSE_DIST then
+		camera.CFrame = CFrame.new(camPos, camPos + wantDir)
+	else
+		local smooth = getSmooth(dist)
+		local newD = curDir:Lerp(wantDir, smooth)
+		camera.CFrame = CFrame.new(camPos, camPos + newD)
+	end
 end)
-
--- 3. Giảm chất lượng hiển thị
-pcall(function()
-    settings().Rendering.MeshPartDrawDistance = 0
-    settings().Rendering.QualityLevel = Enum.QualityLevel.Level02
-end)
-
--- 4. Tắt các hiệu ứng nặng (chỉ giữ lại Sky & Atmosphere)
-local function disableEffects(parent)
-    for _, v in ipairs(parent:GetDescendants()) do
-        if v:IsA("BlurEffect") or v:IsA("SunRaysEffect")
-        or v:IsA("ColorCorrectionEffect") or v:IsA("BloomEffect")
-        or v:IsA("DepthOfFieldEffect") then
-            v.Enabled = false
-        end
-    end
-end
-disableEffects(Lighting)
-Lighting.DescendantAdded:Connect(function(v)
-    disableEffects(v.Parent)
-end)
-
--- 5. Tối ưu đối tượng game để giảm tải
-local function optimizeObject(obj)
-    if CollectionService:HasTag(obj, "__Optimized") then return end
-
-    if obj:IsA("BasePart") then
-        pcall(function()
-            obj.CastShadow = false
-            obj.Reflectance = 0
-            obj.Material = Enum.Material.Plastic
-            obj.CanQuery = false
-        end)
-    elseif obj:IsA("Decal") or obj:IsA("Texture") then
-        pcall(function() obj.Transparency = 1 end)
-    elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") then
-        pcall(function() obj.Enabled = false end)
-    elseif obj:IsA("SurfaceAppearance") then
-        pcall(function() obj:Destroy() end)
-    end
-
-    CollectionService:AddTag(obj, "__Optimized")
-end
-for _, v in ipairs(Workspace:GetDescendants()) do
-    optimizeObject(v)
-end
-Workspace.DescendantAdded:Connect(optimizeObject)
-
--- 6. Giảm âm lượng chung
-pcall(function()
-    SoundService.Volume = 0.1
-end)
-
--- 7. Tắt render khi mất focus
-local function hasFocus()
-    local ok, res = pcall(function()
-        return UserInput:IsWindowFocused()
-    end)
-    return ok and res
-end
-local function disableRender()
-    RunService:Set3dRenderingEnabled(false)
-    pcall(function() setfpscap(10) end)
-end
-local function enableRender()
-    RunService:Set3dRenderingEnabled(true)
-    pcall(function() setfpscap(0) end)
-end
-UserInput.WindowFocusReleased:Connect(disableRender)
-UserInput.WindowFocused:Connect(enableRender)
-if hasFocus() then enableRender() else disableRender() end
-
--- 8. Hiệu ứng lửa dưới chân nhân vật
-local function applyFootFire(char)
-    local root = char:WaitForChild("HumanoidRootPart", 10)
-    if not root then return end
-
-    if root:FindFirstChild("FireAttachment") then
-        root.FireAttachment:Destroy()
-    end
-
-    local attachment = Instance.new("Attachment")
-    attachment.Name = "FireAttachment"
-    attachment.Position = Vector3.new(0, -2.5, 0)
-    attachment.Parent = root
-
-    local fire = Instance.new("ParticleEmitter")
-    fire.Name = "FootFire"
-    fire.Texture = "rbxassetid://3021864529"
-    fire.Rate = 60
-    fire.Lifetime = NumberRange.new(0.4, 0.6)
-    fire.Speed = NumberRange.new(1, 2)
-    fire.Size = NumberSequence.new{
-        NumberSequenceKeypoint.new(0, 2),
-        NumberSequenceKeypoint.new(1, 0)
-    }
-    fire.Transparency = NumberSequence.new{
-        NumberSequenceKeypoint.new(0, 0.2),
-        NumberSequenceKeypoint.new(1, 1)
-    }
-    fire.Color = ColorSequence.new(Color3.new(1, 0.4, 0), Color3.new(1, 1, 0))
-    fire.VelocitySpread = 20
-    fire.EmissionDirection = Enum.NormalId.Top
-    fire.LightEmission = 0.6
-    fire.LockedToPart = true
-    fire.Parent = attachment
-end
-Players.LocalPlayer.CharacterAdded:Connect(applyFootFire)
-if player.Character then
-    applyFootFire(player.Character)
-end
