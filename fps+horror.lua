@@ -1,74 +1,68 @@
 -- LocalScript (đặt trong StarterPlayerScripts)
-local Players  = game:GetService("Players")
-local Debris   = game:GetService("Debris")
+local Players = game:GetService("Players")
+local Debris  = game:GetService("Debris")
 
-local player   = Players.LocalPlayer
-local camera   = workspace.CurrentCamera
+local player  = Players.LocalPlayer
+local camera  = workspace.CurrentCamera
 
--- biến để giữ connection, tiện disconnect khi đóng GUI
+-- giữ connection để có thể disconnect khi đóng GUI
 local charAddedConn
 
 local function makeGUI()
-    -- Xoá GUI cũ nếu có
+    -- xoá GUI cũ nếu có
     local old = player.PlayerGui:FindFirstChild("SelfFlingGUI")
     if old then old:Destroy() end
 
-    -- ScreenGui
+    -- tạo ScreenGui
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name   = "SelfFlingGUI"
     screenGui.Parent = player.PlayerGui
 
-    -- Main Frame
+    -- main Frame
     local frame = Instance.new("Frame", screenGui)
-    frame.Name             = "Container"
     frame.Size             = UDim2.new(0, 200, 0, 140)
     frame.Position         = UDim2.new(0.8, 0, 0.3, 0)
-    frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
     frame.Active           = true
     frame.Draggable        = true
-    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0,8)
     Instance.new("UIStroke", frame).Thickness    = 1
 
-    -- Title
+    -- title
     local title = Instance.new("TextLabel", frame)
     title.Text               = "🚀 Self‑Fling"
     title.Font               = Enum.Font.GothamBold
     title.TextSize           = 16
     title.TextColor3         = Color3.fromRGB(240,240,240)
     title.BackgroundTransparency = 1
-    title.Size               = UDim2.new(1, 0, 0, 28)
+    title.Size               = UDim2.new(1,0,0,28)
 
-    -- Nút X để hủy GUI hoàn toàn
+    -- nút X để huỷ GUI
     local btnClose = Instance.new("TextButton", frame)
     btnClose.Text             = "X"
     btnClose.Font             = Enum.Font.GothamBold
     btnClose.TextSize         = 18
-    btnClose.Size             = UDim2.new(0, 24, 0, 24)
-    btnClose.Position         = UDim2.new(1, -28, 0, 2)
+    btnClose.Size             = UDim2.new(0,24,0,24)
+    btnClose.Position         = UDim2.new(1,-28,0,2)
     btnClose.BackgroundTransparency = 1
     btnClose.TextColor3       = Color3.fromRGB(200,200,200)
     btnClose.MouseEnter:Connect(function() btnClose.TextColor3 = Color3.fromRGB(255,255,255) end)
     btnClose.MouseLeave:Connect(function() btnClose.TextColor3 = Color3.fromRGB(200,200,200) end)
     btnClose.MouseButton1Click:Connect(function()
-        -- Destroy GUI
         screenGui:Destroy()
-        -- Disconnect respawn listener để không tạo lại GUI
-        if charAddedConn then
-            charAddedConn:Disconnect()
-            charAddedConn = nil
-        end
+        if charAddedConn then charAddedConn:Disconnect() charAddedConn = nil end
     end)
 
-    -- Container cho nội dung
+    -- container cho nội dung
     local content = Instance.new("Frame", frame)
-    content.Size               = UDim2.new(1, -16, 1, -44)
-    content.Position           = UDim2.new(0, 8, 0, 32)
+    content.Size               = UDim2.new(1,-16,1,-44)
+    content.Position           = UDim2.new(0,8,0,32)
     content.BackgroundTransparency = 1
     local layout = Instance.new("UIListLayout", content)
-    layout.Padding            = UDim.new(0, 8)
+    layout.Padding            = UDim.new(0,8)
     layout.SortOrder          = Enum.SortOrder.LayoutOrder
 
-    -- Strength Box
+    -- TextBox nhập strength
     local txtStrength = Instance.new("TextBox", content)
     txtStrength.PlaceholderText = "200"
     txtStrength.Text            = "200"
@@ -76,12 +70,12 @@ local function makeGUI()
     txtStrength.TextSize        = 14
     txtStrength.TextColor3      = Color3.fromRGB(230,230,230)
     txtStrength.BackgroundColor3 = Color3.fromRGB(35,35,35)
-    txtStrength.Size            = UDim2.new(1, 0, 0, 28)
+    txtStrength.Size            = UDim2.new(1,0,0,28)
     txtStrength.ClearTextOnFocus = false
-    Instance.new("UICorner", txtStrength).CornerRadius = UDim.new(0, 6)
+    Instance.new("UICorner", txtStrength).CornerRadius = UDim.new(0,6)
     Instance.new("UIStroke", txtStrength).Thickness    = 1
 
-    -- Fling Button
+    -- nút Fling
     local btnFling = Instance.new("TextButton", content)
     btnFling.Text            = "FLING!"
     btnFling.Font            = Enum.Font.GothamBold
@@ -89,85 +83,69 @@ local function makeGUI()
     btnFling.TextColor3      = Color3.fromRGB(255,255,255)
     btnFling.BackgroundColor3 = Color3.fromRGB(180,30,30)
     btnFling.AutoButtonColor = false
-    btnFling.Size            = UDim2.new(1, 0, 0, 36)
-    Instance.new("UICorner", btnFling).CornerRadius = UDim.new(0, 6)
+    btnFling.Size            = UDim2.new(1,0,0,36)
+    Instance.new("UICorner", btnFling).CornerRadius = UDim.new(0,6)
     local stroke = Instance.new("UIStroke", btnFling)
-    stroke.Thickness          = 1
-    stroke.Color              = Color3.fromRGB(120,0,0)
+    stroke.Thickness = 1
+    stroke.Color     = Color3.fromRGB(120,0,0)
     local grad = Instance.new("UIGradient", btnFling)
     grad.Color = ColorSequence.new({
         ColorSequenceKeypoint.new(0, Color3.fromRGB(200,50,50)),
         ColorSequenceKeypoint.new(1, Color3.fromRGB(150,20,20)),
     })
 
-    -- Lưu trạng thái gốc để revert
+    -- lưu trạng thái gốc
     local defaultText  = btnFling.Text
     local defaultColor = btnFling.BackgroundColor3
 
-    -- Self‑fling
+    -- logic Self‑Fling
     btnFling.MouseButton1Click:Connect(function()
-        -- Gỡ gradient cũ để lên màu chuẩn
+        -- gỡ gradient để màu xanh hiện đúng
         grad:Destroy()
-        -- Đổi nút sang 🚀 + xanh lá
+
+        -- đổi nút
         btnFling.Text             = "🚀"
         btnFling.BackgroundColor3 = Color3.fromRGB(50,200,50)
 
+        -- chuẩn bị nhân vật
         local char = player.Character
         if not char then return end
         local hrp      = char:FindFirstChild("HumanoidRootPart")
         local humanoid = char:FindFirstChildOfClass("Humanoid")
         if not hrp or not humanoid then return end
 
-        -- Ragdoll 0.5s
+        -- bật ragdoll ngay lập tức
         humanoid.PlatformStand = true
-        delay(0.5, function()
+
+        -- đọc strength
+        local strength = tonumber(txtStrength.Text) or 200
+
+        -- tạo BodyVelocity đẩy thẳng lên, thời gian 0.2s
+        local bv = Instance.new("BodyVelocity")
+        bv.MaxForce = Vector3.new(0,1e5,0)                  -- chỉ lên y
+        bv.Velocity = Vector3.new(0, strength, 0)
+        bv.Parent   = hrp
+        Debris:AddItem(bv, 0.2)
+
+        -- sau 0.2s, dừng ragdoll
+        delay(0.2, function()
             humanoid.PlatformStand = false
 
-            -- Bay lên + ngang
-            local strength    = tonumber(txtStrength.Text) or 200
-            local horizFactor = 0.4
-            local upForce     = strength
-            local duration    = 0.3
+            -- revert nút về ban đầu
+            btnFling.Text             = defaultText
+            btnFling.BackgroundColor3 = defaultColor
 
-            local sign          = (math.random()<0.5 and -1) or 1
-            local horizontalDir = camera.CFrame.RightVector * strength * horizFactor * sign
-            local verticalDir   = Vector3.new(0, upForce, 0)
-            local flingVector   = horizontalDir + verticalDir
-
-            local bv = Instance.new("BodyVelocity")
-            bv.MaxForce = Vector3.new(1e5,1e5,1e5)
-            bv.Velocity = flingVector
-            bv.Parent   = hrp
-            Debris:AddItem(bv, duration)
-
-            local bav = Instance.new("BodyAngularVelocity")
-            bav.MaxTorque       = Vector3.new(1e5,1e5,1e5)
-            bav.AngularVelocity = Vector3.new(
-                math.random(-8,8),
-                math.random(-8,8),
-                math.random(-8,8)
-            )
-            bav.Parent = hrp
-            Debris:AddItem(bav, duration)
-
-            -- Revert nút
-            delay(duration, function()
-                btnFling.Text             = defaultText
-                btnFling.BackgroundColor3 = defaultColor
-                -- Thêm lại gradient
-                local newGrad = Instance.new("UIGradient", btnFling)
-                newGrad.Color = ColorSequence.new({
-                    ColorSequenceKeypoint.new(0, Color3.fromRGB(200,50,50)),
-                    ColorSequenceKeypoint.new(1, Color3.fromRGB(150,20,20)),
-                })
-                stroke.Color = Color3.fromRGB(120,0,0)
-            end)
+            -- khôi phục gradient
+            local newGrad = Instance.new("UIGradient", btnFling)
+            newGrad.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Color3.fromRGB(200,50,50)),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(150,20,20)),
+            })
+            stroke.Color = Color3.fromRGB(120,0,0)
         end)
     end)
 end
 
--- Tạo GUI khi spawn xong
+-- tạo GUI khi respawn
 charAddedConn = player.CharacterAdded:Connect(makeGUI)
-if player.Character then
-    makeGUI()
-end
+if player.Character then makeGUI() end
