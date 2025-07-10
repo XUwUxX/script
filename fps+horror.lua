@@ -1,11 +1,9 @@
 -- LocalScript (đặt trong StarterGui hoặc trong ScreenGui của bạn)
-local Players           = game:GetService("Players")
-local UserInputService  = game:GetService("UserInputService")
-local Debris            = game:GetService("Debris")
+local Players          = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local Debris           = game:GetService("Debris")
 
 local player = Players.LocalPlayer
-local camera = workspace.CurrentCamera
-local mouse  = player:GetMouse()
 
 -- Tạo hoặc lấy ScreenGui
 local screenGui = player:WaitForChild("PlayerGui"):FindFirstChild("SelfFlingGUI")
@@ -50,7 +48,7 @@ btnFling.BackgroundColor3= Color3.fromRGB(100, 0, 0)
 btnFling.TextColor3      = Color3.new(1,1,1)
 btnFling.BorderSizePixel = 0
 
--- TextBox nhập Strength
+-- TextBox nhập Strength (lực đẩy lên)
 local txtStrength = Instance.new("TextBox", frame)
 txtStrength.PlaceholderText = "Strength"
 txtStrength.Text            = "200"
@@ -84,7 +82,7 @@ btnClose.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
--- Xử lý Self‑Fling
+-- Xử lý Self‑Fling chỉ thẳng lên cao
 btnFling.MouseButton1Click:Connect(function()
     local char = player.Character
     if not char then return end
@@ -93,20 +91,14 @@ btnFling.MouseButton1Click:Connect(function()
 
     -- Đọc strength từ textbox
     local strength = tonumber(txtStrength.Text) or 200
-    local upForce   = strength * 0.5
-    local duration  = 0.2
+    local duration  = 0.2  -- thời gian giữ lực (giây)
 
-    -- Tính hướng bay: từ HRP tới vị trí chuột trên mặt đất
-    local targetPos   = mouse.Hit and mouse.Hit.p or (hrp.Position + camera.CFrame.LookVector * 10)
-    local dirVector   = (targetPos - hrp.Position).Unit
-    local flingVector = dirVector * strength + Vector3.new(0, upForce, 0)
-
-    -- Gắn BodyVelocity để đẩy
+    -- Tạo BodyVelocity đẩy thẳng lên
     local bv = Instance.new("BodyVelocity")
-    bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
-    bv.Velocity = flingVector
+    bv.MaxForce = Vector3.new(0, 1e5, 0)            -- chỉ đẩy trục Y
+    bv.Velocity = Vector3.new(0, strength, 0)       -- lực đẩy lên
     bv.Parent   = hrp
 
-    -- Tự hủy sau một thời gian
+    -- Tự hủy sau duration để trở lại bình thường
     Debris:AddItem(bv, duration)
 end)
