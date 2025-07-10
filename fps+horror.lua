@@ -2,7 +2,6 @@ local Players = game:GetService("Players")
 local Debris  = game:GetService("Debris")
 
 local player = Players.LocalPlayer
-local camera = workspace.CurrentCamera
 local charAddedConn
 
 local function makeGUI()
@@ -17,13 +16,13 @@ local function makeGUI()
 	frame.Size = UDim2.new(0, 200, 0, 130)
 	frame.Position = UDim2.new(0.75, 0, 0.35, 0)
 	frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-	frame.BackgroundTransparency = 0.3
+	frame.BackgroundTransparency = 0.9 -- GẦN NHƯ TRONG SUỐT
 	frame.Active = true
 	frame.Draggable = true
 	Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
 	local stroke = Instance.new("UIStroke", frame)
-	stroke.Color = Color3.fromRGB(100, 100, 100)
-	stroke.Thickness = 1
+	stroke.Color = Color3.fromRGB(180, 180, 180)
+	stroke.Thickness = 1.5
 
 	local title = Instance.new("TextLabel", frame)
 	title.Text = "🚀 Self‑Fling"
@@ -66,12 +65,12 @@ local function makeGUI()
 	txtStrength.Font = Enum.Font.Gotham
 	txtStrength.TextSize = 14
 	txtStrength.TextColor3 = Color3.fromRGB(255, 255, 255)
-	txtStrength.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-	txtStrength.BackgroundTransparency = 0.1
+	txtStrength.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+	txtStrength.BackgroundTransparency = 0.3
 	txtStrength.Size = UDim2.new(1, 0, 0, 30)
 	txtStrength.ClearTextOnFocus = false
 	Instance.new("UICorner", txtStrength).CornerRadius = UDim.new(0, 6)
-	Instance.new("UIStroke", txtStrength).Color = Color3.fromRGB(80, 80, 80)
+	Instance.new("UIStroke", txtStrength).Color = Color3.fromRGB(100, 100, 100)
 
 	local btnFling = Instance.new("TextButton", content)
 	btnFling.Text = "FLING!"
@@ -105,8 +104,9 @@ local function makeGUI()
 
 		local strength = tonumber(txtStrength.Text) or 160
 
+		-- nghiêng người
 		local gyro = Instance.new("BodyGyro")
-		gyro.CFrame = hrp.CFrame * CFrame.Angles(0, 0, math.rad(90)) -- nằm ngang
+		gyro.CFrame = hrp.CFrame * CFrame.Angles(0, 0, math.rad(90))
 		gyro.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
 		gyro.P = 1e4
 		gyro.Parent = hrp
