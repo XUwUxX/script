@@ -1,45 +1,144 @@
--- StarterPlayerScripts/UltraSmartAimlock.lua (LocalScript)
+-- StarterPlayerScripts/UltraSmartAimlock.lua
 
-local Players          = game:GetService("Players")
-local RunService       = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local workspace        = game:GetService("Workspace")
+local Players     = game:GetService("Players")
+local RunService  = game:GetService("RunService")
+local Workspace   = game:GetService("Workspace")
+local StarterGui  = game:GetService("StarterGui")
 
-local player    = Players.LocalPlayer
-local camera    = workspace.CurrentCamera
-local mouse     = player:GetMouse()
+local player   = Players.LocalPlayer
+local camera   = Workspace.CurrentCamera
+local mouse    = player:GetMouse()
 
--- ==== CẤU HÌNH ====
-local MAX_TARGET_DIST      = 120        -- studs
-local BULLET_SPEED         = 600        -- studs/s
-local INIT_PREDICT_FACTOR  = 1.1
-local MIN_SMOOTH           = 0.2        -- smoothing khi target rất nhanh
-local MAX_SMOOTH           = 0.8        -- smoothing khi target chậm
-local ANGLE_IMMEDIATE_DEG  = 3          -- nếu lệch <3° thì set thẳng
-local ADAPT_RATE           = 0.02       -- tốc độ tune predictFactor
-local VERT_VEL_THRESHOLD   = 1.5        -- ngưỡng Y để xem là nhảy
--- ==========================
+-- 🆕 FOV & WalkSpeed
+camera.FieldOfView = 90
+local function onChar(char)
+    local hum = char:WaitForChild("Humanoid")
+    hum.WalkSpeed = 17
+end
+if player.Character then onChar(player.Character) end
+player.CharacterAdded:Connect(onChar)
 
-local aimEnabled    = false
-local predictFactor = INIT_PREDICT_FACTOR
-local lastTargetPos, lastPredictedPos, lastTravelTime
+-- ⚙️ Cấu hình
+local MAX_DIST        = 120
+local BULLET_SPEED    = 900
+local OVERPREDICT     = 1.9
+local ALPHA           = 0.7
+local ANGLE_SNAP      = 3
+local VEL_Y_THRESHOLD = 1.5
+local FOV_LIMIT_DEG   = 60
+local CLOSE_DIST      = 10    -- nâng lên 10 studs để xử lý gần tốt hơn
+local SWITCH_DELAY    = 0.1
 
-mouse.Button2Down:Connect(function() aimEnabled = true end)
-mouse.Button2Up:Connect(function() aimEnabled = false end)
+-- 🔘 State
+local aimEnabled     = false
+local emaVel         = Vector3.new()
+local prevEmaVel     = Vector3.new()
+local velInit        = false
+local lastTime       = tick()
+local lastTarget     = nil
+local lastSwitchTime = 0
 
--- Tìm mục tiêu gần nhất
-local function getClosestHRP()
-    local char = player.Character
-    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-    local best, bestDist = nil, math.huge
+-- 🎯 Vòng tròn đỏ
+local aimDot = Instance.new("Part")
+aimDot.Name, aimDot.Anchored, aimDot.CanCollide, aimDot.Size, aimDot.Transparency =
+"__AimDot", true, false, Vector3.new(0.1,0.1,0.1), 1
+aimDot.Parent = Workspace
+
+local bb = Instance.new("BillboardGui", aimDot)
+bb.Size, bb.AlwaysOnTop, bb.Name, bb.Enabled =
+UDim2.new(0,12,0,12), true, "AimIndicator", false
+local frame = Instance.new("Frame", bb)
+frame.Size, frame.BackgroundTransparency, frame.BorderSizePixel =
+UDim2.new(1,0,1,0), 1, 0
+frame.AnchorPoint, frame.Position = Vector2.new(0.5,0.5), UDim2.new(0.5,0,0.5,0)
+Instance.new("UICorner", frame).CornerRadius = UDim.new(1,0)
+local stroke = Instance.new("UIStroke", frame)
+stroke.Color, stroke.Thickness = Color3.new(1,0,0), 1.8
+
+StarterGui:SetCore("SendNotification", {
+    Title = "Ultra Aimlock",
+    Text  = "Loaded ✓",
+    Duration = 3,
+})
+
+-- 🔄 Toggle aim
+mouse.Button2Down:Connect(function()
+    aimEnabled = true
+    bb.Enabled  = true
+end)
+mouse.Button2Up:Connect(function()
+    aimEnabled = false
+    bb.Enabled  = false
+end)
+
+-- 🧠 EMA & store prev
+local function updateEMA(part)
+    local now = tick()
+    local dt  = now - lastTime
+    lastTime  = now
+
+    local v = part.AssemblyLinearVelocity
+    if dt > 0.5 or not velInit then
+        emaVel, prevEmaVel = v, v
+        velInit = true
+    else
+        prevEmaVel = emaVel
+        emaVel = emaVel * (1 - ALPHA) + v * ALPHA
+    end
+    return dt
+end
+
+-- 📍 Prediction second-order
+local function getPred(part)
+    local dt = updateEMA(part)
+    local camPos = camera.CFrame.Position
+    local toP    = part.Position - camPos
+    local dist   = toP.Magnitude
+
+    if dist < CLOSE_DIST then
+        return part.Position
+    end
+
+    local dir    = toP.Unit
+    local travel = dist / BULLET_SPEED
+    local accel  = (emaVel - prevEmaVel) / math.max(dt, 0.001)
+    local lead1  = emaVel * travel
+    local lead2  = accel * 0.5 * travel * travel
+    local offset = (lead1 + lead2) * OVERPREDICT
+    local base   = part.Position + offset
+
+    local jumping= math.abs(emaVel.Y) > VEL_Y_THRESHOLD
+    local lowC   = Workspace:Raycast(part.Position, Vector3.new(0,5,0)) ~= nil
+    local y = (jumping or lowC or dist < CLOSE_DIST*1.25)
+        and part.Position.Y
+        or (part.Position.Y + emaVel.Y * travel * OVERPREDICT)
+
+    return Vector3.new(base.X, y, base.Z)
+end
+
+-- 🎯 Chọn target body
+local function getTarget()
+    local myHRP = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if not myHRP then return end
+
+    local best, bestScore = nil, math.huge
     for _, pl in ipairs(Players:GetPlayers()) do
         if pl~=player and pl.Character then
-            local o = pl.Character:FindFirstChild("HumanoidRootPart")
-            if o then
-                local d = (o.Position - hrp.Position).Magnitude
-                if d < bestDist and d<=MAX_TARGET_DIST then
-                    bestDist, best = d, o
+            local part = pl.Character:FindFirstChild("LowerTorso")
+                      or pl.Character:FindFirstChild("HumanoidRootPart")
+            local hum  = pl.Character:FindFirstChildOfClass("Humanoid")
+            if part and hum and hum.Health>0 then
+                local d = (part.Position - myHRP.Position).Magnitude
+                if d<=MAX_DIST then
+                    local sp, onS = camera:WorldToViewportPoint(part.Position)
+                    if onS then
+                        local dx = math.abs(sp.X - camera.ViewportSize.X/2)
+                        local dy = math.abs(sp.Y - camera.ViewportSize.Y/2)
+                        local score = d + math.sqrt(dx*dx + dy*dy) * 0.6
+                        if score<bestScore then
+                            best, bestScore = part, score
+                        end
+                    end
                 end
             end
         end
@@ -47,65 +146,29 @@ local function getClosestHRP()
     return best
 end
 
--- Tính vị trí dự đoán “thông minh”
-local function getSmartPredictedPos(part)
-    local vel        = part.AssemblyLinearVelocity
-    local dist       = (part.Position - camera.CFrame.Position).Magnitude
-    local travelTime = dist / BULLET_SPEED
-    lastTravelTime   = travelTime
-
-    -- chọn Y-mode
-    local useFullY = math.abs(vel.Y) <= VERT_VEL_THRESHOLD
-    local horizVel = Vector3.new(vel.X, 0, vel.Z)
-    local base     = part.Position + horizVel * travelTime * predictFactor
-
-    local yComp = useFullY and (part.Position.Y + vel.Y * travelTime * predictFactor) or part.Position.Y
-    return Vector3.new(base.X, yComp, base.Z)
-end
-
--- Tính smoothing factor động
-local function calcSmooth(vel)
-    local speedXZ = Vector3.new(vel.X,0,vel.Z).Magnitude
-    -- map speedXZ in [0, maxSpeed] to [MAX_SMOOTH, MIN_SMOOTH]
-    local maxSpeed = 50
-    local t = math.clamp(speedXZ / maxSpeed, 0, 1)
-    return MAX_SMOOTH*(1-t) + MIN_SMOOTH*t
-end
-
-RunService.RenderStepped:Connect(function()
+-- 🔄 RenderStep (snap)
+RunService:BindToRenderStep("UltraAim", Enum.RenderPriority.Camera.Value, function()
     if not aimEnabled then return end
 
-    local target = getClosestHRP()
-    if not target then return end
+    local now = tick()
+    if not lastTarget or now - lastSwitchTime > SWITCH_DELAY then
+        lastTarget, lastSwitchTime = getTarget(), now
+    end
+    if not lastTarget then return end
 
-    -- compute predicted and desired direction
-    local predPos    = getSmartPredictedPos(target)
-    local camPos     = camera.CFrame.Position
-    local desiredDir = (predPos - camPos).Unit
-    local currDir    = camera.CFrame.LookVector
+    local pred = getPred(lastTarget)
+    local camPos= camera.CFrame.Position
 
-    -- angle between
-    local angleDeg = math.deg(math.acos(math.clamp(currDir:Dot(desiredDir), -1,1)))
-
-    -- smoothing factor based on target speed
-    local smooth = calcSmooth(target.AssemblyLinearVelocity)
-
-    if angleDeg < ANGLE_IMMEDIATE_DEG then
-        camera.CFrame = CFrame.new(camPos, camPos + desiredDir)
-    else
-        local newDir = currDir:Lerp(desiredDir, smooth)
-        camera.CFrame = CFrame.new(camPos, camPos + newDir)
+    -- Nếu quá gần, snap vào vị trí body trực tiếp
+    local dist = (lastTarget.Position - camPos).Magnitude
+    if dist < CLOSE_DIST then
+        camera.CFrame = CFrame.new(camPos, lastTarget.Position)
+        aimDot.Position = lastTarget.Position
+        return
     end
 
-    -- adaptive tuning predictFactor
-    if lastTargetPos and lastPredictedPos and lastTravelTime then
-        local actualMove = (target.Position - lastTargetPos)
-        local idealMove  = (lastPredictedPos - lastTargetPos)
-        local errorDist  = (idealMove - actualMove).Magnitude
-        local sign       = (actualMove.Magnitude > idealMove.Magnitude) and 1 or -1
-        predictFactor    = math.clamp(predictFactor + ADAPT_RATE * sign * (errorDist / lastTravelTime), 0.8, 1.5)
-    end
-
-    lastTargetPos    = target.Position
-    lastPredictedPos = predPos
+    -- Bình thường: second-order prediction
+    local want = (pred - camPos).Unit
+    camera.CFrame = CFrame.new(camPos, camPos + want)
+    aimDot.Position = pred
 end)
