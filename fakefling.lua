@@ -1,30 +1,30 @@
 -- Services
 local Players = game:GetService("Players")
-local Debris   = game:GetService("Debris")
-local UIS      = game:GetService("UserInputService")
+local Debris  = game:GetService("Debris")
+local UIS     = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
-local charAddedConn
+local gui
 
 -- Tạo GUI
 local function makeGUI()
-    -- Dọn GUI cũ nếu có
-    local old = player.PlayerGui:FindFirstChild("SelfFlingGUI")
-    if old then old:Destroy() end
+    if gui and gui.Parent then gui:Destroy() end
 
-    -- ScreenGui chính
-    local gui = Instance.new("ScreenGui", player.PlayerGui)
+    gui = Instance.new("ScreenGui")
     gui.Name = "SelfFlingGUI"
     gui.ResetOnSpawn = false
+    gui.Parent = player:WaitForChild("PlayerGui")
 
     -- Frame chứa
-    local frame = Instance.new("Frame", gui)
+    local frame = Instance.new("Frame")
     frame.Size = UDim2.new(0, 200, 0, 130)
     frame.Position = UDim2.new(0.75, 0, 0.35, 0)
     frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
     frame.BackgroundTransparency = 0.9
     frame.Active = true
     frame.Draggable = true
+    frame.Parent = gui
+
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
     local stroke = Instance.new("UIStroke", frame)
     stroke.Color = Color3.fromRGB(180, 180, 180)
@@ -51,10 +51,6 @@ local function makeGUI()
     btnClose.BackgroundTransparency = 1
     btnClose.MouseButton1Click:Connect(function()
         gui:Destroy()
-        if charAddedConn then 
-            charAddedConn:Disconnect()
-            charAddedConn = nil
-        end
     end)
 
     -- Layout & content
@@ -66,12 +62,13 @@ local function makeGUI()
     layout.Padding = UDim.new(0, 8)
     layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     layout.VerticalAlignment = Enum.VerticalAlignment.Top
+    content.Parent = frame
 
     -- TextBox strength
     local txtStrength = Instance.new("TextBox", content)
     txtStrength.Size = UDim2.new(1, 0, 0, 30)
-    txtStrength.PlaceholderText = "160"
-    txtStrength.Text = "160"
+    txtStrength.PlaceholderText = "95"
+    txtStrength.Text = "95"
     txtStrength.Font = Enum.Font.Gotham
     txtStrength.TextSize = 14
     txtStrength.TextColor3 = Color3.new(1,1,1)
@@ -105,7 +102,7 @@ local function makeGUI()
         local humanoid = char:FindFirstChildOfClass("Humanoid")
         if not (hrp and humanoid) then return end
 
-        local strength = tonumber(txtStrength.Text) or 160
+        local strength = tonumber(txtStrength.Text) or 95
 
         -- HIệu ứng UX
         grad:Destroy()
@@ -148,7 +145,5 @@ local function makeGUI()
     end)
 end
 
--- Kết nối sự kiện tạo GUI cho mỗi CharacterAdded
-charAddedConn = player.CharacterAdded:Connect(makeGUI)
--- Nếu đang có character thì tạo GUI luôn
-if player.Character then makeGUI() end
+-- Khởi tạo GUI một lần duy nhất
+makeGUI()
