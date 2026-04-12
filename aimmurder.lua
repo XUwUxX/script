@@ -41,7 +41,7 @@ RunService.RenderStepped:Connect(function()
         local target = GetMurderer()
         if target then
             -- Prediction: Dự đoán vị trí dựa trên vận tốc để bắn không trượt
-            local predictedPos = target.Position + (target.AssemblyLinearVelocity * 0.18)
+            local predictedPos = target.Position + (target.AssemblyLinearVelocity * 0.06)
             camera.CFrame = CFrame.new(camera.CFrame.Position, predictedPos)
         end
     end
