@@ -4,34 +4,43 @@ local player = Players.LocalPlayer
 
 if _G.FlingActive then
     _G.FlingActive = false
-    if _G.FlingConnection then _G.FlingConnection:Disconnect() end
     return
 end
 
 _G.FlingActive = true
 
-_G.FlingConnection = RunService.Stepped:Connect(function()
-    if not _G.FlingActive then return end
-    
+local function CreateFlingPart()
     local char = player.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-    
-    if hrp and hum then
-        -- Lưu vận tốc di chuyển thực tế từ bàn phím/Humanoid
-        local moveVelocity = hum.MoveDirection * hum.WalkSpeed
-        local currentY = hrp.AssemblyLinearVelocity.Y
-        
-        -- Gán vận tốc cực đại để gây sát thương vật lý (Fling)
-        hrp.AssemblyLinearVelocity = Vector3.new(0, 50000, 0)
-        hrp.AssemblyAngularVelocity = Vector3.new(50000, 50000, 50000)
-        
-        -- Ngay lập tức trả lại vận tốc di chuyển bình thường trong cùng frame
-        RunService.Heartbeat:Wait()
-        
-        if hrp then
-            hrp.AssemblyLinearVelocity = Vector3.new(moveVelocity.X, currentY, moveVelocity.Z)
-            hrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+    if not hrp then return end
+
+    -- Tạo một Part đóng vai trò là vật gây va chạm
+    local flingPart = Instance.new("Part")
+    flingPart.Name = "FlingHitbox"
+    flingPart.Size = Vector3.new(5, 5, 5) -- Độ rộng vùng ảnh hưởng
+    flingPart.Transparency = 1
+    flingPart.CanCollide = false
+    flingPart.CanTouch = true
+    flingPart.Parent = char
+
+    local attachment = Instance.new("Attachment", flingPart)
+    local alignPos = Instance.new("AlignPosition", flingPart)
+    alignPos.Attachment0 = attachment
+    alignPos.Attachment1 = hrp:FindFirstChildOfClass("Attachment") or Instance.new("Attachment", hrp)
+    alignPos.RigidityEnabled = true
+
+    _G.FlingConnection = RunService.Heartbeat:Connect(function()
+        if not _G.FlingActive or not char.Parent then
+            flingPart:Destroy()
+            _G.FlingConnection:Disconnect()
+            return
         end
-    end
-end)
+        
+        -- Gán vận tốc cực đại cho Part này thay vì nhân vật
+        flingPart.AssemblyLinearVelocity = Vector3.new(0, 99999, 0)
+        flingPart.AssemblyAngularVelocity = Vector3.new(99999, 99999, 99999)
+    end)
+end
+
+CreateFlingPart()
+player.CharacterAdded:Connect(CreateFlingPart)
