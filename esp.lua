@@ -16,39 +16,47 @@ toggleBtn.Text = "ESP"
 toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleBtn.Draggable = true
 
--- LOGIC NHẬN DIỆN THÔNG MINH
+-- LOGIC NHẬN DIỆN VAI TRÒ (FIXED FOR ROUND RESET)
 local function GetRoleColor(player)
     local char = player.Character
     if not char then return Color3.fromRGB(200, 200, 200) end
 
-    -- Ưu tiên kiểm tra Murder (Knife)
-    if player.Backpack:FindFirstChild("Knife") or char:FindFirstChild("Knife") then
-        return Color3.fromRGB(255, 0, 0) -- Đỏ
+    -- Ưu tiên 1: Kiểm tra vật phẩm đang cầm trên tay (Thực tế nhất)
+    local tool = char:FindFirstChildOfClass("Tool")
+    local backpack = player:FindFirstChild("Backpack")
+    
+    local hasKnife = (tool and tool.Name == "Knife") or (backpack and backpack:FindFirstChild("Knife"))
+    local hasGun = (tool and tool.Name == "Gun") or (backpack and backpack:FindFirstChild("Gun"))
+
+    if hasKnife then 
+        return Color3.fromRGB(255, 0, 0) -- Murder
     end
 
-    -- Kiểm tra Gun (Sheriff vs Hero)
-    local gun = player.Backpack:FindFirstChild("Gun") or char:FindFirstChild("Gun")
-    if gun then
-        -- Logic: MM2 đặt Sheriff có thuộc tính 'Sheriff' trong Folder dữ liệu
-        -- Nếu không có, kẻ cầm súng chắc chắn là Hero (Innocent nhặt súng)
-        if player:FindFirstChild("TempRole") and player.TempRole.Value == "Sheriff" then
-            return Color3.fromRGB(0, 100, 255) -- Xanh dương
-        elseif player:FindFirstChild("Role") and player.Role.Value == "Sheriff" then
-            return Color3.fromRGB(0, 100, 255) -- Xanh dương
+    if hasGun then
+        -- Tư duy ngược: Kiểm tra danh hiệu thực tế trong Game
+        -- Trong MM2, Sheriff thật luôn có thuộc tính đặc biệt trong PlayerGui hoặc bảng điểm
+        local isOfficialSheriff = player:FindFirstChild("Status") and player.Status:FindFirstChild("Role") and player.Status.Role.Value == "Sheriff"
+        
+        if isOfficialSheriff then
+            return Color3.fromRGB(0, 120, 255) -- Sheriff
         else
-            return Color3.fromRGB(255, 255, 0) -- Vàng
+            return Color3.fromRGB(255, 255, 0) -- Hero (Innocent cầm súng)
         end
     end
 
-    return Color3.fromRGB(200, 200, 200) -- Innocent
+    return Color3.fromRGB(255, 255, 255) -- Innocent
 end
 
--- CẬP NHẬT HIGHLIGHT
+-- QUẢN LÝ HIGHLIGHTS
+local function CleanHighlights()
+    for _, h in pairs(highlights) do h:Destroy() end
+    table.clear(highlights)
+end
+
 local function UpdateESP()
-    if not espActive then
-        for _, h in pairs(highlights) do h:Destroy() end
-        table.clear(highlights)
-        return
+    if not espActive then 
+        CleanHighlights()
+        return 
     end
 
     for _, p in ipairs(Players:GetPlayers()) do
@@ -58,19 +66,21 @@ local function UpdateESP()
         if char and char:FindFirstChild("HumanoidRootPart") then
             local highlight = highlights[p]
             
-            -- Nếu chưa có highlight hoặc highlight cũ bị kẹt (sang ván mới char mới)
+            -- Nếu highlight cũ bị lỗi hoặc nhân vật mới (ván mới), tạo lại
             if not highlight or highlight.Adornee ~= char then
                 if highlight then highlight:Destroy() end
                 highlight = Instance.new("Highlight")
                 highlight.Parent = CoreGui
-                highlight.Adornee = char
+                highlight.Name = "ESP_" .. p.Name
                 highlights[p] = highlight
             end
             
             local color = GetRoleColor(p)
+            highlight.Adornee = char
             highlight.FillColor = color
             highlight.OutlineColor = color
-            highlight.FillTransparency = 0.5
+            highlight.FillTransparency = 0.6
+            highlight.OutlineTransparency = 0
         else
             if highlights[p] then
                 highlights[p]:Destroy()
@@ -80,17 +90,22 @@ local function UpdateESP()
     end
 end
 
--- EVENT
+-- TỰ ĐỘNG RESET KHI VÀO VÁN MỚI (Dựa trên việc túi đồ bị dọn dẹp)
+localPlayer.Backpack.ChildRemoved:Connect(function()
+    task.wait(1) -- Chờ server cấp role mới
+    UpdateESP()
+end)
+
 toggleBtn.MouseButton1Click:Connect(function()
     espActive = not espActive
     toggleBtn.BackgroundColor3 = espActive and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(40, 40, 40)
+    if not espActive then CleanHighlights() end
 end)
 
 -- Vòng lặp tối ưu
 task.spawn(function()
-    while task.wait(0.3) do -- Tăng tốc độ nhận diện lên 0.3s
-        if espActive then
-            UpdateESP()
-        end
+    while true do
+        if espActive then UpdateESP() end
+        task.wait(0.5) 
     end
 end)
