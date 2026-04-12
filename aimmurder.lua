@@ -4,44 +4,54 @@ local StarterGui = game:GetService("StarterGui")
 
 local localPlayer = Players.LocalPlayer
 local camera = workspace.CurrentCamera
+local projectileSpeed = 250
 
--- THÔNG BÁO DUY NHẤT KHI EXECUTE
 StarterGui:SetCore("SendNotification", {
-    Title = "MM2 Silent Aim",
-    Text = "Hệ thống đã sẵn sàng. Cầm súng để kích hoạt.",
+    Title = "MM2 Smart Aim",
+    Text = "Hệ thống đã sẵn sàng.",
     Duration = 3
 })
 
--- LOGIC TÌM MỤC TIÊU (TƯ DUY NGƯỢC: CHỈ QUÉT KHI CẦM SÚNG)
 local function GetMurderer()
     for _, p in ipairs(Players:GetPlayers()) do
         if p == localPlayer then continue end
         local char = p.Character
+        local backpack = p:FindFirstChild("Backpack")
         if char then
-            -- Chỉ khóa mục tiêu có thực thể "Knife"
-            local hasKnife = char:FindFirstChild("Knife") or p.Backpack:FindFirstChild("Knife")
+            local hasKnife = char:FindFirstChild("Knife") or (backpack and backpack:FindFirstChild("Knife"))
             local hrp = char:FindFirstChild("HumanoidRootPart")
             local hum = char:FindFirstChildOfClass("Humanoid")
-            
             if hasKnife and hrp and hum and hum.Health > 0 then
-                return hrp
+                return hrp, hum
             end
         end
     end
-    return nil
+    return nil, nil
 end
 
--- VÒNG LẶP XỬ LÝ VẬT LÝ CAMERA
 RunService.RenderStepped:Connect(function()
     local char = localPlayer.Character
     local tool = char and char:FindFirstChildOfClass("Tool")
+    local localHum = char and char:FindFirstChildOfClass("Humanoid")
     
-    -- Điều kiện: Đang cầm Gun
     if tool and tool.Name == "Gun" then
-        local target = GetMurderer()
-        if target then
-            -- Prediction: Dự đoán vị trí dựa trên vận tốc để bắn không trượt
-            local predictedPos = target.Position + (target.AssemblyLinearVelocity * 0.03)
+        local targetHrp, targetHum = GetMurderer()
+        if targetHrp and localHum then
+            local distance = (targetHrp.Position - char.HumanoidRootPart.Position).Magnitude
+            local timeToHit = distance / projectileSpeed
+            
+            local predictedPos = targetHrp.Position + (targetHrp.AssemblyLinearVelocity * timeToHit)
+            
+            local state = localHum:GetState()
+            if state == Enum.HumanoidStateType.Jumping or state == Enum.HumanoidStateType.Freefall then
+                local accuracyDrop = distance / 50
+                predictedPos = predictedPos + Vector3.new(
+                    math.random(-1, 1) * accuracyDrop,
+                    math.random(-1, 1) * accuracyDrop,
+                    math.random(-1, 1) * accuracyDrop
+                )
+            end
+            
             camera.CFrame = CFrame.new(camera.CFrame.Position, predictedPos)
         end
     end
