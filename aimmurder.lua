@@ -1,26 +1,30 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local StarterGui = game:GetService("StarterGui")
 
-local lp = Players.LocalPlayer
-local mouse = lp:GetMouse()
+local localPlayer = Players.LocalPlayer
 local camera = workspace.CurrentCamera
+local aimActive = false
 
-local aimActive = true -- Mặc định bật
+-- 1. THÔNG BÁO (NOTIFICATION)
+local function Notify(msg)
+    StarterGui:SetCore("SendNotification", {
+        Title = "MM2 Aimlock",
+        Text = msg,
+        Duration = 2
+    })
+end
 
--- LOGIC TƯ DUY NGƯỢC: CHỈ QUÉT KHI CẦN THIẾT
-local function GetMurderer()
+-- 2. TÌM MỤC TIÊU (MURDER) - TƯ DUY NGƯỢC
+local function GetMurder()
     for _, p in ipairs(Players:GetPlayers()) do
-        if p == lp then continue end
-        
-        -- Kiểm tra dao trong Backpack hoặc Character
+        if p == localPlayer then continue end
         local char = p.Character
-        local hasKnife = (char and char:FindFirstChild("Knife")) or (p.Backpack:FindFirstChild("Knife"))
-        
-        if hasKnife and char and char:FindFirstChild("HumanoidRootPart") then
-            -- Kiểm tra nếu Murderer còn sống
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            if hum and hum.Health > 0 then
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            -- Kiểm tra dao trong Inventory hoặc trên tay
+            local hasKnife = p.Backpack:FindFirstChild("Knife") or char:FindFirstChild("Knife")
+            if hasKnife then
                 return char.HumanoidRootPart
             end
         end
@@ -28,30 +32,30 @@ local function GetMurderer()
     return nil
 end
 
--- XỬ LÝ AIM (SMOOTH & OPTIMIZED)
-RunService.RenderStepped:Connect(function()
-    if not aimActive then return end
+-- 3. LOGIC AIMLOCK (SHIFT LOCK STYLE)
+RunService:BindToRenderStep("MM2_Aimlock", Enum.RenderPriority.Camera.Value + 1, function()
+    -- Kiểm tra nếu đang cầm súng (Gun)
+    local char = localPlayer.Character
+    local holdingGun = char and char:FindFirstChild("Gun")
     
-    -- Tư duy ngược: Chỉ chạy logic Aim khi cầm "Gun" trên tay
-    local char = lp.Character
-    if char and char:FindFirstChild("Gun") then
-        local target = GetMurderer()
-        
+    if holdingGun then
+        local target = GetMurder()
         if target then
-            -- Dự đoán vị trí (Prediction logic đơn giản để bắn trúng khi đối thủ chạy)
-            local targetPos = target.Position + (target.AssemblyLinearVelocity * 0.15)
+            if not aimActive then
+                aimActive = true
+                Notify("Đã khóa mục tiêu: MURDER")
+            end
             
-            -- Chế độ Aim thẳng vào mục tiêu (Smooth Camera)
-            camera.CFrame = CFrame.new(camera.CFrame.Position, targetPos)
+            -- Xử lý Camera hướng thẳng vào mục tiêu
+            local lookAt = CFrame.new(camera.CFrame.Position, target.Position)
+            camera.CFrame = lookAt
+        else
+            if aimActive then
+                aimActive = false
+                Notify("Mất dấu Murder...")
+            end
         end
-    end
-end)
-
--- Nút bấm bật/tắt nhanh (Phím L)
-UserInputService.InputBegan:Connect(function(input, gpe)
-    if gpe then return end
-    if input.KeyCode == Enum.KeyCode.L then
-        aimActive = not aimActive
-        print("Aimlock Status: " .. tostring(aimActive))
+    else
+        aimActive = false
     end
 end)
