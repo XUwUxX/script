@@ -1,63 +1,48 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
 local StarterGui = game:GetService("StarterGui")
 
 local localPlayer = Players.LocalPlayer
 local camera = workspace.CurrentCamera
-local aiming = false
 
--- THÔNG BÁO
-local function Notify(msg)
-    StarterGui:SetCore("SendNotification", {
-        Title = "Silent Aim",
-        Text = msg,
-        Duration = 2
-    })
-end
+-- THÔNG BÁO DUY NHẤT KHI EXECUTE
+StarterGui:SetCore("SendNotification", {
+    Title = "MM2 Silent Aim",
+    Text = "Hệ thống đã sẵn sàng. Cầm súng để kích hoạt.",
+    Duration = 3
+})
 
--- LOGIC TÌM MURDER (TƯ DUY NGƯỢC)
+-- LOGIC TÌM MỤC TIÊU (TƯ DUY NGƯỢC: CHỈ QUÉT KHI CẦM SÚNG)
 local function GetMurderer()
     for _, p in ipairs(Players:GetPlayers()) do
         if p == localPlayer then continue end
         local char = p.Character
         if char then
-            -- Kiểm tra xem có Knife trong túi hoặc trên tay không
+            -- Chỉ khóa mục tiêu có thực thể "Knife"
             local hasKnife = char:FindFirstChild("Knife") or p.Backpack:FindFirstChild("Knife")
-            if hasKnife and char:FindFirstChild("HumanoidRootPart") then
-                local hum = char:FindFirstChildOfClass("Humanoid")
-                if hum and hum.Health > 0 then
-                    return char.HumanoidRootPart
-                end
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            
+            if hasKnife and hrp and hum and hum.Health > 0 then
+                return hrp
             end
         end
     end
     return nil
 end
 
--- VÒNG LẶP AIMBOT
+-- VÒNG LẶP XỬ LÝ VẬT LÝ CAMERA
 RunService.RenderStepped:Connect(function()
-    -- Chỉ chạy khi cầm Gun trên tay
-    local tool = localPlayer.Character and localPlayer.Character:FindFirstChildOfClass("Tool")
+    local char = localPlayer.Character
+    local tool = char and char:FindFirstChildOfClass("Tool")
+    
+    -- Điều kiện: Đang cầm Gun
     if tool and tool.Name == "Gun" then
         local target = GetMurderer()
-        
         if target then
-            if not aiming then
-                aiming = true
-                Notify("Đã khóa mục tiêu: MURDER")
-            end
-            
-            -- Tính toán góc nhìn (Smooth)
-            local targetPos = target.Position + (target.AssemblyLinearVelocity * 0.15) -- Dự đoán vị trí di chuyển
-            camera.CFrame = CFrame.new(camera.CFrame.Position, targetPos)
-        else
-            if aiming then
-                aiming = false
-                Notify("Mất dấu Murderer")
-            end
+            -- Prediction: Dự đoán vị trí dựa trên vận tốc để bắn không trượt
+            local predictedPos = target.Position + (target.AssemblyLinearVelocity * 0.18)
+            camera.CFrame = CFrame.new(camera.CFrame.Position, predictedPos)
         end
-    else
-        aiming = false
     end
 end)
