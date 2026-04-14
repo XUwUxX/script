@@ -1,155 +1,148 @@
-local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
+local Lighting = game:GetService("Lighting")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
-local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
 
-local fullbrightEnabled = false
-local speedEnabled = false
-local speedValue = 32
-
--- CẤU HÌNH MÀU SẮC
-local COLORS = {
-    Background = Color3.fromRGB(15, 15, 20),
-    AccentOn = Color3.fromRGB(0, 200, 100),
-    AccentOff = Color3.fromRGB(50, 50, 60),
-    Text = Color3.fromRGB(240, 240, 240),
-    Title = Color3.fromRGB(255, 255, 255)
+-- State Management
+local State = {
+    FullBright = false,
+    NoShadow = false,
+    SpeedHack = false,
+    WalkSpeed = 16,
+    OriginalLighting = {}
 }
 
--- Xóa UI cũ nếu đã tồn tại để tránh trùng lặp
-if CoreGui:FindFirstChild("ModernHorrorUtility") then
-    CoreGui:FindFirstChild("ModernHorrorUtility"):Destroy()
+-- Backup Original Lighting
+for _, prop in ipairs({"Brightness", "ClockTime", "FogEnd", "GlobalShadows", "Ambient", "OutdoorAmbient"}) do
+    State.OriginalLighting[prop] = Lighting[prop]
 end
 
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "ModernHorrorUtility"
-screenGui.Parent = CoreGui
-screenGui.ResetOnSpawn = false
+-- Create GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "HorrorUtility"
+ScreenGui.Parent = CoreGui
+ScreenGui.ResetOnSpawn = false
 
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 220, 0, 260)
-mainFrame.Position = UDim2.new(0.5, -110, 0.5, -130)
-mainFrame.BackgroundColor3 = COLORS.Background
-mainFrame.BackgroundTransparency = 0.2
-mainFrame.BorderSizePixel = 0
-mainFrame.Active = true
-mainFrame.Draggable = true
-mainFrame.Parent = screenGui
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 220, 0, 300)
+MainFrame.Position = UDim2.new(0.5, -110, 0.5, -150)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
 
-local uiStroke = Instance.new("UIStroke")
-uiStroke.Color = Color3.fromRGB(255, 255, 255)
-uiStroke.Transparency = 0.8
-uiStroke.Thickness = 1
-uiStroke.Parent = mainFrame
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = MainFrame
 
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 12)
-corner.Parent = mainFrame
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.Text = "HORROR UTILITY"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.BackgroundTransparency = 1
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 16
+Title.Parent = MainFrame
 
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 50)
-title.Text = "H O R R O R"
-title.TextColor3 = COLORS.Title
-title.BackgroundTransparency = 1
-title.Font = Enum.Font.GothamBold
-title.TextSize = 20
-title.Parent = mainFrame
+local Container = Instance.new("ScrollingFrame")
+Container.Size = UDim2.new(1, -20, 1, -50)
+Container.Position = UDim2.new(0, 10, 0, 45)
+Container.BackgroundTransparency = 1
+Container.CanvasSize = UDim2.new(0, 0, 0, 350)
+Container.ScrollBarThickness = 2
+Container.Parent = MainFrame
 
-local function CreateButton(text, yPos, callback)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -40, 0, 45)
-    btn.Position = UDim2.new(0, 20, 0, yPos)
-    btn.BackgroundColor3 = COLORS.AccentOff
-    btn.BackgroundTransparency = 0.1
-    btn.Text = text
-    btn.TextColor3 = COLORS.Text
-    btn.Font = Enum.Font.GothamMedium
-    btn.TextSize = 14
-    btn.AutoButtonColor = false
-    btn.Parent = mainFrame
-    
-    local btnCorner = Instance.new("UICorner")
-    btnCorner.CornerRadius = UDim.new(0, 8)
-    btnCorner.Parent = btn
+local UIList = Instance.new("UIListLayout")
+UIList.Padding = UDim.new(0, 8)
+UIList.Parent = Container
 
-    btn.MouseEnter:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundTransparency = 0}):Play()
+local function CreateToggle(text, callback)
+    local Button = Instance.new("TextButton")
+    Button.Size = UDim2.new(1, 0, 0, 35)
+    Button.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+    Button.Text = text .. ": OFF"
+    Button.TextColor3 = Color3.fromRGB(200, 200, 200)
+    Button.Font = Enum.Font.Gotham
+    Button.TextSize = 14
+    Button.BorderSizePixel = 0
+    Button.Parent = Container
+
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 4)
+    Corner.Parent = Button
+
+    local active = false
+    Button.MouseButton1Click:Connect(function()
+        active = not active
+        Button.Text = text .. (active and ": ON" or ": OFF")
+        Button.TextColor3 = active and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(200, 200, 200)
+        callback(active)
     end)
-    btn.MouseLeave:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundTransparency = 0.1}):Play()
-    end)
-    
-    btn.MouseButton1Click:Connect(function()
-        callback(btn)
-    end)
-    
-    return btn
+    return Button
 end
 
-local brightBtn
-brightBtn = CreateButton("SANG: TAT", 60, function()
-    fullbrightEnabled = not fullbrightEnabled
-    if fullbrightEnabled then
-        TweenService:Create(brightBtn, TweenInfo.new(0.3), {BackgroundColor3 = COLORS.AccentOn}):Play()
-        brightBtn.Text = "SANG: BAT"
-    else
-        TweenService:Create(brightBtn, TweenInfo.new(0.3), {BackgroundColor3 = COLORS.AccentOff}):Play()
-        brightBtn.Text = "SANG: TAT"
-    end
-end)
-
-local speedBtn
-speedBtn = CreateButton("SPEED: TAT", 115, function()
-    speedEnabled = not speedEnabled
-    if speedEnabled then
-        TweenService:Create(speedBtn, TweenInfo.new(0.3), {BackgroundColor3 = COLORS.AccentOn}):Play()
-        speedBtn.Text = "SPEED: BAT"
-    else
-        TweenService:Create(speedBtn, TweenInfo.new(0.3), {BackgroundColor3 = COLORS.AccentOff}):Play()
-        speedBtn.Text = "SPEED: TAT"
-    end
-end)
-
-local closeBtn = CreateButton("AN MENU", 185, function()
-    mainFrame.Visible = false
-end)
-closeBtn.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
-
-local openBtn = Instance.new("TextButton")
-openBtn.Size = UDim2.new(0, 60, 0, 30)
-openBtn.Position = UDim2.new(0, 10, 0, 10)
-openBtn.BackgroundColor3 = COLORS.Background
-openBtn.Text = "OPEN"
-openBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-openBtn.Font = Enum.Font.GothamBold
-openBtn.TextSize = 12
-openBtn.Parent = screenGui
-openBtn.Visible = false
-
-local openCorner = Instance.new("UICorner")
-openCorner.CornerRadius = UDim.new(0, 6)
-openCorner.Parent = openBtn
-
-closeBtn.MouseButton1Click:Connect(function() openBtn.Visible = true end)
-openBtn.MouseButton1Click:Connect(function()
-    mainFrame.Visible = true
-    openBtn.Visible = false
-end)
-
+-- FullBright Logic
 RunService.RenderStepped:Connect(function()
-    if fullbrightEnabled then
+    if State.FullBright then
         Lighting.Brightness = 2
         Lighting.ClockTime = 14
-        Lighting.GlobalShadows = false
-        Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+        Lighting.FogEnd = 100000
+        Lighting.GlobalShadows = not State.NoShadow and Lighting.GlobalShadows or false
+        Lighting.Ambient = Color3.fromRGB(255, 255, 255)
     end
+    
+    if State.SpeedHack and humanoid then
+        humanoid.WalkSpeed = State.WalkSpeed
+    end
+end)
 
-    local char = player.Character
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-    if hum then
-        hum.WalkSpeed = speedEnabled and speedValue or 16
+-- Toggles Implementation
+CreateToggle("FullBright", function(val)
+    State.FullBright = val
+    if not val then
+        for prop, value in pairs(State.OriginalLighting) do
+            Lighting[prop] = value
+        end
     end
+end)
+
+CreateToggle("No Shadows", function(val)
+    State.NoShadow = val
+    Lighting.GlobalShadows = not val
+end)
+
+CreateToggle("Speed Hack (25)", function(val)
+    State.SpeedHack = val
+    State.WalkSpeed = val and 25 or 16
+    if humanoid then humanoid.WalkSpeed = State.WalkSpeed end
+end)
+
+CreateToggle("Infinite Jump", function(val)
+    State.InfJump = val
+end)
+
+UserInputService.JumpRequest:Connect(function()
+    if State.InfJump and humanoid then
+        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+    end
+end)
+
+-- Toggle GUI Visibility
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if not gpe and input.KeyCode == Enum.KeyCode.RightControl then
+        ScreenGui.Enabled = not ScreenGui.Enabled
+    end
+end)
+
+-- Keep settings after death
+player.CharacterAdded:Connect(function(char)
+    character = char
+    humanoid = char:WaitForChild("Humanoid")
 end)
