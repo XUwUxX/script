@@ -10,7 +10,6 @@ local fullbrightEnabled = false
 local speedEnabled = false
 local speedValue = 32
 
--- CẤU HÌNH GIAO DIỆN HIỆN ĐẠI
 local COLORS = {
     Background = Color3.fromRGB(15, 15, 20),
     AccentOn = Color3.fromRGB(0, 200, 100),
@@ -24,12 +23,11 @@ screenGui.Name = "ModernHorrorUtility"
 screenGui.Parent = CoreGui
 screenGui.ResetOnSpawn = false
 
--- KHUNG CHÍNH LÀM MỜ (GLASSMORPHISM)
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 220, 0, 260)
 mainFrame.Position = UDim2.new(0.5, -110, 0.5, -130)
 mainFrame.BackgroundColor3 = COLORS.Background
-mainFrame.BackgroundTransparency = 0.25 -- Trong suốt một phần
+mainFrame.BackgroundTransparency = 0.25
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
 mainFrame.Draggable = true
@@ -42,10 +40,9 @@ uiStroke.Thickness = 1
 uiStroke.Parent = mainFrame
 
 local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 12) -- Bo góc vừa phải
+corner.CornerRadius = UDim.new(0, 12)
 corner.Parent = mainFrame
 
--- BÓNG ĐỔ (DROP SHADOW)
 local shadow = Instance.new("ImageLabel")
 shadow.Name = "Shadow"
 shadow.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -65,11 +62,10 @@ title.Size = UDim2.new(1, 0, 0, 50)
 title.Text = "H O R R O R"
 title.TextColor3 = COLORS.Title
 title.BackgroundTransparency = 1
-title.Font = Enum.Font.GothamBlack -- Font chữ đẹp, dày
+title.Font = Enum.Font.GothamBlack
 title.TextSize = 20
 title.Parent = mainFrame
 
--- HÀM TẠO NÚT BẤM CÓ HIỆU ỨNG TWEEN (MƯỢT)
 local function CreateButton(text, yPos, callback)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, -40, 0, 45)
@@ -86,7 +82,6 @@ local function CreateButton(text, yPos, callback)
     btnCorner.CornerRadius = UDim.new(0, 8)
     btnCorner.Parent = btn
 
-    -- Hiệu ứng Hover
     btn.MouseEnter:Connect(function()
         TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundTransparency = 0}):Play()
     end)
@@ -95,7 +90,6 @@ local function CreateButton(text, yPos, callback)
     end)
     
     btn.MouseButton1Click:Connect(function()
-        -- Hiệu ứng Click
         btn.Size = UDim2.new(1, -44, 0, 41)
         btn.Position = UDim2.new(0, 22, 0, yPos + 2)
         task.wait(0.1)
@@ -107,7 +101,6 @@ local function CreateButton(text, yPos, callback)
     return btn
 end
 
--- TẠO CÁC NÚT TÍNH NĂNG
 local brightBtn
 brightBtn = CreateButton("Sáng: Tắt", 60, function()
     fullbrightEnabled = not fullbrightEnabled
@@ -135,18 +128,17 @@ end)
 local closeBtn = CreateButton("Ẩn Menu", 185, function()
     mainFrame.Visible = false
 end)
-closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50) -- Màu đỏ cho nút ẩn
+closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 
--- NÚT MỞ LẠI MENU
 local openBtn = Instance.new("TextButton")
 openBtn.Size = UDim2.new(0, 45, 0, 45)
 openBtn.Position = UDim2.new(0, 15, 0, 15)
 openBtn.BackgroundColor3 = COLORS.Background
 openBtn.BackgroundTransparency = 0.25
-openBtn.Text = "👁"
+openBtn.Text = "MENU"
 openBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 openBtn.Font = Enum.Font.GothamBold
-openBtn.TextSize = 20
+openBtn.TextSize = 12
 openBtn.Parent = screenGui
 openBtn.Visible = false
 
@@ -166,7 +158,6 @@ openBtn.MouseButton1Click:Connect(function()
     openBtn.Visible = false
 end)
 
--- LOGIC XỬ LÝ (Tối ưu bằng RunService)
 RunService.RenderStepped:Connect(function()
     if fullbrightEnabled then
         Lighting.Brightness = 2
@@ -176,17 +167,9 @@ RunService.RenderStepped:Connect(function()
         Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
     end
 
-    if speedEnabled then
-        local char = player.Character
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if hum then
-            hum.WalkSpeed = speedValue
-        end
-    else
-        local char = player.Character
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if hum then
-            hum.WalkSpeed = 16
-        end
+    local char = player.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.WalkSpeed = speedEnabled and speedValue or 16
     end
 end)
