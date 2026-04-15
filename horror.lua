@@ -1,71 +1,235 @@
-local p, l, r, u, t, c = game:GetService("Players").LocalPlayer, game:GetService("Lighting"), game:GetService("RunService"), game:GetService("UserInputService"), game:GetService("TweenService"), game:GetService("CoreGui")
-local s, o = {f = false, n = false, s = false, j = false}, {b = l.Brightness, c = l.ClockTime, g = l.GlobalShadows, a = l.Ambient}
+local Players = game:GetService("Players")
+local Lighting = game:GetService("Lighting")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+local TweenService = game:GetService("TweenService")
 
-local g = Instance.new("ScreenGui", c)
-local b = Instance.new("Frame", g)
-b.Size, b.Position, b.BackgroundColor3, b.BorderSizePixel, b.ClipsDescendants = UDim2.fromOffset(450, 300), UDim2.fromScale(.5, .5), Color3.fromRGB(22, 22, 26), 0, true
-b.AnchorPoint = Vector2.new(.5, .5)
-Instance.new("UICorner", b).CornerRadius = UDim.new(0, 10)
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
 
--- Sidebar (Thanh bên)
-local sb = Instance.new("Frame", b)
-sb.Size, sb.BackgroundColor3, sb.BorderSizePixel = UDim2.new(0, 130, 1, 0), Color3.fromRGB(28, 29, 34), 0
+-- State Management
+local State = {
+    FullBright = false,
+    NoShadow = false,
+    SpeedHack = false,
+    WalkSpeed = 16,
+    OriginalLighting = {}
+}
 
-local tit = Instance.new("TextLabel", sb)
-tit.Size, tit.Text, tit.TextColor3, tit.Font, tit.TextSize, tit.BackgroundTransparency = UDim2.new(1, 0, 0, 40), "KEVINZ STYLE", Color3.fromRGB(0, 200, 255), 4, 14, 1
+-- Backup Original Lighting
+for _, prop in ipairs({"Brightness", "ClockTime", "FogEnd", "GlobalShadows", "Ambient", "OutdoorAmbient"}) do
+    State.OriginalLighting[prop] = Lighting[prop]
+end
 
--- Nút đóng (X)
-local cl = Instance.new("TextButton", b)
-cl.Size, cl.Position, cl.BackgroundTransparency, cl.Text, cl.TextColor3, cl.Font, cl.TextSize = UDim2.new(0, 30, 0, 30), UDim2.new(1, -35, 0, 5), 1, "×", Color3.new(1, 0, 0), 3, 25
-cl.ZIndex = 5
-cl.MouseButton1Click:Connect(function() g.Enabled = false end)
+-- Create GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "HorrorUtility"
+ScreenGui.Parent = CoreGui
+ScreenGui.ResetOnSpawn = false
 
--- Container (Nội dung bên phải)
-local ct = Instance.new("ScrollingFrame", b)
-ct.Size, ct.Position, ct.BackgroundTransparency, ct.BorderSizePixel, ct.ScrollBarThickness = UDim2.new(1, -140, 1, -50), UDim2.new(0, 140, 0, 40), 1, 0, 0
-local lyt = Instance.new("UIListLayout", ct)
-lyt.Padding = UDim.new(0, 6)
+-- Acrylic Blur Effect (Background)
+local BlurFrame = Instance.new("Frame")
+BlurFrame.Name = "BlurFrame"
+BlurFrame.Size = UDim2.new(0, 230, 0, 240)
+BlurFrame.Position = UDim2.new(0.5, -115, 0.5, -120)
+BlurFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
+BlurFrame.BackgroundTransparency = 0.15
+BlurFrame.BorderSizePixel = 0
+BlurFrame.Active = true
+BlurFrame.Draggable = true
+BlurFrame.ClipsDescendants = true
+BlurFrame.Parent = ScreenGui
 
-local function x(v, i, k)
-    local f = Instance.new("TextButton", ct)
-    f.Size, f.BackgroundColor3, f.Text, f.TextColor3, f.Font, f.TextSize, f.AutoButtonColor = UDim2.new(1, -10, 0, 35), Color3.fromRGB(35, 36, 42), "  " .. i .. " " .. v, Color3.new(.8, .8, .8), 3, 13, false
-    f.TextXAlignment = 0
-    Instance.new("UICorner", f).CornerRadius = UDim.new(0, 6)
+local BlurCorner = Instance.new("UICorner")
+BlurCorner.CornerRadius = UDim.new(0, 12)
+BlurCorner.Parent = BlurFrame
+
+-- Hiệu ứng viền Gradient
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Thickness = 1.5
+UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+UIStroke.Parent = BlurFrame
+
+local UIGradient = Instance.new("UIGradient")
+UIGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 100)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 200, 255))
+}
+UIGradient.Parent = UIStroke
+
+-- Animation cho viền xoay
+task.spawn(function()
+    while true do
+        UIGradient.Rotation = UIGradient.Rotation + 1
+        task.wait(0.02)
+    end
+end)
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(1, 0, 1, 0)
+MainFrame.BackgroundTransparency = 1
+MainFrame.Parent = BlurFrame
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -40, 0, 45)
+Title.Position = UDim2.new(0, 15, 0, 0)
+Title.Text = "HORROR UTILITY"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.BackgroundTransparency = 1
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 14
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = MainFrame
+
+-- Nút đóng Menu (X)
+local CloseButton = Instance.new("TextButton")
+CloseButton.Name = "CloseButton"
+CloseButton.Size = UDim2.new(0, 28, 0, 28)
+CloseButton.Position = UDim2.new(1, -35, 0, 8)
+CloseButton.BackgroundColor3 = Color3.fromRGB(255, 45, 85)
+CloseButton.Text = "×"
+CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.TextSize = 20
+CloseButton.BorderSizePixel = 0
+CloseButton.Parent = MainFrame
+
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(1, 0)
+CloseCorner.Parent = CloseButton
+
+CloseButton.MouseButton1Click:Connect(function()
+    local fade = TweenService:Create(BlurFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1})
+    fade:Play()
+    fade.Completed:Connect(function() ScreenGui.Enabled = false end)
+end)
+
+local Container = Instance.new("ScrollingFrame")
+Container.Size = UDim2.new(1, -24, 1, -60)
+Container.Position = UDim2.new(0, 12, 0, 50)
+Container.BackgroundTransparency = 1
+Container.CanvasSize = UDim2.new(0, 0, 0, 0)
+Container.AutomaticCanvasSize = Enum.AutomaticSize.Y
+Container.ScrollBarThickness = 0
+Container.Parent = MainFrame
+
+local UIList = Instance.new("UIListLayout")
+UIList.Padding = UDim.new(0, 8)
+UIList.Parent = Container
+
+local function CreateToggle(text, callback)
+    local Button = Instance.new("TextButton")
+    Button.Size = UDim2.new(1, 0, 0, 38)
+    Button.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    Button.BackgroundTransparency = 0.5
+    Button.Text = "   " .. text
+    Button.TextColor3 = Color3.fromRGB(180, 180, 180)
+    Button.Font = Enum.Font.GothamMedium
+    Button.TextSize = 12
+    Button.TextXAlignment = Enum.TextXAlignment.Left
+    Button.BorderSizePixel = 0
+    Button.Parent = Container
+
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 8)
+    Corner.Parent = Button
+
+    local Indicator = Instance.new("Frame")
+    Indicator.Size = UDim2.new(0, 2, 0, 0)
+    Indicator.Position = UDim2.new(0, 0, 0.5, 0)
+    Indicator.BackgroundColor3 = Color3.fromRGB(255, 0, 100)
+    Indicator.BorderSizePixel = 0
+    Indicator.Parent = Button
     
-    local ind = Instance.new("Frame", f)
-    ind.Size, ind.Position, ind.BackgroundColor3, ind.BorderSizePixel = UDim2.new(0, 4, 1, 0), UDim2.new(1, -4, 0, 0), Color3.fromRGB(45, 45, 50), 0
-    Instance.new("UICorner", ind)
+    local IndCorner = Instance.new("UICorner")
+    IndCorner.CornerRadius = UDim.new(1, 0)
+    IndCorner.Parent = Indicator
 
-    f.MouseButton1Click:Connect(function() 
-        s[k] = not s[k] 
-        t:Create(ind, TweenInfo.new(.2), {BackgroundColor3 = s[k] and Color3.fromRGB(0, 255, 120) or Color3.fromRGB(45, 45, 50)}):Play()
-        f.TextColor3 = s[k] and Color3.new(1, 1, 1) or Color3.new(.8, .8, .8)
+    local active = false
+    Button.MouseButton1Click:Connect(function()
+        active = not active
+        local targetColor = active and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(180, 180, 180)
+        local targetIndSize = active and UDim2.new(0, 3, 0.6, 0) or UDim2.new(0, 2, 0, 0)
+        local targetIndPos = active and UDim2.new(0, 0, 0.2, 0) or UDim2.new(0, 0, 0.5, 0)
+
+        TweenService:Create(Button, TweenInfo.new(0.2), {TextColor3 = targetColor}):Play()
+        TweenService:Create(Indicator, TweenInfo.new(0.2), {Size = targetIndSize, Position = targetIndPos}):Play()
+        
+        callback(active)
     end)
+
+    -- Hover effect
+    Button.MouseEnter:Connect(function()
+        TweenService:Create(Button, TweenInfo.new(0.2), {BackgroundTransparency = 0.2}):Play()
+    end)
+    Button.MouseLeave:Connect(function()
+        TweenService:Create(Button, TweenInfo.new(0.2), {BackgroundTransparency = 0.5}):Play()
+    end)
+
+    return Button
 end
 
-local function m(v)
-    t:Create(b, TweenInfo.new(.4, 6), {Size = v and UDim2.fromOffset(450, 300) or UDim2.fromOffset(0, 0)}):Play()
-end
-
--- Danh sách tính năng với Icon
-local cmds = {{"FullBright", "☀", "f"}, {"No Shadows", "🌑", "n"}, {"Speed Hack", "⚡", "s"}, {"Infinite Jump", "🦘", "j"}}
-for _, v in ipairs(cmds) do x(v[1], v[2], v[3]) end
-
--- Logic vận hành (Tư duy ngược)
-r.RenderStepped:Connect(function()
-    l.Brightness, l.ClockTime, l.Ambient = s.f and 2 or o.b, s.f and 14 or o.c, s.f and Color3.new(1, 1, 1) or o.a
-    l.GlobalShadows = not s.n and o.g or false
-    local c = p.Character
-    if c and c:FindFirstChild("Humanoid") then c.Humanoid.WalkSpeed = s.s and 35 or 16 end
+-- FullBright Logic
+RunService.RenderStepped:Connect(function()
+    if State.FullBright then
+        Lighting.Brightness = 2
+        Lighting.ClockTime = 14
+        Lighting.FogEnd = 100000
+        Lighting.GlobalShadows = not State.NoShadow and Lighting.GlobalShadows or false
+        Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+    end
+    
+    if State.SpeedHack and humanoid then
+        humanoid.WalkSpeed = State.WalkSpeed
+    end
 end)
 
-u.JumpRequest:Connect(function() 
-    local h = p.Character and p.Character:FindFirstChildOfClass("Humanoid")
-    if s.j and h then h:ChangeState(3) end 
+-- Toggles Implementation
+CreateToggle("HACK SÁNG (FULLBRIGHT)", function(val)
+    State.FullBright = val
+    if not val then
+        for prop, value in pairs(State.OriginalLighting) do
+            Lighting[prop] = value
+        end
+    end
 end)
 
-u.InputBegan:Connect(function(i, p) 
-    if not p and i.KeyCode == Enum.KeyCode.RightControl then g.Enabled = not g.Enabled m(g.Enabled) end 
+CreateToggle("XÓA BÓNG ĐỔ (NO SHADOW)", function(val)
+    State.NoShadow = val
+    Lighting.GlobalShadows = not val
 end)
 
-m(true)
+CreateToggle("TĂNG TỐC CHẠY (SPEED)", function(val)
+    State.SpeedHack = val
+    State.WalkSpeed = val and 25 or 16
+    if humanoid then humanoid.WalkSpeed = State.WalkSpeed end
+end)
+
+CreateToggle("NHẢY VÔ HẠN (INF JUMP)", function(val)
+    State.InfJump = val
+end)
+
+UserInputService.JumpRequest:Connect(function()
+    if State.InfJump and humanoid then
+        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+    end
+end)
+
+-- Toggle GUI Visibility (RightControl)
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if not gpe and input.KeyCode == Enum.KeyCode.RightControl then
+        ScreenGui.Enabled = not ScreenGui.Enabled
+        if ScreenGui.Enabled then
+            BlurFrame.Size = UDim2.new(0, 0, 0, 0)
+            TweenService:Create(BlurFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 230, 0, 240)}):Play()
+        end
+    end
+end)
+
+player.CharacterAdded:Connect(function(char)
+    character = char
+    humanoid = char:WaitForChild("Humanoid")
+end)
