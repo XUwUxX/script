@@ -1,11 +1,8 @@
 --[[
-    KevinzHub UI Library v3
-    - Gộp console vào sidebar
-    - Avatar trên search bar
-    - iOS 18 style toggle/button
-    - Version badge gold shimmer
-    - Kéo thả mượt, mobile support
-    - Tự động log khi khởi động
+    KevinzHub UI Library v3.1 (Fixed)
+    - Console tích hợp sidebar, avatar trên search
+    - iOS 18 toggle/button, version badge vàng shimmer
+    - Kéo thả mượt, mobile & PC, tự log khi mở window
 ]]
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -14,7 +11,7 @@ local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-local C = { -- Colors
+local C = {
     Bg      = Color3.fromRGB(18,18,22),
     Top     = Color3.fromRGB(24,24,30),
     Side    = Color3.fromRGB(22,23,28),
@@ -34,10 +31,10 @@ local C = { -- Colors
     LogBg   = Color3.fromRGB(26,28,34),
     Gold    = Color3.fromRGB(255,215,0)
 }
-local VERSION = "3.0"
-local T = {Fade=0.15, Tween=0.18, Press=0.06, NotifIn=0.2, NotifOut=0.28} -- Timings
+local VERSION = "3.1"
+local T = {Fade=0.15, Tween=0.18, Press=0.06}
 
-local function Rounded(props) -- Tạo frame bo góc + stroke
+local function Rounded(props)
     local f = Instance.new("Frame")
     for k,v in pairs(props) do f[k] = v end
     f.BorderSizePixel = 0
@@ -47,31 +44,31 @@ local function Rounded(props) -- Tạo frame bo góc + stroke
     return f
 end
 
-local function iOSBtn(btn, bg, hov, prs) -- Hiệu ứng nút iOS 18
+local function iOSBtn(btn, bg, hov, prs)
     local hl = Instance.new("Frame", btn)
     hl.BackgroundTransparency, hl.Size, hl.ZIndex = 1, UDim2.new(1,0,1,0), 99
     Instance.new("UICorner", hl).CornerRadius = UDim.new(0,10)
-    local function anim(from, to, tr, prop)
-        TweenService:Create(btn, TweenInfo.new(T.Fade, Enum.EasingStyle.Quint), {[prop or "BackgroundColor3"]=to}):Play()
+    local function anim(to, tr)
+        TweenService:Create(btn, TweenInfo.new(T.Fade, Enum.EasingStyle.Quint), {BackgroundColor3=to}):Play()
         TweenService:Create(hl, TweenInfo.new(T.Fade, Enum.EasingStyle.Quint), {BackgroundTransparency=tr}):Play()
     end
-    btn.MouseEnter:Connect(function() anim(bg, hov, 0.88) end)
-    btn.MouseLeave:Connect(function() anim(hov, bg, 1) end)
+    btn.MouseEnter:Connect(function() anim(hov or bg, 0.88) end)
+    btn.MouseLeave:Connect(function() anim(bg, 1) end)
     btn.InputBegan:Connect(function(i)
         if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
-            anim(hov or bg, prs, 0.75)
+            anim(prs, 0.75)
             local snd = Instance.new("Sound"); snd.SoundId = "rbxassetid://535716488"; snd.Volume = 1; snd.Parent = btn; snd:Play()
             task.delay(0.1, function() snd:Destroy() end)
         end
     end)
     btn.InputEnded:Connect(function(i)
         if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
-            anim(prs, bg, 1)
+            anim(bg, 1)
         end
     end)
 end
 
-local function dragify(obj) -- Kéo thả mượt
+local function dragify(obj)
     local drag, start, pos, input
     obj.InputBegan:Connect(function(i)
         if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
@@ -90,21 +87,20 @@ end
 local KevinzHub = {}
 local UI = {}
 
--- Console log mini trong sidebar (có thể expand)
+-- Tạo mini console có thể mở rộng
 local function createMiniConsole(sidebar)
     local con = Rounded{
         Name="Console", Parent=sidebar, Size=UDim2.new(1,-8,0,24), BackgroundColor3=C.LogBg,
-        Position=UDim2.new(0,4,1,-30)
+        Position=UDim2.new(0,4,1,-30), LayoutOrder=999
     }
-    con.LayoutOrder = 999
     local open, logs = false, {}
     local scroll = Rounded{
         Name="LogScroll", Parent=con, Visible=false, Size=UDim2.new(1,-4,0,100), Position=UDim2.new(0,2,0,26),
-        BackgroundColor3=C.LogBg, ClipsDescendants=true
+        BackgroundColor3=C.LogBg, ClipsDescendants=true, ZIndex=5
     }
-    scroll.ZIndex = 5
     local list = Instance.new("UIListLayout", scroll)
     list.SortOrder, list.Padding = Enum.SortOrder.LayoutOrder, UDim.new(0,2)
+
     local toggle = Instance.new("TextButton", con)
     toggle.Text, toggle.Font, toggle.TextSize, toggle.TextColor3 = "▼ Console", Enum.Font.GothamBold, 12, C.Text
     toggle.BackgroundTransparency, toggle.Size, toggle.Position = 1, UDim2.new(1,-20,0,24), UDim2.new(0,4,0,0)
@@ -119,13 +115,17 @@ local function createMiniConsole(sidebar)
         arrow.Rotation = open and 180 or 0
         con.Size = open and UDim2.new(1,-8,0,24+math.min(#logs*22+8, 120)) or UDim2.new(1,-8,0,24)
     end)
+
+    -- Phương thức thêm log
     function con:AddLog(text, color)
         table.insert(logs, text)
         local lbl = Instance.new("TextLabel", scroll)
         lbl.Text, lbl.Font, lbl.TextSize, lbl.TextColor3 = text, Enum.Font.Code, 11, color or C.Text
         lbl.BackgroundTransparency, lbl.Size, lbl.TextXAlignment = 1, UDim2.new(1,0,0,22), Enum.TextXAlignment.Left
         lbl.LayoutOrder = #logs
-        if open then con.Size = UDim2.new(1,-8,0,24+math.min(#logs*22+8, 120)) end
+        if open then
+            con.Size = UDim2.new(1,-8,0,24+math.min(#logs*22+8, 120))
+        end
     end
     return con
 end
@@ -151,16 +151,15 @@ function KevinzHub:MakeWindow(opt)
     title.BackgroundTransparency, title.Position, title.Size = 1, UDim2.new(0,44,0.5,-10), UDim2.new(0,200,0,20)
     title.TextXAlignment = Enum.TextXAlignment.Left
 
-    -- Version badge shimmer gold
+    -- Version badge vàng shimmer
     local badge = Rounded{
         Name="Version", Parent=top, Size=UDim2.new(0,0,0,20), Position=UDim2.new(0,44,0.5,-10),
         BackgroundColor3=C.Gold, BackgroundTransparency=0.25
     }
-    badge.Size = UDim2.new(0,30,0,20)
     local badgeTxt = Instance.new("TextLabel", badge)
     badgeTxt.Text, badgeTxt.Font, badgeTxt.TextSize, badgeTxt.TextColor3 = "v"..VERSION, Enum.Font.GothamBold, 11, C.Gold
-    badgeTxt.BackgroundTransparency, badgeTxt.Size = 1, UDim2.new(1,-6,1,0)
-    badgeTxt.Position, badgeTxt.TextXAlignment = UDim2.new(0,3,0,0), Enum.TextXAlignment.Center
+    badgeTxt.BackgroundTransparency, badgeTxt.Size, badgeTxt.TextXAlignment = 1, UDim2.new(1,-6,1,0), Enum.TextXAlignment.Center
+    badgeTxt.Position = UDim2.new(0,3,0,0)
     local shimmer = Instance.new("Frame", badge)
     shimmer.BackgroundColor3, shimmer.BorderSizePixel = Color3.fromRGB(255,255,200), 0
     shimmer.Size, shimmer.Position, shimmer.BackgroundTransparency = UDim2.new(0,8,1,0), UDim2.new(0,-10,0,0), 0.7
@@ -177,7 +176,7 @@ function KevinzHub:MakeWindow(opt)
         badge.Size = UDim2.new(0, badgeTxt.TextBounds.X + 14, 0, 20)
     end)
 
-    -- Close/Minimize buttons
+    -- Nút Close/Minimize (iOS style)
     local function makeTopBtn(parent, text, posX, cb)
         local btn = Rounded{
             Name=text, Parent=parent, Size=UDim2.new(0,28,0,28), Position=UDim2.new(1,posX,0.5,-14), BackgroundColor3=C.BtnBg
@@ -208,7 +207,7 @@ function KevinzHub:MakeWindow(opt)
         end)
         if UserInputService.TouchEnabled then rest.TouchTap:Connect(function() win.Visible = true; rest:Destroy() end) end
     end)
-    makeTopBtn(top, "✕", -30, function()
+    makeTopBtn(top, "X", -30, function()
         KevinzHub:Destroy()
         print("[KevinzHub] UI Destroyed | Version "..VERSION)
         game:GetService("StarterGui"):SetCore("SendNotification", {Title="KevinzHub", Text="UI đã tắt hoàn toàn", Duration=2, Icon="rbxassetid://11836181348"})
@@ -243,7 +242,7 @@ function KevinzHub:MakeWindow(opt)
     username.BackgroundTransparency, username.Position, username.Size = 1, UDim2.new(0,38,0,10), UDim2.new(1,-44,0,20)
     username.TextXAlignment = Enum.TextXAlignment.Left
 
-    -- Search bar (dưới avatar)
+    -- Search bar
     local search = Instance.new("TextBox", sidebar)
     search.Name, search.PlaceholderText, search.Text = "Search", "  🔍  Tìm tab...", ""
     search.Size, search.LayoutOrder = UDim2.new(1,-8,0,24), 1
@@ -251,12 +250,16 @@ function KevinzHub:MakeWindow(opt)
     search.ClearTextOnFocus, search.BorderSizePixel = false, 0
     Instance.new("UICorner", search).CornerRadius = UDim.new(0,8)
 
-    -- Mini console
-    local miniConsole = createMiniConsole(sidebar)
+    -- Mini console (gán vào UI.console)
+    UI.console = createMiniConsole(sidebar)
 
-    -- Tab system
+    -- Tự động log khi tạo window
+    KevinzHub:Log("System", "KevinzHub UI v"..VERSION.." đã sẵn sàng", Color3.fromRGB(144,238,144))
+    KevinzHub:Log("Core", "Kéo thả & responsive hoạt động", Color3.fromRGB(173,216,230))
+
+    -- Hệ thống tab
     local tabs, contents = {}, {}
-    local activeTab, scrollY = nil, 0
+    local activeTab = nil
     local function selectTab(name)
         for n,btn in pairs(tabs) do
             local isActive = (n == name)
@@ -275,7 +278,6 @@ function KevinzHub:MakeWindow(opt)
     contentArea.Name, contentArea.BackgroundTransparency, contentArea.ClipsDescendants = "ContentArea", 1, true
     contentArea.Position, contentArea.Size = UDim2.new(0,164,0,38), UDim2.new(1,-172,1,-46)
 
-    -- Methods
     local Window = {}
     function Window:MakeTab(tabOpt)
         local btn = Rounded{
@@ -342,15 +344,14 @@ function KevinzHub:MakeWindow(opt)
                 return btn
             end
 
-            function Section:AddToggle(opt) -- iOS 18 Style
+            function Section:AddToggle(opt)
                 local container = Instance.new("Frame", sec)
                 container.BackgroundTransparency, container.Size, container.LayoutOrder = 1, UDim2.new(1,0,0,28), order
                 order += 1
                 local bg = Rounded{
                     Name="ToggleBG", Parent=container, Size=UDim2.new(0,44,0,26), Position=UDim2.new(0,0,0.5,-13),
-                    BackgroundColor3=C.TogOff
+                    BackgroundColor3=opt.Default and C.TogOn or C.TogOff
                 }
-                bg.BackgroundColor3 = opt.Default and C.TogOn or C.TogOff
                 local knob = Rounded{
                     Name="Knob", Parent=bg, Size=UDim2.new(0,22,0,22), Position=UDim2.new(0,1,0,1),
                     BackgroundColor3=Color3.fromRGB(255,255,255)
@@ -460,7 +461,6 @@ function KevinzHub:MakeWindow(opt)
                     Name="Menu", Parent=container, Size=UDim2.new(0,140,0,0), Position=UDim2.new(0,0,1,2), BackgroundColor3=C.SecBg, Visible=false, ZIndex=10
                 }
                 menu.AutomaticSize = Enum.AutomaticSize.Y; menu.ClipsDescendants = true
-                local mList = Instance.new("UIListLayout", menu)
                 local selected = opt.Default or (opt.Values[1] or "")
                 local function buildMenu(vals)
                     menu:ClearAllChildren()
@@ -469,7 +469,7 @@ function KevinzHub:MakeWindow(opt)
                         item.Text, item.Font, item.TextSize, item.TextColor3 = tostring(v), Enum.Font.Gotham, 13, C.Text
                         item.BackgroundTransparency, item.Size, item.AutoButtonColor = 1, UDim2.new(1,0,0,24), false
                         item.TextXAlignment = Enum.TextXAlignment.Left
-                        local pad = Instance.new("UIPadding", item); pad.PaddingLeft = UDim.new(0,8)
+                        Instance.new("UIPadding", item).PaddingLeft = UDim.new(0,8)
                         item.MouseButton1Click:Connect(function()
                             selected = tostring(v); lbl.Text = selected; menu.Visible = false
                             if opt.Callback then opt.Callback(selected) end
@@ -491,12 +491,17 @@ function KevinzHub:MakeWindow(opt)
         return Tab
     end
 
-    function Window:Destroy() KevinzHub:Destroy() end
+    function Window:Destroy()
+        KevinzHub:Destroy()
+    end
+
     return Window
 end
 
 function KevinzHub:Log(module, msg, color)
-    if UI.console then UI.console:AddLog("["..module.."] "..msg, color) end
+    if UI.console and UI.console.AddLog then
+        UI.console:AddLog("["..module.."] "..msg, color)
+    end
     print("[KevinzHub:"..module.."] "..msg)
 end
 
@@ -504,12 +509,5 @@ function KevinzHub:Destroy()
     if UI.screenGui then UI.screenGui:Destroy() end
     UI = {}
 end
-
--- Tự động log khi load UI
-task.spawn(function()
-    task.wait(0.5)
-    KevinzHub:Log("System", "KevinzHub UI v"..VERSION.." đã sẵn sàng", Color3.fromRGB(144,238,144))
-    KevinzHub:Log("Core", "Kéo thả & responsive hoạt động", Color3.fromRGB(173,216,230))
-end)
 
 return KevinzHub
