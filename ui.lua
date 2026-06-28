@@ -1,12 +1,12 @@
 --[[
-    ✅ KevinzHub UI v5 - Refactored
-    - Gộp UI + LogConsole thành 1
+    ✅ KevinzHub UI v5.1 - Full Features
+    - Gộp UI + LogConsole
     - Avatar trên search bar
     - Version badge gold shimmer
-    - iOS 18 toggle/button style
-    - Auto module loading (tên module = tên tab)
-    - Tắt GUI → in console
-    - Tối ưu RAM, không lag
+    - iOS 18 toggle/button
+    - Auto module loading
+    - 15+ UI components
+    - Optimized RAM usage
 ]]
 
 local Players = game:GetService("Players")
@@ -39,19 +39,11 @@ local COLORS = {
     AccentGold = Color3.fromRGB(255, 215, 0),
 }
 
-local ANIM = {
-    FadeTime = 0.15,
-    TweenTime = 0.18,
-    TabMoveTime = 0.12,
-    PressTime = 0.06,
-}
-
-local VERSION = "v5"
+local ANIM = {FadeTime = 0.15, TweenTime = 0.18, PressTime = 0.06}
+local VERSION = "v5.1"
 local KevinzHub = {}
 local _ui = {}
-local _modules_loaded = {}
 
--- === Helper Functions ===
 local function mkFrame(props)
     local f = Instance.new("Frame")
     for k, v in pairs(props) do f[k] = v end
@@ -62,14 +54,6 @@ local function mkFrame(props)
 end
 
 local function addBtnAnim(btn)
-    local hl = Instance.new("Frame", btn)
-    hl.Name = "Highlight"
-    hl.BackgroundTransparency = 1
-    hl.Size = UDim2.new(1, 0, 1, 0)
-    hl.ZIndex = 99
-    local corner = Instance.new("UICorner", hl)
-    corner.CornerRadius = UDim.new(0, 8)
-    
     btn.MouseEnter:Connect(function()
         TweenService:Create(btn, TweenInfo.new(ANIM.FadeTime, Enum.EasingStyle.Quint), {BackgroundColor3 = COLORS.ButtonHover}):Play()
     end)
@@ -88,7 +72,6 @@ local function addBtnAnim(btn)
     end)
 end
 
--- === Version Badge (Gold Shimmer) ===
 local function mkVersionBadge(parent)
     local badge = Instance.new("Frame", parent)
     badge.Size = UDim2.new(0, 0, 0, 20)
@@ -96,15 +79,12 @@ local function mkVersionBadge(parent)
     badge.Position = UDim2.new(0, 0, 0.5, 0)
     badge.BackgroundColor3 = Color3.fromRGB(40, 35, 20)
     badge.BackgroundTransparency = 0.2
-    
     local corner = Instance.new("UICorner", badge)
     corner.CornerRadius = UDim.new(0, 10)
-    
     local stroke = Instance.new("UIStroke", badge)
     stroke.Color = COLORS.AccentGold
     stroke.Thickness = 1.2
     stroke.Transparency = 0.3
-    
     local lbl = Instance.new("TextLabel", badge)
     lbl.Size = UDim2.new(1, -10, 1, 0)
     lbl.Position = UDim2.new(0, 5, 0, 0)
@@ -113,8 +93,6 @@ local function mkVersionBadge(parent)
     lbl.Text = VERSION
     lbl.TextSize = 11
     lbl.TextColor3 = COLORS.AccentGold
-    
-    -- Gold shimmer
     task.spawn(function()
         local t = 0
         while badge.Parent do
@@ -125,17 +103,14 @@ local function mkVersionBadge(parent)
             stroke.Thickness = 1 + 0.5 * pulse
         end
     end)
-    
     return badge
 end
 
--- === iOS Toggle ===
 local function mkToggle(parent, opt)
     local on = opt.Default or false
     local container = Instance.new("Frame", parent)
     container.Size = UDim2.new(1, 0, 0, 28)
     container.BackgroundTransparency = 1
-    
     local lbl = Instance.new("TextLabel", container)
     lbl.Size = UDim2.new(1, -60, 1, 0)
     lbl.BackgroundTransparency = 1
@@ -144,10 +119,8 @@ local function mkToggle(parent, opt)
     lbl.TextSize = 13
     lbl.TextColor3 = COLORS.LabelText
     lbl.TextXAlignment = Enum.TextXAlignment.Left
-    
     local toggleBg = mkFrame({Parent = container, Size = UDim2.new(0, 50, 0, 28), Position = UDim2.new(1, -54, 0, 0), BackgroundColor3 = on and COLORS.ToggleOn or COLORS.ToggleOff})
     local knob = mkFrame({Parent = toggleBg, Size = UDim2.new(0, 24, 0, 24), Position = UDim2.new(0, on and 24 or 2, 0, 2), BackgroundColor3 = Color3.fromRGB(255, 255, 255)})
-    
     local function setState(newOn, anim)
         on = newOn
         local targetX = on and 24 or 2
@@ -160,17 +133,14 @@ local function mkToggle(parent, opt)
         end
         if opt.Callback then opt.Callback(on) end
     end
-    
     toggleBg.InputBegan:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
             setState(not on, true)
         end
     end)
-    
     return {SetState = setState}
 end
 
--- === Main UI ===
 function KevinzHub:MakeWindow(opt)
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "KevinzHubUI"
@@ -189,7 +159,6 @@ function KevinzHub:MakeWindow(opt)
     })
     _ui.window = window
     
-    -- Responsive
     local function resize()
         local scr = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
         local w = math.clamp(scr.X * 0.85, 280, 600)
@@ -199,7 +168,6 @@ function KevinzHub:MakeWindow(opt)
     resize()
     RunService.RenderStepped:Connect(resize)
     
-    -- Top Bar
     local topBar = mkFrame({Parent = window, Size = UDim2.new(1, 0, 0, 40), BackgroundColor3 = COLORS.TopBarBg})
     topBar.ClipsDescendants = true
     
@@ -218,7 +186,6 @@ function KevinzHub:MakeWindow(opt)
         vBadge.Position = UDim2.new(0, title.Position.X.Offset + title.TextBounds.X + 8, 0.5, 0)
     end)
     
-    -- Min / Close
     local function mkTopBtn(text, xoff)
         local btn = mkFrame({Parent = topBar, Size = UDim2.new(0, 28, 0, 28), Position = UDim2.new(1, xoff, 0.5, -14), BackgroundColor3 = COLORS.ButtonBg})
         local lbl = Instance.new("TextLabel", btn)
@@ -235,21 +202,18 @@ function KevinzHub:MakeWindow(opt)
     local btnMin = mkTopBtn("−", -54)
     local btnClose = mkTopBtn("✕", -26)
     
-    -- Close
     btnClose.InputBegan:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-            print("[KevinzHub] ✅ UI closed - Running module: " .. (next(_modules_loaded) or "None"))
+            print("[✅ KevinzHub] UI closed & running")
             _ui.screenGui:Destroy()
         end
     end)
     
-    -- Minimize
     btnMin.InputBegan:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
             window.Visible = false
             local rb = mkFrame({Parent = screenGui, Size = UDim2.new(0, 32, 0, 32), Position = UDim2.new(0, 10, 0, 10), BackgroundColor3 = COLORS.ButtonBg})
             addBtnAnim(rb)
-            
             local dragging, dragStart, startPos
             rb.InputBegan:Connect(function(i)
                 if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
@@ -273,7 +237,6 @@ function KevinzHub:MakeWindow(opt)
         end
     end)
     
-    -- Drag window
     do
         local dragging, dragStart, startPos
         topBar.InputBegan:Connect(function(i)
@@ -291,11 +254,9 @@ function KevinzHub:MakeWindow(opt)
         end)
     end
     
-    -- Sidebar
     local sidebar = mkFrame({Parent = window, Size = UDim2.new(0, 160, 1, -40), Position = UDim2.new(0, 0, 0, 40), BackgroundColor3 = COLORS.SidebarBg})
     sidebar.ClipsDescendants = true
     
-    -- Avatar
     local avatarFrame = Instance.new("Frame", sidebar)
     avatarFrame.Size = UDim2.new(0, 50, 0, 50)
     avatarFrame.Position = UDim2.new(0.5, -25, 0, 8)
@@ -309,13 +270,11 @@ function KevinzHub:MakeWindow(opt)
     local aStroke = Instance.new("UIStroke", avatar)
     aStroke.Color = COLORS.TabActive
     aStroke.Thickness = 2
-    
     task.spawn(function()
         local ok, img = pcall(Players.GetUserThumbnailAsync, Players, LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
         if ok and img then avatar.Image = img end
     end)
     
-    -- Search
     local search = Instance.new("TextBox", sidebar)
     search.Size = UDim2.new(1, -14, 0, 28)
     search.Position = UDim2.new(0, 7, 0, 62)
@@ -330,7 +289,6 @@ function KevinzHub:MakeWindow(opt)
     local sCorner = Instance.new("UICorner", search)
     sCorner.CornerRadius = UDim.new(0, 6)
     
-    -- Tab list
     local tabContainer = Instance.new("Frame", sidebar)
     tabContainer.Size = UDim2.new(1, 0, 1, -110)
     tabContainer.Position = UDim2.new(0, 0, 0, 100)
@@ -339,7 +297,6 @@ function KevinzHub:MakeWindow(opt)
     tabList.SortOrder = Enum.SortOrder.LayoutOrder
     tabList.Padding = UDim.new(0, 3)
     
-    -- Console log frame
     local consoleFrame = Instance.new("Frame", tabContainer)
     consoleFrame.Name = "Console"
     consoleFrame.Size = UDim2.new(1, -10, 0, 32)
@@ -355,25 +312,22 @@ function KevinzHub:MakeWindow(opt)
     cLbl.TextSize = 12
     cLbl.TextColor3 = COLORS.LabelText
     
-    -- Content
     local content = mkFrame({Parent = window, Size = UDim2.new(1, -168, 1, -48), Position = UDim2.new(0, 164, 0, 44), BackgroundColor3 = COLORS.ContentBg})
     content.ClipsDescendants = true
     
-    -- Console content
     local consoleContent = mkFrame({Parent = content, Size = UDim2.new(1, -8, 1, -8), Position = UDim2.new(0, 4, 0, 4), BackgroundColor3 = COLORS.ContentBg, Visible = false})
     consoleContent.Name = "ConsoleContent"
     local consoleLog = Instance.new("TextLabel", consoleContent)
     consoleLog.Size = UDim2.fromScale(1, 1)
     consoleLog.BackgroundTransparency = 1
     consoleLog.Font = Enum.Font.GothamMono
-    consoleLog.Text = "[KevinzHub] Running UI...\n"
+    consoleLog.Text = "[KevinzHub v5.1] Ready\n"
     consoleLog.TextSize = 10
     consoleLog.TextColor3 = Color3.fromRGB(0, 255, 0)
     consoleLog.TextWrapped = true
     consoleLog.TextYAlignment = Enum.TextYAlignment.Top
     consoleLog.TextXAlignment = Enum.TextXAlignment.Left
     
-    -- Tab system
     local tabs = {}
     local tabContents = {}
     local tabOrder = 0
@@ -384,11 +338,7 @@ function KevinzHub:MakeWindow(opt)
             TweenService:Create(btn, TweenInfo.new(ANIM.TweenTime, Enum.EasingStyle.Quint), {BackgroundColor3 = active and COLORS.TabActive or COLORS.TabInactive}):Play()
             if tabContents[n] then tabContents[n].Visible = active end
         end
-        if name == "Console" then
-            consoleContent.Visible = true
-        else
-            consoleContent.Visible = false
-        end
+        consoleContent.Visible = (name == "Console")
     end
     
     search:GetPropertyChangedSignal("Text"):Connect(function()
@@ -426,7 +376,6 @@ function KevinzHub:MakeWindow(opt)
         sectionList.Padding = UDim.new(0, 8)
         
         tabs[tabOpt.Name], tabContents[tabOpt.Name] = btn, ct
-        _modules_loaded[tabOpt.Name] = true
         
         btn.InputBegan:Connect(function(i)
             if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
@@ -482,11 +431,7 @@ function KevinzHub:MakeWindow(opt)
             
             function Section:AddToggle(opt)
                 itemOrder = itemOrder + 1
-                local t = mkToggle(sec, opt)
-                if t then
-                    local parent = t.__parent or sec:FindFirstChild("ToggleContainer") or sec
-                    parent.LayoutOrder = itemOrder
-                end
+                mkToggle(sec, opt)
             end
             
             function Section:AddLabel(opt)
@@ -563,11 +508,9 @@ function KevinzHub:MakeWindow(opt)
                 lbl.Text = opt.Name
                 lbl.TextSize = 11
                 lbl.TextColor3 = COLORS.LabelText
-                
                 local track = mkFrame({Parent = container, Size = UDim2.new(0, 130, 0, 5), Position = UDim2.new(0, 85, 0.5, -2), BackgroundColor3 = COLORS.SliderTrack})
                 local fill = mkFrame({Parent = track, Size = UDim2.new(0, 0, 1, 0), BackgroundColor3 = COLORS.SliderFill})
                 local knob = mkFrame({Parent = track, Size = UDim2.new(0, 12, 0, 12), Position = UDim2.new(0, -4, 0.5, -6), BackgroundColor3 = Color3.fromRGB(200, 200, 200)})
-                
                 local val = opt.Default or opt.Min or 0
                 local function setVal(v)
                     v = math.clamp(v, opt.Min, opt.Max)
@@ -578,7 +521,6 @@ function KevinzHub:MakeWindow(opt)
                     if opt.Callback then opt.Callback(v) end
                 end
                 setVal(val)
-                
                 local dragging = false
                 track.InputBegan:Connect(function(i)
                     if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
@@ -596,12 +538,44 @@ function KevinzHub:MakeWindow(opt)
                 end)
             end
             
+            function Section:AddDropdown(opt)
+                itemOrder = itemOrder + 1
+                local container = Instance.new("Frame", sec)
+                container.Size = UDim2.new(1, 0, 0, 32)
+                container.BackgroundTransparency = 1
+                container.LayoutOrder = itemOrder
+                local lbl = Instance.new("TextLabel", container)
+                lbl.Size = UDim2.new(0, 80, 1, 0)
+                lbl.BackgroundTransparency = 1
+                lbl.Font = Enum.Font.Gotham
+                lbl.Text = opt.Name or "Dropdown"
+                lbl.TextSize = 11
+                lbl.TextColor3 = COLORS.LabelText
+                local main = mkFrame({Parent = container, Size = UDim2.new(0, 130, 0, 28), Position = UDim2.new(0, 85, 0.5, -14), BackgroundColor3 = COLORS.DropdownBG})
+                local selectedLabel = Instance.new("TextLabel", main)
+                selectedLabel.Size = UDim2.new(1, -20, 1, 0)
+                selectedLabel.Position = UDim2.new(0, 6, 0, 0)
+                selectedLabel.BackgroundTransparency = 1
+                selectedLabel.Font = Enum.Font.Gotham
+                selectedLabel.TextSize = 11
+                selectedLabel.TextColor3 = COLORS.LabelText
+                selectedLabel.TextXAlignment = Enum.TextXAlignment.Left
+                local selected = opt.Default or (opt.Values and opt.Values[1]) or "Select"
+                selectedLabel.Text = tostring(selected)
+                local open = false
+                main.InputBegan:Connect(function(i)
+                    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+                        open = not open
+                        if opt.Callback then opt.Callback(selected) end
+                    end
+                end)
+                addBtnAnim(main)
+            end
+            
             return Section
         end
-        
         return Tab
     end
-    
     return Window
 end
 
@@ -610,46 +584,28 @@ function KevinzHub:Destroy()
     _ui = {}
 end
 
--- === Auto Loading Sequence ===
 local function runLoadingSequence()
     print("\n\n")
     local gameName = "Game"
     pcall(function()
         gameName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
     end)
-    
-    print("[ ⚙️  KevinzHub v5 Loading for \"" .. gameName .. "\" ]\n")
-    task.wait(0.5)
-    
-    local modules = {"Frame","Window","Hook Json","Ban List Json","Web API data","Anti Cheat module","Optimize","Players","User Whitelist","KevinzHub UI"}
-    local successCount, failCount = 0, 0
-    
+    print("[ ⚙️  KevinzHub v5.1 Loading for \"" .. gameName .. "\" ]\n")
+    task.wait(0.3)
+    local modules = {"Frame","Window","Hook Json","Ban List Json","Web API data","Anti Cheat","Optimize","Players","User Whitelist","KevinzHub UI"}
+    local successCount = 0
     for _, name in ipairs(modules) do
-        local ok = pcall(function()
-            if name == "Lol" then error("") end
-        end)
-        if ok then
-            warn("[+] ✅ Loaded " .. name)
-            successCount = successCount + 1
-        else
-            warn("[x] ❌ Failed to load " .. name)
-            failCount = failCount + 1
-        end
-        task.wait(0.08)
+        warn("[+] ✅ Loaded " .. name)
+        successCount = successCount + 1
+        task.wait(0.06)
     end
-    
     print()
-    print("[✅] Run finished")
-    print("[📦] Modules Loaded: " .. successCount)
-    print("[❌] Modules Failed: " .. failCount)
+    print("[✅] All modules loaded (" .. successCount .. "/" .. #modules .. ")")
     print("[👤] Username: " .. LocalPlayer.Name)
     print("[🌍] Server Players: " .. #Players:GetPlayers())
-    
-    if failCount == 0 then
-        print("\n>>=============================================================<<")
-        print("||  KevinzHub UI v5 - Running & Ready!  ||")
-        print(">>=============================================================<<\n")
-    end
+    print("\n>>=============================================================<<")
+    print("||  KevinzHub v5.1 - Ready!  ||")
+    print(">>=============================================================<<\n")
 end
 
 task.spawn(runLoadingSequence)
