@@ -320,7 +320,7 @@ function KevinzHub:MakeWindow(opt)
     local consoleLog = Instance.new("TextLabel", consoleContent)
     consoleLog.Size = UDim2.fromScale(1, 1)
     consoleLog.BackgroundTransparency = 1
-    consoleLog.Font = Enum.Font.GothamMono
+    consoleLog.Font = Enum.Font.Gotham
     consoleLog.Text = "[KevinzHub v5.1] Ready\n"
     consoleLog.TextSize = 10
     consoleLog.TextColor3 = Color3.fromRGB(0, 255, 0)
