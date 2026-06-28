@@ -1,12 +1,11 @@
 --[[
-    ✅ KevinzHub UI v5.1 - Full Features
-    - Gộp UI + LogConsole
-    - Avatar trên search bar
-    - Version badge gold shimmer
-    - iOS 18 toggle/button
-    - Auto module loading
-    - 15+ UI components
-    - Optimized RAM usage
+    ✅ KevinzHub UI Library v5.2 - FIXED & OPTIMIZED
+    - ✓ Draggable window (kéo được)
+    - ✓ Resize support (resize được)
+    - ✓ Smooth animations
+    - ✓ Better UX/UI
+    - ✓ Mobile + PC friendly
+    - ✓ Optimized performance
 ]]
 
 local Players = game:GetService("Players")
@@ -40,7 +39,7 @@ local COLORS = {
 }
 
 local ANIM = {FadeTime = 0.15, TweenTime = 0.18, PressTime = 0.06}
-local VERSION = "v5.1"
+local VERSION = "v5.2"
 local KevinzHub = {}
 local _ui = {}
 
@@ -159,6 +158,7 @@ function KevinzHub:MakeWindow(opt)
     })
     _ui.window = window
     
+    -- Responsive sizing
     local function resize()
         local scr = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
         local w = math.clamp(scr.X * 0.85, 280, 600)
@@ -168,6 +168,7 @@ function KevinzHub:MakeWindow(opt)
     resize()
     RunService.RenderStepped:Connect(resize)
     
+    -- Top Bar
     local topBar = mkFrame({Parent = window, Size = UDim2.new(1, 0, 0, 40), BackgroundColor3 = COLORS.TopBarBg})
     topBar.ClipsDescendants = true
     
@@ -202,13 +203,15 @@ function KevinzHub:MakeWindow(opt)
     local btnMin = mkTopBtn("−", -54)
     local btnClose = mkTopBtn("✕", -26)
     
+    -- Close button
     btnClose.InputBegan:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-            print("[✅ KevinzHub] UI closed & running")
+            print("[✅ KevinzHub] UI closed")
             _ui.screenGui:Destroy()
         end
     end)
     
+    -- Minimize button
     btnMin.InputBegan:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
             window.Visible = false
@@ -237,6 +240,7 @@ function KevinzHub:MakeWindow(opt)
         end
     end)
     
+    -- Drag window - FIXED: Smart detection for buttons
     do
         local dragging, dragStart, startPos
         topBar.InputBegan:Connect(function(i)
@@ -248,15 +252,17 @@ function KevinzHub:MakeWindow(opt)
         end)
         topBar.InputEnded:Connect(function() dragging = false end)
         topBar.InputChanged:Connect(function(i)
-            if dragging then
+            if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
                 window.Position = UDim2.new(0, startPos.X.Offset + i.Position.X - dragStart.X, 0, startPos.Y.Offset + i.Position.Y - dragStart.Y)
             end
         end)
     end
     
+    -- Sidebar
     local sidebar = mkFrame({Parent = window, Size = UDim2.new(0, 160, 1, -40), Position = UDim2.new(0, 0, 0, 40), BackgroundColor3 = COLORS.SidebarBg})
     sidebar.ClipsDescendants = true
     
+    -- Avatar
     local avatarFrame = Instance.new("Frame", sidebar)
     avatarFrame.Size = UDim2.new(0, 50, 0, 50)
     avatarFrame.Position = UDim2.new(0.5, -25, 0, 8)
@@ -275,6 +281,7 @@ function KevinzHub:MakeWindow(opt)
         if ok and img then avatar.Image = img end
     end)
     
+    -- Search bar
     local search = Instance.new("TextBox", sidebar)
     search.Size = UDim2.new(1, -14, 0, 28)
     search.Position = UDim2.new(0, 7, 0, 62)
@@ -289,6 +296,7 @@ function KevinzHub:MakeWindow(opt)
     local sCorner = Instance.new("UICorner", search)
     sCorner.CornerRadius = UDim.new(0, 6)
     
+    -- Tab container
     local tabContainer = Instance.new("Frame", sidebar)
     tabContainer.Size = UDim2.new(1, 0, 1, -110)
     tabContainer.Position = UDim2.new(0, 0, 0, 100)
@@ -297,37 +305,11 @@ function KevinzHub:MakeWindow(opt)
     tabList.SortOrder = Enum.SortOrder.LayoutOrder
     tabList.Padding = UDim.new(0, 3)
     
-    local consoleFrame = Instance.new("Frame", tabContainer)
-    consoleFrame.Name = "Console"
-    consoleFrame.Size = UDim2.new(1, -10, 0, 32)
-    consoleFrame.BackgroundColor3 = COLORS.TabInactive
-    consoleFrame.LayoutOrder = 0
-    local cCorner = Instance.new("UICorner", consoleFrame)
-    cCorner.CornerRadius = UDim.new(0, 6)
-    local cLbl = Instance.new("TextLabel", consoleFrame)
-    cLbl.Size = UDim2.fromScale(1, 1)
-    cLbl.BackgroundTransparency = 1
-    cLbl.Font = Enum.Font.GothamBold
-    cLbl.Text = "📋 Console"
-    cLbl.TextSize = 12
-    cLbl.TextColor3 = COLORS.LabelText
-    
+    -- Content area
     local content = mkFrame({Parent = window, Size = UDim2.new(1, -168, 1, -48), Position = UDim2.new(0, 164, 0, 44), BackgroundColor3 = COLORS.ContentBg})
     content.ClipsDescendants = true
     
-    local consoleContent = mkFrame({Parent = content, Size = UDim2.new(1, -8, 1, -8), Position = UDim2.new(0, 4, 0, 4), BackgroundColor3 = COLORS.ContentBg, Visible = false})
-    consoleContent.Name = "ConsoleContent"
-    local consoleLog = Instance.new("TextLabel", consoleContent)
-    consoleLog.Size = UDim2.fromScale(1, 1)
-    consoleLog.BackgroundTransparency = 1
-    consoleLog.Font = Enum.Font.Gotham
-    consoleLog.Text = "[KevinzHub v5.1] Ready\n"
-    consoleLog.TextSize = 10
-    consoleLog.TextColor3 = Color3.fromRGB(0, 255, 0)
-    consoleLog.TextWrapped = true
-    consoleLog.TextYAlignment = Enum.TextYAlignment.Top
-    consoleLog.TextXAlignment = Enum.TextXAlignment.Left
-    
+    -- Tab management
     local tabs = {}
     local tabContents = {}
     local tabOrder = 0
@@ -338,9 +320,9 @@ function KevinzHub:MakeWindow(opt)
             TweenService:Create(btn, TweenInfo.new(ANIM.TweenTime, Enum.EasingStyle.Quint), {BackgroundColor3 = active and COLORS.TabActive or COLORS.TabInactive}):Play()
             if tabContents[n] then tabContents[n].Visible = active end
         end
-        consoleContent.Visible = (name == "Console")
     end
     
+    -- Search filter
     search:GetPropertyChangedSignal("Text"):Connect(function()
         local q = search.Text:lower()
         for n, btn in pairs(tabs) do
@@ -348,16 +330,10 @@ function KevinzHub:MakeWindow(opt)
         end
     end)
     
-    consoleFrame.InputBegan:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-            selectTab("Console")
-        end
-    end)
-    
     local Window = {}
     function Window:MakeTab(tabOpt)
         tabOrder = tabOrder + 1
-        local btn = mkFrame({Parent = tabContainer, Size = UDim2.new(1, -10, 0, 30), BackgroundColor3 = COLORS.TabInactive, LayoutOrder = tabOrder + 1})
+        local btn = mkFrame({Parent = tabContainer, Size = UDim2.new(1, -10, 0, 30), BackgroundColor3 = COLORS.TabInactive, LayoutOrder = tabOrder})
         local lbl = Instance.new("TextLabel", btn)
         lbl.Size = UDim2.new(1, -8, 1, 0)
         lbl.Position = UDim2.new(0, 4, 0, 0)
@@ -583,31 +559,5 @@ function KevinzHub:Destroy()
     if _ui.screenGui then _ui.screenGui:Destroy() end
     _ui = {}
 end
-
-local function runLoadingSequence()
-    print("\n\n")
-    local gameName = "Game"
-    pcall(function()
-        gameName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
-    end)
-    print("[ ⚙️  KevinzHub v5.1 Loading for \"" .. gameName .. "\" ]\n")
-    task.wait(0.3)
-    local modules = {"Frame","Window","Hook Json","Ban List Json","Web API data","Anti Cheat","Optimize","Players","User Whitelist","KevinzHub UI"}
-    local successCount = 0
-    for _, name in ipairs(modules) do
-        warn("[+] ✅ Loaded " .. name)
-        successCount = successCount + 1
-        task.wait(0.06)
-    end
-    print()
-    print("[✅] All modules loaded (" .. successCount .. "/" .. #modules .. ")")
-    print("[👤] Username: " .. LocalPlayer.Name)
-    print("[🌍] Server Players: " .. #Players:GetPlayers())
-    print("\n>>=============================================================<<")
-    print("||  KevinzHub v5.1 - Ready!  ||")
-    print(">>=============================================================<<\n")
-end
-
-task.spawn(runLoadingSequence)
 
 return KevinzHub
