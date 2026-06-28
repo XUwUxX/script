@@ -1,10 +1,9 @@
 --[[
-    KHub UI Library v4.0
-    - Mini console trong sidebar (dạng table)
-    - Avatar trên search bar
-    - iOS 18 style toggle/button
-    - Version badge vàng shimmer
-    - Kéo thả mượt, mobile & PC, tự log khởi động
+    KHub UI v5.0 - Đã sửa lỗi kéo thả, scroll, mobile, loại bỏ badge
+    - Kéo cửa sổ chỉ qua topbar, không xung đột với các thành phần khác.
+    - Sidebar dùng ScrollingFrame, cuộn mượt cảm ứng & chuột.
+    - Hỗ trợ đầy đủ mobile touch (kéo, bấm, trượt).
+    - Nhẹ, không crash, không lag.
 ]]
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -13,7 +12,7 @@ local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- Màu sắc
+-- Colors
 local C = {
     WinBg   = Color3.fromRGB(18,18,22),
     TopBg   = Color3.fromRGB(22,22,28),
@@ -32,12 +31,11 @@ local C = {
     TabAct  = Color3.fromRGB(52,199,89),
     TabIn   = Color3.fromRGB(35,37,44),
     LogBg   = Color3.fromRGB(26,28,34),
-    Gold    = Color3.fromRGB(255,215,0)
 }
-local VERSION = "4.0"
+local VERSION = "5.0"
 local T = {Fade=0.15, Tween=0.18, Press=0.06}
 
--- Helper tạo frame bo góc + viền
+-- Helper tạo Frame bo góc + viền
 local function Frame(props)
     local f = Instance.new("Frame")
     for k,v in pairs(props) do f[k] = v end
@@ -73,28 +71,11 @@ local function iOSButton(btn, bg, hov, prs)
     end)
 end
 
--- Kéo thả
-local function Dragify(obj)
-    local drag, start, pos, input
-    obj.InputBegan:Connect(function(i)
-        if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
-            drag, start, pos, input = true, i.Position, obj.Position, i
-        end
-    end)
-    obj.InputEnded:Connect(function(i) if i==input then drag=false end end)
-    obj.InputChanged:Connect(function(i)
-        if drag and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
-            local d = i.Position - start
-            obj.Position = UDim2.new(pos.X.Scale, pos.X.Offset+d.X, pos.Y.Scale, pos.Y.Offset+d.Y)
-        end
-    end)
-end
-
--- Mini console (trả về table)
-local function CreateConsole(sidebar)
+-- Mini console (table)
+local function CreateConsole(parent)
     local con = Frame{
-        Name="Console", Parent=sidebar, Size=UDim2.new(1,-8,0,24), BackgroundColor3=C.LogBg,
-        Position=UDim2.new(0,4,1,-30), LayoutOrder=999
+        Name="Console", Parent=parent, Size=UDim2.new(1,-8,0,24), BackgroundColor3=C.LogBg,
+        LayoutOrder=999
     }
     local logs, open = {}, false
     local scroll = Frame{
@@ -119,8 +100,8 @@ local function CreateConsole(sidebar)
         con.Size = open and UDim2.new(1,-8,0,24+math.min(#logs*22+8, 120)) or UDim2.new(1,-8,0,24)
     end)
 
-    local consoleObj = {}
-    function consoleObj:AddLog(text, color)
+    local console = {}
+    function console:AddLog(text, color)
         table.insert(logs, text)
         local lbl = Instance.new("TextLabel", scroll)
         lbl.Text, lbl.Font, lbl.TextSize, lbl.TextColor3 = text, Enum.Font.Code, 11, color or C.Text
@@ -130,62 +111,34 @@ local function CreateConsole(sidebar)
             con.Size = UDim2.new(1,-8,0,24+math.min(#logs*22+8, 120))
         end
     end
-    consoleObj.Frame = con
-    return consoleObj
+    console.Frame = con
+    return console
 end
 
 local KHub = {}
-local UI = {} -- Lưu screenGui, window, console
+local UI = {}
 
 function KHub:MakeWindow(opt)
-    -- ScreenGui
     local gui = Instance.new("ScreenGui")
     gui.Name, gui.ResetOnSpawn, gui.ZIndexBehavior, gui.Parent = "KHubUI", false, Enum.ZIndexBehavior.Global, PlayerGui
     UI.screenGui = gui
 
-    -- Main window
     local win = Frame{
         Name="Main", Parent=gui, AnchorPoint=Vector2.new(0.5,0.5), Position=UDim2.fromScale(0.5,0.5),
         Size=UDim2.new(0,560,0,390), BackgroundColor3=C.WinBg
     }
     UI.window = win
-    Dragify(win)
 
-    -- Top bar
-    local top = Frame{Name="Top", Parent=win, Size=UDim2.new(1,0,0,36), BackgroundColor3=C.TopBg}
-    local title = Instance.new("TextLabel", top)
+    -- ===== TOP BAR (kéo thả) =====
+    local topBar = Frame{Name="Top", Parent=win, Size=UDim2.new(1,0,0,36), BackgroundColor3=C.TopBg}
+    local title = Instance.new("TextLabel", topBar)
     title.Text, title.Font, title.TextSize, title.TextColor3 = opt.Name or "KHub", Enum.Font.GothamBold, 18, C.Text
     title.BackgroundTransparency, title.Position, title.Size = 1, UDim2.new(0,44,0.5,-10), UDim2.new(0,200,0,20)
     title.TextXAlignment = Enum.TextXAlignment.Left
 
-    -- Version badge (vàng shimmer)
-    local badge = Frame{
-        Name="Version", Parent=top, Size=UDim2.new(0,0,0,20), Position=UDim2.new(0,44,0.5,-10),
-        BackgroundColor3=C.Gold, BackgroundTransparency=0.25
-    }
-    local badgeTxt = Instance.new("TextLabel", badge)
-    badgeTxt.Text, badgeTxt.Font, badgeTxt.TextSize, badgeTxt.TextColor3 = "v"..VERSION, Enum.Font.GothamBold, 11, C.Gold
-    badgeTxt.BackgroundTransparency, badgeTxt.Size, badgeTxt.TextXAlignment = 1, UDim2.new(1,-6,1,0), Enum.TextXAlignment.Center
-    badgeTxt.Position = UDim2.new(0,3,0,0)
-    local shimmer = Instance.new("Frame", badge)
-    shimmer.BackgroundColor3, shimmer.BorderSizePixel = Color3.fromRGB(255,255,200), 0
-    shimmer.Size, shimmer.Position, shimmer.BackgroundTransparency = UDim2.new(0,8,1,0), UDim2.new(0,-10,0,0), 0.7
-    Instance.new("UICorner", shimmer).CornerRadius = UDim.new(0,4)
-    task.spawn(function()
-        while badge.Parent do
-            shimmer.Position = UDim2.new(0,-10,0,0)
-            TweenService:Create(shimmer, TweenInfo.new(0.8, Enum.EasingStyle.Linear), {Position=UDim2.new(0,badge.Size.X.Offset+10,0,0)}):Play()
-            task.wait(0.8)
-        end
-    end)
-    title:GetPropertyChangedSignal("Text"):Connect(function()
-        badge.Position = UDim2.new(0, title.Position.X.Offset + title.TextBounds.X + 8, 0.5, -10)
-        badge.Size = UDim2.new(0, badgeTxt.TextBounds.X + 14, 0, 20)
-    end)
-
     -- Nút Min/Close
     local function topBtn(text, posX, cb)
-        local btn = Frame{Name=text, Parent=top, Size=UDim2.new(0,28,0,28), Position=UDim2.new(1,posX,0.5,-14), BackgroundColor3=C.BtnBg}
+        local btn = Frame{Name=text, Parent=topBar, Size=UDim2.new(0,28,0,28), Position=UDim2.new(1,posX,0.5,-14), BackgroundColor3=C.BtnBg}
         local lbl = Instance.new("TextLabel", btn)
         lbl.Text, lbl.Font, lbl.TextSize, lbl.TextColor3 = text, Enum.Font.GothamBold, 16, C.Text
         lbl.BackgroundTransparency, lbl.Size, lbl.TextXAlignment, lbl.TextYAlignment = 1, UDim2.fromScale(1,1), Enum.TextXAlignment.Center, Enum.TextYAlignment.Center
@@ -202,11 +155,27 @@ function KHub:MakeWindow(opt)
         local img = Instance.new("ImageLabel", rest)
         img.Image, img.BackgroundTransparency, img.Size, img.ScaleType = "rbxassetid://1912438810", 1, UDim2.fromScale(1,1), Enum.ScaleType.Fit
         img.ImageColor3 = C.Text
-        iOSButton(rest, C.BtnBg, C.BtnHov, C.BtnPrs); Dragify(rest)
+        iOSButton(rest, C.BtnBg, C.BtnHov, C.BtnPrs)
+        -- Kéo restore button
+        local drag, start, pos
         rest.InputBegan:Connect(function(i)
-            if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then win.Visible=true rest:Destroy() end
+            if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+                drag, start, pos = true, i.Position, rest.Position
+            end
         end)
-        if UserInputService.TouchEnabled then rest.TouchTap:Connect(function() win.Visible=true rest:Destroy() end) end
+        rest.InputEnded:Connect(function() drag=false end)
+        rest.InputChanged:Connect(function(i)
+            if drag and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
+                local delta = i.Position - start
+                rest.Position = UDim2.new(pos.X.Scale, pos.X.Offset+delta.X, pos.Y.Scale, pos.Y.Offset+delta.Y)
+            end
+        end)
+        rest.InputBegan:Connect(function(i)
+            if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+                if not drag then win.Visible = true; rest:Destroy() end
+            end
+        end)
+        if UserInputService.TouchEnabled then rest.TouchTap:Connect(function() win.Visible = true; rest:Destroy() end) end
     end)
     topBtn("✕", -30, function()
         KHub:Destroy()
@@ -214,18 +183,63 @@ function KHub:MakeWindow(opt)
         game:GetService("StarterGui"):SetCore("SendNotification", {Title="KHub", Text="UI đã tắt", Duration=2, Icon="rbxassetid://11836181348"})
     end)
 
-    -- Sidebar
+    -- ===== KÉO CỬA SỔ CHỈ QUA TOPBAR =====
+    local dragging, dragStart, startPos
+    local function onDragStart(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = win.Position
+            input.Changed:Wait()
+        end
+    end
+    local function onDragEnd(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end
+    local function onDragMove(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            win.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end
+    topBar.InputBegan:Connect(onDragStart)
+    topBar.InputEnded:Connect(onDragEnd)
+    UserInputService.InputChanged:Connect(onDragMove) -- để nhận cả mouse movement và touch movement
+    -- Ngăn kéo khi nhấn vào nút
+    for _, btn in ipairs(topBar:GetChildren()) do
+        if btn:IsA("Frame") and btn.Name ~= "Top" then -- các nút Min/Close
+            btn.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    dragging = false -- hủy kéo nếu bấm nút
+                end
+            end)
+        end
+    end
+
+    -- ===== SIDEBAR (ScrollingFrame) =====
     local sbHolder = Instance.new("Frame", win)
     sbHolder.Name, sbHolder.BackgroundTransparency, sbHolder.Position, sbHolder.Size = "SBHolder", 1, UDim2.new(0,0,0,36), UDim2.new(0,160,1,-36)
     local sidebar = Frame{Name="Sidebar", Parent=sbHolder, Size=UDim2.new(1,0,1,0), BackgroundColor3=C.SideBg}
-    sidebar.ClipsDescendants = true
-    local pad = Instance.new("UIPadding", sidebar)
-    pad.PaddingTop, pad.PaddingLeft, pad.PaddingRight = UDim.new(0,8), UDim.new(0,6), UDim.new(0,6)
-    local sList = Instance.new("UIListLayout", sidebar)
-    sList.SortOrder, sList.Padding = Enum.SortOrder.LayoutOrder, UDim.new(0,6)
+    -- Dùng ScrollingFrame để scroll mượt
+    local sf = Instance.new("ScrollingFrame", sidebar)
+    sf.Name, sf.Size, sf.Position = "Scroll", UDim2.new(1,-2,1,-2), UDim2.new(0,1,0,1)
+    sf.BackgroundTransparency, sf.BorderSizePixel, sf.ScrollBarThickness = 1, 0, 4
+    sf.ScrollBarImageColor3 = C.Stroke
+    sf.CanvasSize = UDim2.new(0,0,0,0)
+    sf.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    sf.ScrollingDirection = Enum.ScrollingDirection.Y
+    sf.ElasticBehavior = Enum.ElasticBehavior.WhenScrollable
+    sf.VerticalScrollBarInset = Enum.ScrollBarInset.Always
+    sf.ClipsDescendants = true
+    local sfList = Instance.new("UIListLayout", sf)
+    sfList.SortOrder, sfList.Padding = Enum.SortOrder.LayoutOrder, UDim.new(0,6)
+    local sfPad = Instance.new("UIPadding", sf)
+    sfPad.PaddingTop, sfPad.PaddingLeft, sfPad.PaddingRight = UDim.new(0,8), UDim.new(0,6), UDim.new(0,6)
 
     -- User info (avatar + name)
-    local userFrame = Instance.new("Frame", sidebar)
+    local userFrame = Instance.new("Frame", sf)
     userFrame.Name, userFrame.BackgroundTransparency, userFrame.Size, userFrame.LayoutOrder = "User", 1, UDim2.new(1,0,0,40), 0
     local av = Instance.new("ImageLabel", userFrame)
     av.Name, av.Size, av.Position = "Avatar", UDim2.new(0,32,0,32), UDim2.new(0,0,0,4)
@@ -241,7 +255,7 @@ function KHub:MakeWindow(opt)
     uname.TextXAlignment = Enum.TextXAlignment.Left
 
     -- Search bar
-    local search = Instance.new("TextBox", sidebar)
+    local search = Instance.new("TextBox", sf)
     search.Name, search.PlaceholderText, search.Text = "Search", "🔍 Tìm tab...", ""
     search.Size, search.LayoutOrder = UDim2.new(1,-8,0,24), 1
     search.BackgroundColor3, search.TextColor3, search.Font, search.TextSize = C.SecBg, C.Text, Enum.Font.Gotham, 13
@@ -249,11 +263,11 @@ function KHub:MakeWindow(opt)
     Instance.new("UICorner", search).CornerRadius = UDim.new(0,8)
 
     -- Console
-    UI.console = CreateConsole(sidebar)
+    UI.console = CreateConsole(sf)
 
     -- Tự log
     KHub:Log("System", "KHub UI v"..VERSION.." sẵn sàng", Color3.fromRGB(144,238,144))
-    KHub:Log("Core", "Kéo thả & responsive OK", Color3.fromRGB(173,216,230))
+    KHub:Log("Core", "Kéo thả & scroll mượt", Color3.fromRGB(173,216,230))
 
     -- Hệ thống tab
     local tabs, contents = {}, {}
@@ -271,7 +285,7 @@ function KHub:MakeWindow(opt)
         for n,btn in pairs(tabs) do btn.Visible = (q=="" or n:lower():find(q,1,true)) end
     end)
 
-    -- Content area
+    -- Content area (bên phải)
     local contentArea = Instance.new("Frame", win)
     contentArea.Name, contentArea.BackgroundTransparency, contentArea.ClipsDescendants = "Content", 1, true
     contentArea.Position, contentArea.Size = UDim2.new(0,164,0,38), UDim2.new(1,-172,1,-46)
@@ -279,7 +293,7 @@ function KHub:MakeWindow(opt)
     local Window = {}
     function Window:MakeTab(tabOpt)
         local btn = Frame{
-            Name=tabOpt.Name.."Tab", Parent=sidebar, Size=UDim2.new(1,-8,0,32), LayoutOrder=#tabs+2,
+            Name=tabOpt.Name.."Tab", Parent=sf, Size=UDim2.new(1,-8,0,32), LayoutOrder=#tabs+2,
             BackgroundColor3=C.TabIn
         }
         iOSButton(btn, C.TabIn, C.TabAct, C.TabAct)
@@ -295,7 +309,18 @@ function KHub:MakeWindow(opt)
             Visible=false
         }
         page.ClipsDescendants = true
-        local pList = Instance.new("UIListLayout", page)
+        -- Dùng ScrollingFrame cho nội dung nếu nhiều
+        local pageScroll = Instance.new("ScrollingFrame", page)
+        pageScroll.Size, pageScroll.Position = UDim2.new(1,0,1,0), UDim2.new(0,0,0,0)
+        pageScroll.BackgroundTransparency, pageScroll.BorderSizePixel = 1, 0
+        pageScroll.ScrollBarThickness = 4
+        pageScroll.ScrollBarImageColor3 = C.Stroke
+        pageScroll.CanvasSize = UDim2.new(0,0,0,0)
+        pageScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        pageScroll.ScrollingDirection = Enum.ScrollingDirection.Y
+        pageScroll.ElasticBehavior = Enum.ElasticBehavior.WhenScrollable
+        pageScroll.ClipsDescendants = true
+        local pList = Instance.new("UIListLayout", pageScroll)
         pList.SortOrder, pList.Padding = Enum.SortOrder.LayoutOrder, UDim.new(0,10)
         pList.HorizontalAlignment, pList.VerticalAlignment = Enum.HorizontalAlignment.Center, Enum.VerticalAlignment.Top
 
@@ -312,7 +337,7 @@ function KHub:MakeWindow(opt)
         local Tab = {}
         function Tab:AddSection(secOpt)
             local sec = Frame{
-                Name=secOpt.Name.."Sec", Parent=page, Size=UDim2.new(1,-16,0,0), BackgroundColor3=C.SecBg,
+                Name=secOpt.Name.."Sec", Parent=pageScroll, Size=UDim2.new(1,-16,0,0), BackgroundColor3=C.SecBg,
                 LayoutOrder=#tabs+1
             }
             sec.AutomaticSize = Enum.AutomaticSize.Y
